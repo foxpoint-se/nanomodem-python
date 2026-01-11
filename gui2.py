@@ -239,11 +239,9 @@ class Modem:
         # Convert to meters
         distance_meters = distance_pixels / PIXELS_PER_METER
         
-        # Calculate round-trip time
-        round_trip_time = 2 * distance_meters / SOUND_SPEED
-        
-        # Convert to timestamp (multiply by 10^5, format as 5 digits)
-        timestamp = int(round_trip_time * 100000)
+        # Calculate timestamp using spec formula: R = yyyyy * c * 3.125e-5
+        # Solving for yyyyy: yyyyy = R / (c * 3.125e-5)
+        timestamp = int(round(distance_meters / (SOUND_SPEED * 3.125e-5)))
         timestamp_str = f"{timestamp:05d}"
         
         # Format ID as 3 digits
@@ -277,12 +275,11 @@ class Modem:
             if len(timestamp_str) != 5:
                 return None
             
-            # Convert timestamp back to time
+            # Parse timestamp
             timestamp = int(timestamp_str)
-            round_trip_time = timestamp / 100000.0
             
-            # Calculate distance
-            distance_meters = (round_trip_time * SOUND_SPEED) / 2
+            # Calculate distance using spec formula: R = yyyyy * c * 3.125e-5
+            distance_meters = timestamp * SOUND_SPEED * 3.125e-5
             
             return (target_id, distance_meters)
         except (ValueError, IndexError):
