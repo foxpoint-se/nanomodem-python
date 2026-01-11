@@ -1,4 +1,5 @@
 import tkinter as tk
+from tkinter import ttk
 import argparse
 import threading
 import queue
@@ -7,7 +8,7 @@ from typing import Optional, Protocol, Union, TYPE_CHECKING, cast
 
 # Constants for distance calculation
 PIXELS_PER_METER = 100  # Scale: 100 pixels = 1 meter
-SOUND_SPEED = 1500  # m/s in water
+SOUND_SPEED = 1500  # m/s (default: water, can be changed via GUI)
 
 if TYPE_CHECKING:
     import serial
@@ -311,7 +312,7 @@ class GUI:
         
         # Left side: canvas (3/4) - only show in mock mode
         if self.is_mock_mode:
-            self.canvas = tk.Canvas(self.root, width=800, height=600, bg="white")
+            self.canvas = tk.Canvas(self.root, width=1000, height=600, bg="white")
             self.canvas.pack(side='left', fill='both', expand=True)
             
             # Bind mouse events for dragging
@@ -323,7 +324,7 @@ class GUI:
             pass
         
         # Chat panel (1/4 in mock mode, full width in real mode)
-        chat_frame = tk.Frame(self.root, width=200 if self.is_mock_mode else 800)
+        chat_frame = tk.Frame(self.root, width=300 if self.is_mock_mode else 800)
         chat_frame.pack(side='right' if self.is_mock_mode else 'left', fill='both', expand=True)
         if self.is_mock_mode:
             chat_frame.pack_propagate(False)
@@ -331,6 +332,17 @@ class GUI:
         # Chat view
         self.chat = tk.Text(chat_frame, state='disabled')
         self.chat.pack(fill='both', expand=True, padx=5, pady=5)
+        
+        # Sound speed selector
+        speed_frame = tk.Frame(chat_frame)
+        speed_frame.pack(fill='x', padx=5, pady=(5, 0))
+        tk.Label(speed_frame, text="Sound speed:").pack(side='left', padx=(0, 5))
+        self.speed_var = tk.StringVar(value="1500 m/s (water)")
+        speed_combo = ttk.Combobox(speed_frame, textvariable=self.speed_var, 
+                                   values=["1500 m/s (water)", "340 m/s (air)"],
+                                   state="readonly", width=18)
+        speed_combo.pack(side='left')
+        speed_combo.bind("<<ComboboxSelected>>", self._on_speed_change)
         
         # Input frame
         input_frame = tk.Frame(chat_frame)
@@ -375,6 +387,15 @@ class GUI:
     def _on_canvas_release(self, event) -> None:
         """Handle mouse release - stop dragging."""
         self.dragged_modem = None
+    
+    def _on_speed_change(self, event=None) -> None:
+        """Handle sound speed selection change."""
+        global SOUND_SPEED
+        selection = self.speed_var.get()
+        if "1500" in selection:
+            SOUND_SPEED = 1500
+        elif "340" in selection:
+            SOUND_SPEED = 340
     
     def _poll_serial(self) -> None:
         """Poll serial interface for incoming messages from modem."""
