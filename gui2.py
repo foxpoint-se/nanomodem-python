@@ -307,6 +307,10 @@ class GUI:
         self.modems: list[Modem] = []
         self.dragged_modem: Optional[Modem] = None
         
+        # Message history for arrow key navigation
+        self.message_history: list[str] = []
+        self.history_index: int = -1  # -1 means at end (no history selected)
+        
         # Poll for serial responses
         self._poll_serial()
         
@@ -355,6 +359,8 @@ class GUI:
         self.entry = tk.Entry(input_frame)
         self.entry.pack(side='left', fill='x', expand=True)
         self.entry.bind('<Return>', self.on_submit)
+        self.entry.bind('<Up>', self._on_arrow_up)
+        self.entry.bind('<Down>', self._on_arrow_down)
         
         # Submit button
         submit_btn = tk.Button(input_frame, text="Send", command=self.on_submit)
@@ -437,6 +443,51 @@ class GUI:
         elif "340" in selection:
             SOUND_SPEED = 340
     
+    def _on_arrow_up(self, event) -> None:
+        """Navigate backward through message history."""
+        if not self.message_history:
+            return
+        
+        # If at end, save current text (if any)
+        if self.history_index == -1:
+            current_text = self.entry.get()
+            if current_text:
+                # Don't save if it's the same as last message
+                if not self.message_history or current_text != self.message_history[-1]:
+                    self.message_history.append(current_text)
+        
+        # Move backward in history
+        if self.history_index > 0:
+            self.history_index -= 1
+        elif self.history_index == -1:
+            self.history_index = len(self.message_history) - 1
+        
+        # Display the message
+        if 0 <= self.history_index < len(self.message_history):
+            self.entry.delete(0, 'end')
+            self.entry.insert(0, self.message_history[self.history_index])
+        
+        return "break"  # Prevent default behavior
+    
+    def _on_arrow_down(self, event) -> None:
+        """Navigate forward through message history."""
+        if not self.message_history or self.history_index == -1:
+            return
+        
+        # Move forward in history
+        self.history_index += 1
+        
+        # If at end, clear the field
+        if self.history_index >= len(self.message_history):
+            self.history_index = -1
+            self.entry.delete(0, 'end')
+        else:
+            # Display the message
+            self.entry.delete(0, 'end')
+            self.entry.insert(0, self.message_history[self.history_index])
+        
+        return "break"  # Prevent default behavior
+    
     def _poll_serial(self) -> None:
         """Poll serial interface for incoming messages from modem."""
         if self.is_mock_mode:
@@ -475,6 +526,11 @@ class GUI:
             self.chat.insert('end', "> " + text + '\n')
             self.chat.config(state='disabled')
             self.chat.see('end')
+            
+            # Add to history (avoid duplicates if same as last message)
+            if not self.message_history or text != self.message_history[-1]:
+                self.message_history.append(text)
+            self.history_index = -1  # Reset to end of history
             
             # Send command to modem via serial interface
             self.serial_interface.write(text)
