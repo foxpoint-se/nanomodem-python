@@ -1,8 +1,11 @@
 import tkinter as tk
 import argparse
 import threading
-import time
-from typing import Callable, Optional, Protocol
+import queue
+from typing import Optional, Protocol, Union, TYPE_CHECKING, cast
+
+if TYPE_CHECKING:
+    import serial
 
 try:
     import serial
@@ -46,48 +49,44 @@ class MockSerialInterface:
 
 class RealSerialInterface:
     """Real serial interface using pyserial."""
-    def __init__(self, port: str, baud: int = 9600):
+    def __init__(self, port: str, baud: int = 9600) -> None:
         if not SERIAL_AVAILABLE:
             raise ImportError("pyserial not installed. Install with: pip install pyserial")
         
-        self.ser = serial.Serial(port, baud, timeout=0.1)
-        self.buffer = ""
-        self.running = True
+        self.ser: 'serial.Serial' = serial.Serial(port, baud, timeout=0.1)
+        self.message_queue: queue.Queue[str] = queue.Queue()
+        self.running: bool = True
         
-        # Start background thread to read from serial
+        # Start background thread to read from serial using blocking reads
         self.reader_thread = threading.Thread(target=self._read_loop, daemon=True)
         self.reader_thread.start()
     
     def _read_loop(self) -> None:
-        """Background thread to continuously read from serial port."""
+        """Background thread that blocks on readline() until data arrives."""
         while self.running:
-            if self.ser.in_waiting:
-                try:
-                    data = self.ser.read(self.ser.in_waiting).decode('ascii', errors='replace')
-                    self.buffer += data
-                except Exception:
-                    pass
-            time.sleep(0.01)
+            try:
+                # Blocking read - OS wakes thread when data arrives
+                line = self.ser.readline()
+                if line:
+                    decoded = line.decode('ascii', errors='replace').strip()
+                    if decoded:
+                        self.message_queue.put(decoded)
+            except Exception:
+                # Handle serial errors gracefully
+                if self.running:
+                    continue
+                break
     
     def write(self, data: str) -> None:
         """Computer sends data to modem."""
         self.ser.write(data.encode('ascii'))
     
     def read(self) -> Optional[str]:
-        """Computer reads data from modem (non-blocking)."""
-        # Simple: return data up to newline, or all available data if no newline
-        if not self.buffer:
+        """Computer reads data from modem (non-blocking, from queue)."""
+        try:
+            return self.message_queue.get_nowait()
+        except queue.Empty:
             return None
-        
-        # Split on newline if present (common serial protocol pattern)
-        if '\n' in self.buffer:
-            lines = self.buffer.split('\n', 1)
-            self.buffer = lines[1]
-            return lines[0].strip()
-        
-        # If no newline yet, return None (wait for more data)
-        # This prevents returning incomplete messages
-        return None
     
     def close(self) -> None:
         """Close the serial connection."""
@@ -140,8 +139,8 @@ class AcousticBus:
 
 class Modem:
     def __init__(self, id: str, acoustic_bus: AcousticBus, 
-                 serial_interface: Optional[SerialInterface] = None,
-                 x: int = 100, y: int = 100):
+                 serial_interface: Optional[Union[MockSerialInterface, 'RealSerialInterface']] = None,
+                 x: int = 100, y: int = 100) -> None:
         self.id = id
         self.acoustic_bus = acoustic_bus
         self.serial_interface = serial_interface
@@ -199,7 +198,7 @@ class Modem:
 
     def process_serial_command(self, command: str) -> Optional[str]:
         """Process command received from serial interface."""
-        if not self.serial_interface:
+        if not self.serial_interface or not isinstance(self.serial_interface, MockSerialInterface):
             return None
         
         # Echo command back immediately
@@ -245,7 +244,8 @@ class Modem:
 
 
 class GUI:
-    def __init__(self, serial_interface, host_modem: Optional[Modem] = None):
+    def __init__(self, serial_interface: Union[MockSerialInterface, RealSerialInterface], 
+                 host_modem: Optional[Modem] = None) -> None:
         self.root = tk.Tk()
         self.root.title("GUI")
         self.serial_interface = serial_interface
@@ -330,8 +330,8 @@ class GUI:
         """Poll serial interface for incoming messages from modem."""
         if self.is_mock_mode:
             # Mock mode: process commands through host modem
-            if hasattr(self.serial_interface, 'modem_read'):
-                command = self.serial_interface.modem_read()  # type: ignore
+            if isinstance(self.serial_interface, MockSerialInterface):
+                command = self.serial_interface.modem_read()
                 if command and self.host_modem:
                     self.host_modem.process_serial_command(command)
         
@@ -372,8 +372,11 @@ if __name__ == "__main__":
                         help="Baud rate for serial communication (default: 9600)")
     
     args = parser.parse_args()
+    # Type the args namespace for proper type checking
+    port: str = args.port
+    baud: int = args.baud
     
-    if args.port.lower() == "mock":
+    if port.lower() == "mock":
         # Mock mode: simulated modems with acoustic bus
         acoustic_bus = AcousticBus()
         serial_interface = MockSerialInterface()
@@ -389,8 +392,8 @@ if __name__ == "__main__":
     else:
         # Real mode: actual serial communication
         try:
-            serial_interface = RealSerialInterface(args.port, args.baud)
-            print(f"Connected to {args.port} at {args.baud} baud")
+            serial_interface = RealSerialInterface(port, baud)
+            print(f"Connected to {port} at {baud} baud")
         except Exception as e:
             print(f"Error opening serial port: {e}")
             exit(1)
