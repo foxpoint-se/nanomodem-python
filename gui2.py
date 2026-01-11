@@ -315,6 +315,9 @@ class GUI:
             self.canvas = tk.Canvas(self.root, width=1000, height=600, bg="white")
             self.canvas.pack(side='left', fill='both', expand=True)
             
+            # Draw scale/ruler
+            self._draw_scale()
+            
             # Bind mouse events for dragging
             self.canvas.bind("<Button-1>", self._on_canvas_click)
             self.canvas.bind("<B1-Motion>", self._on_canvas_drag)
@@ -363,6 +366,43 @@ class GUI:
             return  # Only works in mock mode
         self.modems.append(modem)
         modem.init_on_canvas(self.canvas)
+    
+    def _draw_scale(self) -> None:
+        """Draw scale/ruler on canvas showing meters."""
+        if not self.is_mock_mode or not self.canvas:
+            return
+        
+        # Use configured canvas dimensions
+        canvas_width = 1000  # From canvas creation
+        canvas_height = 600  # From canvas creation
+        
+        # Scale parameters
+        tick_length = 10
+        label_offset = 15
+        
+        # Draw X-axis scale (bottom)
+        max_meters_x = int(canvas_width / PIXELS_PER_METER) + 1
+        for meter in range(0, max_meters_x):
+            x = meter * PIXELS_PER_METER
+            if x <= canvas_width:
+                # Draw tick mark
+                self.canvas.create_line(x, canvas_height, x, canvas_height - tick_length, 
+                                       fill="gray", width=1, tags="scale")
+                # Draw label
+                self.canvas.create_text(x, canvas_height - tick_length - label_offset, 
+                                       text=f"{meter}m", fill="gray", tags="scale")
+        
+        # Draw Y-axis scale (left)
+        max_meters_y = int(canvas_height / PIXELS_PER_METER) + 1
+        for meter in range(0, max_meters_y):
+            y = meter * PIXELS_PER_METER
+            if y <= canvas_height:
+                # Draw tick mark
+                self.canvas.create_line(0, y, tick_length, y, 
+                                       fill="gray", width=1, tags="scale")
+                # Draw label
+                self.canvas.create_text(tick_length + label_offset, y, 
+                                       text=f"{meter}m", fill="gray", tags="scale")
     
     def _find_modem_at(self, x: int, y: int) -> Optional[Modem]:
         """Find the modem at the given canvas coordinates."""
