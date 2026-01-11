@@ -1,15 +1,91 @@
 import tkinter as tk
 from typing import Callable, Optional
 
+class SerialInterface:
+    """Interface for computer ↔ host modem communication."""
+    def __init__(self):
+        self.outgoing_queue: list[str] = []  # Messages from computer to modem
+        self.incoming_queue: list[str] = []   # Messages from modem to computer
+    
+    def write(self, data: str) -> None:
+        """Computer sends data to modem."""
+        self.outgoing_queue.append(data)
+    
+    def read(self) -> Optional[str]:
+        """Computer reads data from modem."""
+        if self.incoming_queue:
+            return self.incoming_queue.pop(0)
+        return None
+    
+    def modem_read(self) -> Optional[str]:
+        """Modem reads data from computer."""
+        if self.outgoing_queue:
+            return self.outgoing_queue.pop(0)
+        return None
+    
+    def modem_write(self, data: str) -> None:
+        """Modem sends data to computer."""
+        self.incoming_queue.append(data)
+
+
+class AcousticBus:
+    """Bus for modem ↔ modem acoustic communication."""
+    def __init__(self):
+        self.modems: dict[str, 'Modem'] = {}  # ID -> Modem mapping
+    
+    def register(self, modem: 'Modem') -> None:
+        """Register a modem with the bus."""
+        self.modems[modem.id] = modem
+    
+    def send(self, message: str, from_modem: 'Modem') -> Optional[str]:
+        """Send message from one modem to another, return response."""
+        # Parse target ID from command
+        target_id = self._extract_target_id(message)
+        if target_id is None:
+            return None
+        
+        # Find target modem (try exact match, then try without leading zeros)
+        target_modem = self.modems.get(target_id)
+        if target_modem is None:
+            # Try without leading zeros
+            target_id_stripped = target_id.lstrip('0') or '0'
+            target_modem = self.modems.get(target_id_stripped)
+        
+        if target_modem is None:
+            return None
+        
+        # Deliver message to target modem and get response
+        return target_modem.handle_acoustic_message(message, from_modem)
+    
+    def _extract_target_id(self, message: str) -> Optional[str]:
+        """Extract target modem ID from command string."""
+        # $P123 -> "123"
+        # $P002 -> "002"
+        # $M123 -> "123"
+        if len(message) >= 5 and message[0] == '$':
+            # Commands like $P, $M, $U, $V, $T, $E
+            if message[1] in 'PMUVTE':
+                # Extract ID (3 digits after command prefix)
+                return message[2:5]
+        return None
+
+
 class Modem:
-    def __init__(self, id: str, x: int = 100, y: int = 100):
+    def __init__(self, id: str, acoustic_bus: AcousticBus, 
+                 serial_interface: Optional[SerialInterface] = None,
+                 x: int = 100, y: int = 100):
         self.id = id
+        self.acoustic_bus = acoustic_bus
+        self.serial_interface = serial_interface
         self.x = x
         self.y = y
         self.box_id: Optional[int] = None  # Canvas ID for the rectangle
         self.label_id: Optional[int] = None  # Canvas ID for the text label
         self.canvas: Optional[tk.Canvas] = None  # Reference to canvas for updates
         self.size = 50  # Size of the rectangle
+        
+        # Register with acoustic bus
+        acoustic_bus.register(self)
 
     def init_on_canvas(self, canvas: tk.Canvas) -> None:
         """Initialize the modem's visual representation on the canvas."""
@@ -53,22 +129,66 @@ class Modem:
         self.update_label()
         return f"#{id}"
 
-    def command(self, command: str) -> str:
+    def process_serial_command(self, command: str) -> Optional[str]:
+        """Process command received from serial interface."""
+        if not self.serial_interface:
+            return None
+        
+        # Echo command back immediately
+        self.serial_interface.modem_write(command)
+        
+        # Handle local commands
         if command.startswith("$A"):
             resp = self.set_id(command[2:])
+            self.serial_interface.modem_write(resp)
             return resp
-        return ""
+        
+        # Handle acoustic commands (ping)
+        if command.startswith("$P"):
+            response = self.acoustic_bus.send(command, self)
+            if response:
+                self.serial_interface.modem_write(response)
+                return response
+            else:
+                # Timeout case - would send #TO after 4 seconds
+                # For now, just return None
+                return None
+        
+        return None
+
+    def handle_acoustic_message(self, message: str, from_modem: 'Modem') -> Optional[str]:
+        """Handle message received via acoustic bus."""
+        # Handle ping command
+        if message.startswith("$P"):
+            # Respond with #RxxxTyyyyy where xxx is this modem's ID
+            # For now, hardcoded timestamp
+            timestamp = "12345"  # Hardcoded for now
+            # Format ID as 3 digits (e.g., "002" not "2")
+            formatted_id = self.id.zfill(3) if len(self.id) < 3 else self.id[:3]
+            response = f"#R{formatted_id}T{timestamp}"
+            return response
+        
+        return None
+
+    def command(self, command: str) -> str:
+        """Legacy method - redirects to process_serial_command."""
+        result = self.process_serial_command(command)
+        return result if result else ""
 
 
 class GUI:
-    def __init__(self, on_submit: Callable[[str], None]):
+    def __init__(self, serial_interface: SerialInterface, host_modem: Modem):
         self.root = tk.Tk()
         self.root.title("GUI")
-        self.on_input_submit = on_submit
+        self.serial_interface = serial_interface
+        self.host_modem = host_modem
         
         # Store modems and track dragging
         self.modems: list[Modem] = []
         self.dragged_modem: Optional[Modem] = None
+        
+        # Poll for serial responses
+        self._poll_serial()
         
         # Left side: canvas (3/4)
         self.canvas = tk.Canvas(self.root, width=800, height=600, bg="white")
@@ -130,19 +250,36 @@ class GUI:
         """Handle mouse release - stop dragging."""
         self.dragged_modem = None
     
+    def _poll_serial(self) -> None:
+        """Poll serial interface for incoming messages from modem."""
+        # Check for commands from computer to modem
+        command = self.serial_interface.modem_read()
+        if command:
+            self.host_modem.process_serial_command(command)
+        
+        # Check for responses from modem to computer
+        response = self.serial_interface.read()
+        if response:
+            self.chat.config(state='normal')
+            self.chat.insert('end', response + '\n')
+            self.chat.config(state='disabled')
+            self.chat.see('end')
+        
+        # Schedule next poll
+        self.root.after(50, self._poll_serial)
+    
     def on_submit(self, event=None) -> None:
         """Handle input submission."""
         text = self.entry.get()
         if text:
             self.chat.config(state='normal')
             self.chat.insert('end', "> " + text + '\n')
-
-            resp = self.on_input_submit(text)
-            if resp:
-                self.chat.insert('end', resp + '\n')
-    
             self.chat.config(state='disabled')
             self.chat.see('end')
+            
+            # Send command to modem via serial interface
+            self.serial_interface.write(text)
+            
             self.entry.delete(0, 'end')
     
     def run(self) -> None:
@@ -150,13 +287,16 @@ class GUI:
 
 
 if __name__ == "__main__":
-    host_modem = Modem("host", x=150, y=200)
-    beacon_modem = Modem("2", x=400, y=200)
-
-    def handle_command(command: str) -> str:
-        return host_modem.command(command)
-
-    gui = GUI(on_submit=handle_command)
+    # Create communication infrastructure
+    acoustic_bus = AcousticBus()
+    serial_interface = SerialInterface()
+    
+    # Create modems
+    host_modem = Modem("host", acoustic_bus, serial_interface, x=150, y=200)
+    beacon_modem = Modem("002", acoustic_bus, x=400, y=200)
+    
+    # Create GUI
+    gui = GUI(serial_interface, host_modem)
     gui.add_modem(host_modem)
     gui.add_modem(beacon_modem)
     gui.run()
