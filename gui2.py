@@ -8,10 +8,12 @@ class Modem:
         self.y = y
         self.box_id: Optional[int] = None  # Canvas ID for the rectangle
         self.label_id: Optional[int] = None  # Canvas ID for the text label
+        self.canvas: Optional[tk.Canvas] = None  # Reference to canvas for updates
         self.size = 50  # Size of the rectangle
 
-    def draw(self, canvas) -> None:
-        """Draw the modem as a rectangle on the canvas."""
+    def init_on_canvas(self, canvas: tk.Canvas) -> None:
+        """Initialize the modem's visual representation on the canvas."""
+        self.canvas = canvas  # Store canvas reference
         if self.box_id is not None:
             self._update_position(canvas)
         else:
@@ -28,7 +30,7 @@ class Modem:
                 tags="modem"
             )
 
-    def _update_position(self, canvas) -> None:
+    def _update_position(self, canvas: tk.Canvas) -> None:
         """Update the visual position of the modem on canvas."""
         if self.box_id is None:
             return
@@ -41,8 +43,14 @@ class Modem:
         if self.label_id is not None:
             canvas.coords(self.label_id, self.x, self.y)
 
+    def update_label(self) -> None:
+        """Update the label text to reflect current ID."""
+        if self.label_id is not None and self.canvas is not None:
+            self.canvas.itemconfig(self.label_id, text=self.id)
+
     def set_id(self, id: str) -> str:
         self.id = id
+        self.update_label()
         return f"#{id}"
 
     def command(self, command: str) -> str:
@@ -94,9 +102,9 @@ class GUI:
         submit_btn.pack(side='right', padx=(5, 0))
     
     def add_modem(self, modem: Modem) -> None:
-        """Add a modem to the canvas and draw it."""
+        """Add a modem to the canvas and initialize its visual representation."""
         self.modems.append(modem)
-        modem.draw(self.canvas)
+        modem.init_on_canvas(self.canvas)
     
     def _find_modem_at(self, x: int, y: int) -> Optional[Modem]:
         """Find the modem at the given canvas coordinates."""
@@ -142,13 +150,13 @@ class GUI:
 
 
 if __name__ == "__main__":
-    host_modem = Modem("1", x=150, y=200)
-    target_modem = Modem("2", x=400, y=200)
+    host_modem = Modem("host", x=150, y=200)
+    beacon_modem = Modem("2", x=400, y=200)
 
     def handle_command(command: str) -> str:
         return host_modem.command(command)
 
     gui = GUI(on_submit=handle_command)
     gui.add_modem(host_modem)
-    gui.add_modem(target_modem)
+    gui.add_modem(beacon_modem)
     gui.run()
