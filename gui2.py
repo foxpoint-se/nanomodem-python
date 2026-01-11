@@ -1,8 +1,24 @@
 import tkinter as tk
-from typing import Callable, Optional
+import argparse
+import threading
+import time
+from typing import Callable, Optional, Protocol
 
-class SerialInterface:
-    """Interface for computer ↔ host modem communication."""
+try:
+    import serial
+    SERIAL_AVAILABLE = True
+except ImportError:
+    SERIAL_AVAILABLE = False
+
+
+class SerialInterface(Protocol):
+    """Protocol for serial communication interface."""
+    def write(self, data: str) -> None: ...
+    def read(self) -> Optional[str]: ...
+
+
+class MockSerialInterface:
+    """Mock interface for computer ↔ host modem communication (simulated)."""
     def __init__(self):
         self.outgoing_queue: list[str] = []  # Messages from computer to modem
         self.incoming_queue: list[str] = []   # Messages from modem to computer
@@ -26,6 +42,58 @@ class SerialInterface:
     def modem_write(self, data: str) -> None:
         """Modem sends data to computer."""
         self.incoming_queue.append(data)
+
+
+class RealSerialInterface:
+    """Real serial interface using pyserial."""
+    def __init__(self, port: str, baud: int = 9600):
+        if not SERIAL_AVAILABLE:
+            raise ImportError("pyserial not installed. Install with: pip install pyserial")
+        
+        self.ser = serial.Serial(port, baud, timeout=0.1)
+        self.buffer = ""
+        self.running = True
+        
+        # Start background thread to read from serial
+        self.reader_thread = threading.Thread(target=self._read_loop, daemon=True)
+        self.reader_thread.start()
+    
+    def _read_loop(self) -> None:
+        """Background thread to continuously read from serial port."""
+        while self.running:
+            if self.ser.in_waiting:
+                try:
+                    data = self.ser.read(self.ser.in_waiting).decode('ascii', errors='replace')
+                    self.buffer += data
+                except Exception:
+                    pass
+            time.sleep(0.01)
+    
+    def write(self, data: str) -> None:
+        """Computer sends data to modem."""
+        self.ser.write(data.encode('ascii'))
+    
+    def read(self) -> Optional[str]:
+        """Computer reads data from modem (non-blocking)."""
+        # Simple: return data up to newline, or all available data if no newline
+        if not self.buffer:
+            return None
+        
+        # Split on newline if present (common serial protocol pattern)
+        if '\n' in self.buffer:
+            lines = self.buffer.split('\n', 1)
+            self.buffer = lines[1]
+            return lines[0].strip()
+        
+        # If no newline yet, return None (wait for more data)
+        # This prevents returning incomplete messages
+        return None
+    
+    def close(self) -> None:
+        """Close the serial connection."""
+        self.running = False
+        if hasattr(self, 'ser'):
+            self.ser.close()
 
 
 class AcousticBus:
@@ -177,11 +245,12 @@ class Modem:
 
 
 class GUI:
-    def __init__(self, serial_interface: SerialInterface, host_modem: Modem):
+    def __init__(self, serial_interface, host_modem: Optional[Modem] = None):
         self.root = tk.Tk()
         self.root.title("GUI")
         self.serial_interface = serial_interface
         self.host_modem = host_modem
+        self.is_mock_mode = host_modem is not None
         
         # Store modems and track dragging
         self.modems: list[Modem] = []
@@ -190,19 +259,24 @@ class GUI:
         # Poll for serial responses
         self._poll_serial()
         
-        # Left side: canvas (3/4)
-        self.canvas = tk.Canvas(self.root, width=800, height=600, bg="white")
-        self.canvas.pack(side='left', fill='both', expand=True)
+        # Left side: canvas (3/4) - only show in mock mode
+        if self.is_mock_mode:
+            self.canvas = tk.Canvas(self.root, width=800, height=600, bg="white")
+            self.canvas.pack(side='left', fill='both', expand=True)
+            
+            # Bind mouse events for dragging
+            self.canvas.bind("<Button-1>", self._on_canvas_click)
+            self.canvas.bind("<B1-Motion>", self._on_canvas_drag)
+            self.canvas.bind("<ButtonRelease-1>", self._on_canvas_release)
+        else:
+            # In real mode, just show chat taking full width
+            pass
         
-        # Bind mouse events for dragging
-        self.canvas.bind("<Button-1>", self._on_canvas_click)
-        self.canvas.bind("<B1-Motion>", self._on_canvas_drag)
-        self.canvas.bind("<ButtonRelease-1>", self._on_canvas_release)
-        
-        # Right side: chat panel (1/4)
-        chat_frame = tk.Frame(self.root, width=200)
-        chat_frame.pack(side='right', fill='both')
-        chat_frame.pack_propagate(False)
+        # Chat panel (1/4 in mock mode, full width in real mode)
+        chat_frame = tk.Frame(self.root, width=200 if self.is_mock_mode else 800)
+        chat_frame.pack(side='right' if self.is_mock_mode else 'left', fill='both', expand=True)
+        if self.is_mock_mode:
+            chat_frame.pack_propagate(False)
         
         # Chat view
         self.chat = tk.Text(chat_frame, state='disabled')
@@ -223,6 +297,8 @@ class GUI:
     
     def add_modem(self, modem: Modem) -> None:
         """Add a modem to the canvas and initialize its visual representation."""
+        if not self.is_mock_mode:
+            return  # Only works in mock mode
         self.modems.append(modem)
         modem.init_on_canvas(self.canvas)
     
@@ -252,12 +328,14 @@ class GUI:
     
     def _poll_serial(self) -> None:
         """Poll serial interface for incoming messages from modem."""
-        # Check for commands from computer to modem
-        command = self.serial_interface.modem_read()
-        if command:
-            self.host_modem.process_serial_command(command)
+        if self.is_mock_mode:
+            # Mock mode: process commands through host modem
+            if hasattr(self.serial_interface, 'modem_read'):
+                command = self.serial_interface.modem_read()  # type: ignore
+                if command and self.host_modem:
+                    self.host_modem.process_serial_command(command)
         
-        # Check for responses from modem to computer
+        # Check for responses from modem to computer (works in both modes)
         response = self.serial_interface.read()
         if response:
             self.chat.config(state='normal')
@@ -287,16 +365,43 @@ class GUI:
 
 
 if __name__ == "__main__":
-    # Create communication infrastructure
-    acoustic_bus = AcousticBus()
-    serial_interface = SerialInterface()
+    parser = argparse.ArgumentParser(description="Acoustic Modem GUI")
+    parser.add_argument("--port", type=str, default="mock",
+                        help="Serial port (e.g., COM3, /dev/ttyUSB0) or 'mock' for simulation")
+    parser.add_argument("--baud", type=int, default=9600,
+                        help="Baud rate for serial communication (default: 9600)")
     
-    # Create modems
-    host_modem = Modem("host", acoustic_bus, serial_interface, x=150, y=200)
-    beacon_modem = Modem("002", acoustic_bus, x=400, y=200)
+    args = parser.parse_args()
     
-    # Create GUI
-    gui = GUI(serial_interface, host_modem)
-    gui.add_modem(host_modem)
-    gui.add_modem(beacon_modem)
-    gui.run()
+    if args.port.lower() == "mock":
+        # Mock mode: simulated modems with acoustic bus
+        acoustic_bus = AcousticBus()
+        serial_interface = MockSerialInterface()
+        
+        # Create modems
+        host_modem = Modem("host", acoustic_bus, serial_interface, x=150, y=200)
+        beacon_modem = Modem("002", acoustic_bus, x=400, y=200)
+        
+        # Create GUI with modems
+        gui = GUI(serial_interface, host_modem)
+        gui.add_modem(host_modem)
+        gui.add_modem(beacon_modem)
+    else:
+        # Real mode: actual serial communication
+        try:
+            serial_interface = RealSerialInterface(args.port, args.baud)
+            print(f"Connected to {args.port} at {args.baud} baud")
+        except Exception as e:
+            print(f"Error opening serial port: {e}")
+            exit(1)
+        
+        # Create GUI without modems (direct serial communication)
+        gui = GUI(serial_interface, host_modem=None)
+    
+    try:
+        gui.run()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        if hasattr(serial_interface, 'close'):
+            serial_interface.close()
