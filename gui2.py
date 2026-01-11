@@ -2,7 +2,12 @@ import tkinter as tk
 import argparse
 import threading
 import queue
+import math
 from typing import Optional, Protocol, Union, TYPE_CHECKING, cast
+
+# Constants for distance calculation
+PIXELS_PER_METER = 100  # Scale: 100 pixels = 1 meter
+SOUND_SPEED = 1500  # m/s in water
 
 if TYPE_CHECKING:
     import serial
@@ -223,22 +228,64 @@ class Modem:
         
         return None
 
-    def _respond_to_ping(self, message: str) -> str:
-        # Respond with #RxxxTyyyyy where xxx is this modem's ID
-        # For now, hardcoded timestamp
-        timestamp = "12345"  # Hardcoded for now
-        # Format ID as 3 digits (e.g., "002" not "2")
+    def _respond_to_ping(self, from_modem: 'Modem') -> str:
+        """Respond to ping with timestamp calculated from distance."""
+        # Calculate distance in pixels
+        dx = from_modem.x - self.x
+        dy = from_modem.y - self.y
+        distance_pixels = math.sqrt(dx * dx + dy * dy)
+        
+        # Convert to meters
+        distance_meters = distance_pixels / PIXELS_PER_METER
+        
+        # Calculate round-trip time
+        round_trip_time = 2 * distance_meters / SOUND_SPEED
+        
+        # Convert to timestamp (multiply by 10^5, format as 5 digits)
+        timestamp = int(round_trip_time * 100000)
+        timestamp_str = f"{timestamp:05d}"
+        
+        # Format ID as 3 digits
         formatted_id = self.id.zfill(3) if len(self.id) < 3 else self.id[:3]
-        response = f"#R{formatted_id}T{timestamp}"
+        response = f"#R{formatted_id}T{timestamp_str}"
         return response
 
     def handle_acoustic_message(self, message: str, from_modem: 'Modem') -> Optional[str]:
         """Handle message received via acoustic bus."""
         # Handle ping command
         if message.startswith("$P"):
-
-            return self._respond_to_ping(message)        
+            return self._respond_to_ping(from_modem)
         return None
+    
+    @staticmethod
+    def parse_ping_response(response: str) -> Optional[tuple[str, float]]:
+        """Parse ping response #RxxxTyyyyy and return (target_id, distance_meters)."""
+        # Format: #RxxxTyyyyy
+        if not response.startswith("#R") or "T" not in response:
+            return None
+        
+        try:
+            # Extract parts: #RxxxTyyyyy
+            parts = response[2:].split("T")
+            if len(parts) != 2:
+                return None
+            
+            target_id = parts[0]
+            timestamp_str = parts[1]
+            
+            if len(timestamp_str) != 5:
+                return None
+            
+            # Convert timestamp back to time
+            timestamp = int(timestamp_str)
+            round_trip_time = timestamp / 100000.0
+            
+            # Calculate distance
+            distance_meters = (round_trip_time * SOUND_SPEED) / 2
+            
+            return (target_id, distance_meters)
+        except (ValueError, IndexError):
+            return None
 
     def command(self, command: str) -> str:
         """Legacy method - redirects to process_serial_command."""
@@ -343,6 +390,16 @@ class GUI:
         if response:
             self.chat.config(state='normal')
             self.chat.insert('end', response + '\n')
+            
+            # Check if it's a ping response and display distance
+            ping_info = Modem.parse_ping_response(response)
+            if ping_info:
+                target_id, distance_meters = ping_info
+                # Remove leading zeros from target_id for display
+                display_id = target_id.lstrip('0') or '0'
+                distance_str = f"Host is {distance_meters:.2f} meters from unit {display_id}\n"
+                self.chat.insert('end', distance_str)
+            
             self.chat.config(state='disabled')
             self.chat.see('end')
         
