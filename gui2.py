@@ -223,18 +223,21 @@ class Modem:
         
         return None
 
+    def _respond_to_ping(self, message: str) -> str:
+        # Respond with #RxxxTyyyyy where xxx is this modem's ID
+        # For now, hardcoded timestamp
+        timestamp = "12345"  # Hardcoded for now
+        # Format ID as 3 digits (e.g., "002" not "2")
+        formatted_id = self.id.zfill(3) if len(self.id) < 3 else self.id[:3]
+        response = f"#R{formatted_id}T{timestamp}"
+        return response
+
     def handle_acoustic_message(self, message: str, from_modem: 'Modem') -> Optional[str]:
         """Handle message received via acoustic bus."""
         # Handle ping command
         if message.startswith("$P"):
-            # Respond with #RxxxTyyyyy where xxx is this modem's ID
-            # For now, hardcoded timestamp
-            timestamp = "12345"  # Hardcoded for now
-            # Format ID as 3 digits (e.g., "002" not "2")
-            formatted_id = self.id.zfill(3) if len(self.id) < 3 else self.id[:3]
-            response = f"#R{formatted_id}T{timestamp}"
-            return response
-        
+
+            return self._respond_to_ping(message)        
         return None
 
     def command(self, command: str) -> str:
