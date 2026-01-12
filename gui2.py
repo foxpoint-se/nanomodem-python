@@ -160,37 +160,48 @@ class Modem:
         # Register with acoustic bus
         acoustic_bus.register(self)
 
-    def init_on_canvas(self, canvas: tk.Canvas) -> None:
+    def init_on_canvas(self, canvas: tk.Canvas, canvas_height: Optional[int] = None) -> None:
         """Initialize the modem's visual representation on the canvas."""
         self.canvas = canvas  # Store canvas reference
+        self.canvas_height = canvas_height  # Store for y-coordinate flipping
         if self.box_id is not None:
             self._update_position(canvas)
         else:
+            # Convert logical y (0 at bottom) to canvas y (0 at top)
+            canvas_y = self._to_canvas_y(self.y)
             self.box_id = canvas.create_rectangle(
-                self.x - self.size//2, self.y - self.size//2,
-                self.x + self.size//2, self.y + self.size//2,
+                self.x - self.size//2, canvas_y - self.size//2,
+                self.x + self.size//2, canvas_y + self.size//2,
                 fill="lightblue", outline="black", width=2,
                 tags="modem"
             )
             # Add ID label
             self.label_id = canvas.create_text(
-                self.x, self.y,
+                self.x, canvas_y,
                 text=self.id, fill="black",
                 tags="modem"
             )
+
+    def _to_canvas_y(self, logical_y: int) -> int:
+        """Convert logical y coordinate (0 at bottom) to canvas y (0 at top)."""
+        if self.canvas_height is None:
+            return logical_y
+        return self.canvas_height - logical_y
 
     def _update_position(self, canvas: tk.Canvas) -> None:
         """Update the visual position of the modem on canvas."""
         if self.box_id is None:
             return
+        # Convert logical y (0 at bottom) to canvas y (0 at top)
+        canvas_y = self._to_canvas_y(self.y)
         canvas.coords(
             self.box_id,
-            self.x - self.size//2, self.y - self.size//2,
-            self.x + self.size//2, self.y + self.size//2
+            self.x - self.size//2, canvas_y - self.size//2,
+            self.x + self.size//2, canvas_y + self.size//2
         )
         # Update label position
         if self.label_id is not None:
-            canvas.coords(self.label_id, self.x, self.y)
+            canvas.coords(self.label_id, self.x, canvas_y)
 
     def update_label(self) -> None:
         """Update the label text to reflect current ID."""
@@ -368,6 +379,10 @@ class GUI:
         self.canvas = tk.Canvas(self.sim_window, width=1000, height=600, bg="white")
         self.canvas.pack(fill='both', expand=True)
         
+        # Store canvas dimensions for coordinate conversion
+        self.canvas_width = 1000
+        self.canvas_height = 600
+        
         # Draw scale/ruler
         self._draw_scale()
         
@@ -376,27 +391,35 @@ class GUI:
         self.canvas.bind("<B1-Motion>", self._on_canvas_drag)
         self.canvas.bind("<ButtonRelease-1>", self._on_canvas_release)
     
+    def _flip_y(self, y: int) -> int:
+        """Convert y coordinate from logical (0 at bottom) to canvas (0 at top)."""
+        return self.canvas_height - y
+    
+    def _unflip_y(self, canvas_y: int) -> int:
+        """Convert y coordinate from canvas (0 at top) to logical (0 at bottom)."""
+        return self.canvas_height - canvas_y
+    
     def add_modem(self, modem: Modem) -> None:
         """Add a modem to the canvas and initialize its visual representation."""
         if not self.is_mock_mode or not self.canvas:
             return
         self.modems.append(modem)
-        modem.init_on_canvas(self.canvas)
+        # Modem y coordinates are in logical system (0 at bottom)
+        modem.init_on_canvas(self.canvas, self.canvas_height)
     
     def _draw_scale(self) -> None:
-        """Draw scale/ruler on canvas showing meters."""
+        """Draw scale/ruler on canvas showing meters (y-axis flipped: zero at bottom)."""
         if not self.canvas:
             return
         
-        # Use configured canvas dimensions
-        canvas_width = 1000  # From canvas creation
-        canvas_height = 600  # From canvas creation
+        canvas_width = self.canvas_width
+        canvas_height = self.canvas_height
         
         # Scale parameters
         tick_length = 10
         label_offset = 15
         
-        # Draw X-axis scale (bottom)
+        # Draw X-axis scale (bottom) - same scale as Y
         max_meters_x = int(canvas_width / PIXELS_PER_METER) + 1
         for meter in range(0, max_meters_x):
             x = meter * PIXELS_PER_METER
@@ -408,23 +431,27 @@ class GUI:
                 self.canvas.create_text(x, canvas_height - tick_length - label_offset, 
                                        text=f"{meter}m", fill="gray", tags="scale")
         
-        # Draw Y-axis scale (left)
+        # Draw Y-axis scale (left) - flipped: zero at bottom, increasing upward
         max_meters_y = int(canvas_height / PIXELS_PER_METER) + 1
         for meter in range(0, max_meters_y):
-            y = meter * PIXELS_PER_METER
-            if y <= canvas_height:
+            # Flip y coordinate: zero at bottom
+            y_canvas = canvas_height - (meter * PIXELS_PER_METER)
+            if y_canvas >= 0:
                 # Draw tick mark
-                self.canvas.create_line(0, y, tick_length, y, 
+                self.canvas.create_line(0, y_canvas, tick_length, y_canvas, 
                                        fill="gray", width=1, tags="scale")
                 # Draw label
-                self.canvas.create_text(tick_length + label_offset, y, 
+                self.canvas.create_text(tick_length + label_offset, y_canvas, 
                                        text=f"{meter}m", fill="gray", tags="scale")
     
-    def _find_modem_at(self, x: int, y: int) -> Optional[Modem]:
+    def _find_modem_at(self, canvas_x: int, canvas_y: int) -> Optional[Modem]:
         """Find the modem at the given canvas coordinates."""
+        # Convert canvas y to logical y for comparison
+        logical_y = self._unflip_y(canvas_y)
         for modem in self.modems:
-            if (modem.x - modem.size//2 <= x <= modem.x + modem.size//2 and
-                modem.y - modem.size//2 <= y <= modem.y + modem.size//2):
+            # Modem stores logical y, so compare with converted y
+            if (modem.x - modem.size//2 <= canvas_x <= modem.x + modem.size//2 and
+                modem.y - modem.size//2 <= logical_y <= modem.y + modem.size//2):
                 return modem
         return None
     
@@ -436,8 +463,9 @@ class GUI:
         """Handle mouse drag - move the modem if one is being dragged."""
         if self.dragged_modem is None:
             return
+        # Convert canvas coordinates to logical coordinates
         self.dragged_modem.x = event.x
-        self.dragged_modem.y = event.y
+        self.dragged_modem.y = self._unflip_y(event.y)
         self.dragged_modem._update_position(self.canvas)
     
     def _on_canvas_release(self, event) -> None:
@@ -568,9 +596,10 @@ if __name__ == "__main__":
         acoustic_bus = AcousticBus()
         serial_interface = MockSerialInterface()
         
-        # Create modems
-        host_modem = Modem("host", acoustic_bus, serial_interface, x=150, y=200)
-        beacon_modem = Modem("002", acoustic_bus, x=400, y=200)
+        # Create modems (y coordinates in logical system: 0 at bottom)
+        # Canvas is 600px high, so y=400 means 400px from bottom (4 meters)
+        host_modem = Modem("host", acoustic_bus, serial_interface, x=150, y=400)
+        beacon_modem = Modem("002", acoustic_bus, x=400, y=400)
         
         # Create GUI with modems
         gui = GUI(serial_interface, host_modem)
