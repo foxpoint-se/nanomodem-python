@@ -146,16 +146,21 @@ class AcousticBus:
 class Modem:
     def __init__(self, id: str, acoustic_bus: AcousticBus, 
                  serial_interface: Optional[Union[MockSerialInterface, 'RealSerialInterface']] = None,
-                 x: int = 100, y: int = 100) -> None:
+                 x: int = 100, y: int = 100, track_position: bool = False) -> None:
         self.id = id
         self.acoustic_bus = acoustic_bus
         self.serial_interface = serial_interface
         self.x = x
         self.y = y
+        self.track_position = track_position
         self.box_id: Optional[int] = None  # Canvas ID for the rectangle
         self.label_id: Optional[int] = None  # Canvas ID for the text label
         self.canvas: Optional[tk.Canvas] = None  # Reference to canvas for updates
+        self.viz_canvas: Optional[tk.Canvas] = None  # Reference to visualization canvas
+        self.viz_circle_id: Optional[int] = None  # Canvas ID for visualization circle
+        self.viz_canvas_height: Optional[int] = None  # For coordinate conversion
         self.size = 50  # Size of the rectangle
+        self.viz_size = 8  # Size of circle in visualization (radius)
         
         # Register with acoustic bus
         acoustic_bus.register(self)
@@ -182,11 +187,12 @@ class Modem:
                 tags="modem"
             )
 
-    def _to_canvas_y(self, logical_y: int) -> int:
+    def _to_canvas_y(self, logical_y: int, use_viz: bool = False) -> int:
         """Convert logical y coordinate (0 at bottom) to canvas y (0 at top)."""
-        if self.canvas_height is None:
+        canvas_height = self.viz_canvas_height if use_viz else self.canvas_height
+        if canvas_height is None:
             return logical_y
-        return self.canvas_height - logical_y
+        return canvas_height - logical_y
 
     def _update_position(self, canvas: tk.Canvas) -> None:
         """Update the visual position of the modem on canvas."""
@@ -207,6 +213,40 @@ class Modem:
         """Update the label text to reflect current ID."""
         if self.label_id is not None and self.canvas is not None:
             self.canvas.itemconfig(self.label_id, text=self.id)
+
+    def init_on_viz_canvas(self, viz_canvas: tk.Canvas, canvas_height: int) -> None:
+        """Initialize the modem's visualization circle on the visualization canvas."""
+        if not self.track_position:
+            return
+        
+        self.viz_canvas = viz_canvas
+        self.viz_canvas_height = canvas_height
+        
+        # Convert logical y (0 at bottom) to canvas y (0 at top)
+        canvas_y = self._to_canvas_y(self.y, use_viz=True)
+        
+        # Draw small circle
+        self.viz_circle_id = viz_canvas.create_oval(
+            self.x - self.viz_size, canvas_y - self.viz_size,
+            self.x + self.viz_size, canvas_y + self.viz_size,
+            fill="blue", outline="darkblue", width=1,
+            tags="viz_modem"
+        )
+
+    def _update_viz_position(self) -> None:
+        """Update the visualization circle position."""
+        if not self.track_position or self.viz_circle_id is None or self.viz_canvas is None:
+            return
+        
+        # Convert logical y (0 at bottom) to canvas y (0 at top)
+        canvas_y = self._to_canvas_y(self.y, use_viz=True)
+        
+        # Update circle position
+        self.viz_canvas.coords(
+            self.viz_circle_id,
+            self.x - self.viz_size, canvas_y - self.viz_size,
+            self.x + self.viz_size, canvas_y + self.viz_size
+        )
 
     def set_id(self, id: str) -> str:
         self.id = id
@@ -417,6 +457,10 @@ class GUI:
         self.modems.append(modem)
         # Modem y coordinates are in logical system (0 at bottom)
         modem.init_on_canvas(self.canvas, self.canvas_height)
+        
+        # Initialize visualization if modem tracks position
+        if modem.track_position and self.viz_canvas:
+            modem.init_on_viz_canvas(self.viz_canvas, self.viz_canvas_height)
     
     def _draw_scale(self) -> None:
         """Draw scale/ruler on simulation canvas showing meters (y-axis flipped: zero at bottom)."""
@@ -515,6 +559,10 @@ class GUI:
         self.dragged_modem.x = event.x
         self.dragged_modem.y = self._unflip_y(event.y)
         self.dragged_modem._update_position(self.canvas)
+        
+        # Update visualization position if modem tracks position
+        if self.dragged_modem.track_position:
+            self.dragged_modem._update_viz_position()
     
     def _on_canvas_release(self, event) -> None:
         """Handle mouse release - stop dragging."""
@@ -646,8 +694,8 @@ if __name__ == "__main__":
         
         # Create modems (y coordinates in logical system: 0 at bottom)
         # Canvas is 600px high, so y=400 means 400px from bottom (4 meters)
-        host_modem = Modem("host", acoustic_bus, serial_interface, x=150, y=400)
-        beacon_modem = Modem("002", acoustic_bus, x=400, y=400)
+        host_modem = Modem("host", acoustic_bus, serial_interface, x=150, y=400, track_position=False)
+        beacon_modem = Modem("002", acoustic_bus, x=400, y=400, track_position=True)
         
         # Create GUI with modems
         gui = GUI(serial_interface, host_modem)
