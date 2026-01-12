@@ -295,14 +295,15 @@ class GUI:
     def __init__(self, serial_interface: Union[MockSerialInterface, RealSerialInterface], 
                  host_modem: Optional[Modem] = None) -> None:
         self.root = tk.Tk()
-        self.root.title("GUI")
+        self.root.title("Acoustic Modem GUI")
         self.serial_interface = serial_interface
         self.host_modem = host_modem
         self.is_mock_mode = host_modem is not None
         
-        # Store modems and track dragging
+        # Store modems and track dragging (for simulation window)
         self.modems: list[Modem] = []
         self.dragged_modem: Optional[Modem] = None
+        self.canvas: Optional[tk.Canvas] = None  # Canvas in simulation window
         
         # Message history for arrow key navigation
         self.message_history: list[str] = []
@@ -311,27 +312,17 @@ class GUI:
         # Poll for serial responses
         self._poll_serial()
         
-        # Left side: canvas (3/4) - only show in mock mode
-        if self.is_mock_mode:
-            self.canvas = tk.Canvas(self.root, width=1000, height=600, bg="white")
-            self.canvas.pack(side='left', fill='both', expand=True)
-            
-            # Draw scale/ruler
-            self._draw_scale()
-            
-            # Bind mouse events for dragging
-            self.canvas.bind("<Button-1>", self._on_canvas_click)
-            self.canvas.bind("<B1-Motion>", self._on_canvas_drag)
-            self.canvas.bind("<ButtonRelease-1>", self._on_canvas_release)
-        else:
-            # In real mode, just show chat taking full width
-            pass
+        # Main window layout: Visualization (left) + Terminal (right)
+        # Left side: Visualization area (empty for now)
+        viz_frame = tk.Frame(self.root, width=600, bg="lightgray")
+        viz_frame.pack(side='left', fill='both', expand=True)
+        tk.Label(viz_frame, text="Distance Visualization\n(Coming soon)", 
+                font=("Arial", 16), fg="gray").pack(expand=True)
         
-        # Chat panel (1/4 in mock mode, full width in real mode)
-        chat_frame = tk.Frame(self.root, width=300 if self.is_mock_mode else 800)
-        chat_frame.pack(side='right' if self.is_mock_mode else 'left', fill='both', expand=True)
-        if self.is_mock_mode:
-            chat_frame.pack_propagate(False)
+        # Right side: Terminal/Chat panel
+        chat_frame = tk.Frame(self.root, width=400, height=600)
+        chat_frame.pack(side='right', fill='both')
+        chat_frame.pack_propagate(False)
         
         # Chat view
         self.chat = tk.Text(chat_frame, state='disabled')
@@ -362,17 +353,39 @@ class GUI:
         # Submit button
         submit_btn = tk.Button(input_frame, text="Send", command=self.on_submit)
         submit_btn.pack(side='right', padx=(5, 0))
+        
+        # Create simulation window (only in mock mode)
+        if self.is_mock_mode:
+            self._create_simulation_window()
+    
+    def _create_simulation_window(self) -> None:
+        """Create the simulation window with canvas for mock mode."""
+        self.sim_window = tk.Toplevel(self.root)
+        self.sim_window.title("Simulation - Modem Positions")
+        self.sim_window.geometry("1000x600")
+        
+        # Canvas for simulation
+        self.canvas = tk.Canvas(self.sim_window, width=1000, height=600, bg="white")
+        self.canvas.pack(fill='both', expand=True)
+        
+        # Draw scale/ruler
+        self._draw_scale()
+        
+        # Bind mouse events for dragging
+        self.canvas.bind("<Button-1>", self._on_canvas_click)
+        self.canvas.bind("<B1-Motion>", self._on_canvas_drag)
+        self.canvas.bind("<ButtonRelease-1>", self._on_canvas_release)
     
     def add_modem(self, modem: Modem) -> None:
         """Add a modem to the canvas and initialize its visual representation."""
-        if not self.is_mock_mode:
-            return  # Only works in mock mode
+        if not self.is_mock_mode or not self.canvas:
+            return
         self.modems.append(modem)
         modem.init_on_canvas(self.canvas)
     
     def _draw_scale(self) -> None:
         """Draw scale/ruler on canvas showing meters."""
-        if not self.is_mock_mode or not self.canvas:
+        if not self.canvas:
             return
         
         # Use configured canvas dimensions
