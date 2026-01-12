@@ -757,12 +757,16 @@ if __name__ == "__main__":
         # Create modems (y coordinates in logical system: 0 at bottom)
         # Canvas is 600px high, so y=400 means 400px from bottom (4 meters)
         host_modem = Modem("host", acoustic_bus, serial_interface, x=150, y=400, track_position=False)
-        beacon_modem = Modem("002", acoustic_bus, x=400, y=400, track_position=True)
+        beacon_modem_1 = Modem("002", acoustic_bus, x=400, y=400, track_position=True)
+        beacon_modem_2 = Modem("003", acoustic_bus, x=600, y=200, track_position=True)
+        beacon_modem_3 = Modem("004", acoustic_bus, x=800, y=500, track_position=True)
         
         # Create GUI with modems
         gui = GUI(serial_interface, host_modem)
         gui.add_modem(host_modem)
-        gui.add_modem(beacon_modem)
+        gui.add_modem(beacon_modem_1)
+        gui.add_modem(beacon_modem_2)
+        gui.add_modem(beacon_modem_3)
     else:
         # Real mode: actual serial communication
         try:
