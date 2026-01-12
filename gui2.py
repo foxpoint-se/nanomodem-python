@@ -357,6 +357,9 @@ class GUI:
         self.canvas: Optional[tk.Canvas] = None  # Canvas in simulation window
         self.viz_canvas: Optional[tk.Canvas] = None  # Canvas in visualization area
         
+        # Track distance circles per target modem (target_id -> circle_id)
+        self.distance_circles: dict[str, int] = {}
+        
         # Message history for arrow key navigation
         self.message_history: list[str] = []
         self.history_index: int = -1  # -1 means at end (no history selected)
@@ -536,6 +539,62 @@ class GUI:
                 self.viz_canvas.create_text(tick_length + label_offset, y_canvas, 
                                            text=f"{meter}m", fill="gray", tags="viz_scale")
     
+    def _find_modem_by_id(self, target_id: str) -> Optional[Modem]:
+        """Find a modem by its ID (handles 3-digit format with leading zeros)."""
+        # Try exact match first
+        for modem in self.modems:
+            # Format modem ID as 3 digits for comparison
+            formatted_id = modem.id.zfill(3) if len(modem.id) < 3 else modem.id[:3]
+            if formatted_id == target_id:
+                return modem
+            # Also try without leading zeros
+            if modem.id.lstrip('0') == target_id.lstrip('0'):
+                return modem
+        return None
+    
+    def _handle_distance_measurement(self, target_id: str, distance_meters: float) -> None:
+        """Handle a new distance measurement by drawing/updating circle in visualization."""
+        if not self.viz_canvas:
+            return
+        
+        # Find target modem
+        target_modem = self._find_modem_by_id(target_id)
+        if not target_modem or not target_modem.track_position:
+            return  # Can't visualize if target not tracked
+        
+        # Clear old circle for this target if it exists
+        if target_id in self.distance_circles:
+            old_circle_id = self.distance_circles[target_id]
+            self.viz_canvas.delete(old_circle_id)
+        
+        # Draw new circle
+        self._draw_distance_circle(target_modem, distance_meters, target_id)
+    
+    def _draw_distance_circle(self, target_modem: Modem, distance_meters: float, target_id: str) -> None:
+        """Draw a circle around target modem representing the measured distance."""
+        if not self.viz_canvas:
+            return
+        
+        # Convert distance to pixels
+        radius_pixels = distance_meters * PIXELS_PER_METER
+        
+        # Get target position (logical coordinates: 0 at bottom)
+        center_x = target_modem.x
+        center_y_logical = target_modem.y
+        
+        # Convert to canvas coordinates (flip y-axis)
+        center_y_canvas = self.viz_canvas_height - center_y_logical
+        
+        # Draw circle (outline only, grey)
+        circle_id = self.viz_canvas.create_oval(
+            center_x - radius_pixels, center_y_canvas - radius_pixels,
+            center_x + radius_pixels, center_y_canvas + radius_pixels,
+            outline="gray", width=2, tags="distance_circle"
+        )
+        
+        # Store circle ID for this target
+        self.distance_circles[target_id] = circle_id
+    
     def _find_modem_at(self, canvas_x: int, canvas_y: int) -> Optional[Modem]:
         """Find the modem at the given canvas coordinates."""
         # Convert canvas y to logical y for comparison
@@ -645,6 +704,9 @@ class GUI:
                 display_id = target_id.lstrip('0') or '0'
                 distance_str = f"Host is {distance_meters:.2f} meters from unit {display_id}\n"
                 self.chat.insert('end', distance_str)
+                
+                # Visualize distance measurement
+                self._handle_distance_measurement(target_id, distance_meters)
             
             self.chat.config(state='disabled')
             self.chat.see('end')
