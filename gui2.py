@@ -315,6 +315,7 @@ class GUI:
         self.modems: list[Modem] = []
         self.dragged_modem: Optional[Modem] = None
         self.canvas: Optional[tk.Canvas] = None  # Canvas in simulation window
+        self.viz_canvas: Optional[tk.Canvas] = None  # Canvas in visualization area
         
         # Message history for arrow key navigation
         self.message_history: list[str] = []
@@ -324,11 +325,21 @@ class GUI:
         self._poll_serial()
         
         # Main window layout: Visualization (left) + Terminal (right)
-        # Left side: Visualization area (empty for now)
-        viz_frame = tk.Frame(self.root, width=600, bg="lightgray")
+        # Left side: Visualization area with canvas
+        viz_frame = tk.Frame(self.root, width=1000, height=600)
         viz_frame.pack(side='left', fill='both', expand=True)
-        tk.Label(viz_frame, text="Distance Visualization\n(Coming soon)", 
-                font=("Arial", 16), fg="gray").pack(expand=True)
+        viz_frame.pack_propagate(False)
+        
+        # Visualization canvas (same size as simulation window)
+        self.viz_canvas = tk.Canvas(viz_frame, width=1000, height=600, bg="white")
+        self.viz_canvas.pack(fill='both', expand=True)
+        
+        # Store visualization canvas dimensions for coordinate conversion
+        self.viz_canvas_width = 1000
+        self.viz_canvas_height = 600
+        
+        # Draw scales on visualization canvas
+        self._draw_viz_scale()
         
         # Right side: Terminal/Chat panel
         chat_frame = tk.Frame(self.root, width=400, height=600)
@@ -408,7 +419,7 @@ class GUI:
         modem.init_on_canvas(self.canvas, self.canvas_height)
     
     def _draw_scale(self) -> None:
-        """Draw scale/ruler on canvas showing meters (y-axis flipped: zero at bottom)."""
+        """Draw scale/ruler on simulation canvas showing meters (y-axis flipped: zero at bottom)."""
         if not self.canvas:
             return
         
@@ -443,6 +454,43 @@ class GUI:
                 # Draw label
                 self.canvas.create_text(tick_length + label_offset, y_canvas, 
                                        text=f"{meter}m", fill="gray", tags="scale")
+    
+    def _draw_viz_scale(self) -> None:
+        """Draw scale/ruler on visualization canvas showing meters (y-axis flipped: zero at bottom)."""
+        if not self.viz_canvas:
+            return
+        
+        canvas_width = self.viz_canvas_width
+        canvas_height = self.viz_canvas_height
+        
+        # Scale parameters
+        tick_length = 10
+        label_offset = 15
+        
+        # Draw X-axis scale (bottom) - same scale as Y
+        max_meters_x = int(canvas_width / PIXELS_PER_METER) + 1
+        for meter in range(0, max_meters_x):
+            x = meter * PIXELS_PER_METER
+            if x <= canvas_width:
+                # Draw tick mark
+                self.viz_canvas.create_line(x, canvas_height, x, canvas_height - tick_length, 
+                                           fill="gray", width=1, tags="viz_scale")
+                # Draw label
+                self.viz_canvas.create_text(x, canvas_height - tick_length - label_offset, 
+                                           text=f"{meter}m", fill="gray", tags="viz_scale")
+        
+        # Draw Y-axis scale (left) - flipped: zero at bottom, increasing upward
+        max_meters_y = int(canvas_height / PIXELS_PER_METER) + 1
+        for meter in range(0, max_meters_y):
+            # Flip y coordinate: zero at bottom
+            y_canvas = canvas_height - (meter * PIXELS_PER_METER)
+            if y_canvas >= 0:
+                # Draw tick mark
+                self.viz_canvas.create_line(0, y_canvas, tick_length, y_canvas, 
+                                           fill="gray", width=1, tags="viz_scale")
+                # Draw label
+                self.viz_canvas.create_text(tick_length + label_offset, y_canvas, 
+                                           text=f"{meter}m", fill="gray", tags="viz_scale")
     
     def _find_modem_at(self, canvas_x: int, canvas_y: int) -> Optional[Modem]:
         """Find the modem at the given canvas coordinates."""
