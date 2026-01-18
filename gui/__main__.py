@@ -5,6 +5,7 @@ import threading
 import queue
 import math
 from typing import Optional, Protocol, Union, TYPE_CHECKING, cast
+from trilateration import trilaterate
 
 # Constants for distance calculation
 PIXELS_PER_METER = 100  # Scale: 100 pixels = 1 meter
@@ -360,6 +361,9 @@ class GUI:
         # Track distance circles per target modem (target_id -> circle_id)
         self.distance_circles: dict[str, int] = {}
         
+        # Track distance measurements for trilateration (target_id -> distance_meters)
+        self.distance_measurements: dict[str, float] = {}
+        
         # Message history for arrow key navigation
         self.message_history: list[str] = []
         self.history_index: int = -1  # -1 means at end (no history selected)
@@ -562,6 +566,9 @@ class GUI:
         if not target_modem or not target_modem.track_position:
             return  # Can't visualize if target not tracked
         
+        # Store distance measurement for trilateration
+        self.distance_measurements[target_id] = distance_meters
+        
         # Clear old circle for this target if it exists
         if target_id in self.distance_circles:
             old_circle_id = self.distance_circles[target_id]
@@ -569,6 +576,9 @@ class GUI:
         
         # Draw new circle
         self._draw_distance_circle(target_modem, distance_meters, target_id)
+        
+        # Check if we have enough measurements for trilateration
+        self._check_and_perform_trilateration()
     
     def _draw_distance_circle(self, target_modem: Modem, distance_meters: float, target_id: str) -> None:
         """Draw a circle around target modem representing the measured distance."""
@@ -594,6 +604,44 @@ class GUI:
         
         # Store circle ID for this target
         self.distance_circles[target_id] = circle_id
+    
+    def _check_and_perform_trilateration(self) -> None:
+        """Check if we have 3+ distance measurements and perform trilateration."""
+        if len(self.distance_measurements) < 3:
+            return
+        
+        # Get beacon positions and distances
+        beacon_positions: list[tuple[float, float]] = []
+        distances: list[float] = []
+        
+        for target_id, distance in self.distance_measurements.items():
+            target_modem = self._find_modem_by_id(target_id)
+            if target_modem and target_modem.track_position:
+                # Convert pixel coordinates to meters
+                beacon_x_meters = target_modem.x / PIXELS_PER_METER
+                beacon_y_meters = target_modem.y / PIXELS_PER_METER
+                beacon_positions.append((beacon_x_meters, beacon_y_meters))
+                distances.append(distance)
+        
+        if len(beacon_positions) < 3:
+            return
+        
+        try:
+            # Perform trilateration
+            estimated_pos = trilaterate(beacon_positions, distances)
+            est_x, est_y = estimated_pos
+            
+            # Print result to chat
+            self.chat.config(state='normal')
+            self.chat.insert('end', f"Trilateration: Estimated host position at ({est_x:.2f}, {est_y:.2f}) meters\n")
+            self.chat.config(state='disabled')
+            self.chat.see('end')
+        except Exception as e:
+            # Print error if trilateration fails
+            self.chat.config(state='normal')
+            self.chat.insert('end', f"Trilateration error: {e}\n")
+            self.chat.config(state='disabled')
+            self.chat.see('end')
     
     def _find_modem_at(self, canvas_x: int, canvas_y: int) -> Optional[Modem]:
         """Find the modem at the given canvas coordinates."""
