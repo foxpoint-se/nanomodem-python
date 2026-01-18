@@ -364,6 +364,9 @@ class GUI:
         # Track distance measurements for trilateration (target_id -> distance_meters)
         self.distance_measurements: dict[str, float] = {}
         
+        # Track estimated position dot (red dot showing trilateration result)
+        self.estimated_position_dot: Optional[int] = None
+        
         # Message history for arrow key navigation
         self.message_history: list[str] = []
         self.history_index: int = -1  # -1 means at end (no history selected)
@@ -636,12 +639,42 @@ class GUI:
             self.chat.insert('end', f"Trilateration: Estimated host position at ({est_x:.2f}, {est_y:.2f}) meters\n")
             self.chat.config(state='disabled')
             self.chat.see('end')
+            
+            # Draw/update red dot for estimated position
+            self._draw_estimated_position(est_x, est_y)
         except Exception as e:
             # Print error if trilateration fails
             self.chat.config(state='normal')
             self.chat.insert('end', f"Trilateration error: {e}\n")
             self.chat.config(state='disabled')
             self.chat.see('end')
+    
+    def _draw_estimated_position(self, x_meters: float, y_meters: float) -> None:
+        """Draw or update red dot showing estimated host position from trilateration."""
+        if not self.viz_canvas:
+            return
+        
+        # Convert meters to pixels
+        x_pixels = x_meters * PIXELS_PER_METER
+        y_pixels_logical = y_meters * PIXELS_PER_METER
+        
+        # Convert to canvas coordinates (flip y-axis)
+        y_pixels_canvas = self.viz_canvas_height - y_pixels_logical
+        
+        # Size same as beacon dots
+        dot_size = 8
+        
+        # Delete old dot if it exists
+        if self.estimated_position_dot is not None:
+            self.viz_canvas.delete(self.estimated_position_dot)
+        
+        # Draw red dot
+        self.estimated_position_dot = self.viz_canvas.create_oval(
+            x_pixels - dot_size, y_pixels_canvas - dot_size,
+            x_pixels + dot_size, y_pixels_canvas + dot_size,
+            fill="red", outline="darkred", width=1,
+            tags="estimated_position"
+        )
     
     def _find_modem_at(self, canvas_x: int, canvas_y: int) -> Optional[Modem]:
         """Find the modem at the given canvas coordinates."""
