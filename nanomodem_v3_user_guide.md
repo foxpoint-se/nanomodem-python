@@ -134,106 +134,31 @@ section 5.2. An error will be returned if you attempt to send a message to the a
 sending unit e.g. entering $P000 on unit 000.
 
 ### 5.2 Modem commands
-Command string
-$Axxx
-$?
-$Pxxx
-Description
-Responses
-Status and setup commands
-Set node address to xxx (ascii #Axxx – confirms node address has
-decimal e.g. 123)
-been set to xxx and stored in non-
-volatile memory.
-#AxxxVyyyyy – where xxx is node
-Query status
-address and yyyyy is a 16-bit supply
-voltage monitor value. To convert
-to a voltage: v = yyyyy * 15/65536
-Ping unit with address xxx
-$Pxxx is returned immediately to
-acknowledge command.
-#RxxxTyyyyy is then returned if
-response is received from unit xxx.
-Range to unit xxx is given by R =
-yyyyy * c * 3.125e-5 where c is the
-sound velocity (assume 1500 m/s if
-no data is available). If no response$Vxxx
-$Bnnddd…
-$Uxxxnnddd…
-$Mxxxnnddd…
-$Txxx
-$Exxxnnddd…
-$Q
-is received, #TO is returned after 4s.
-Another ping request may be sent
-earlier than this and timing is reset.
-Get supply voltage on unit xxx $Vxxx to acknowledge command.
-#Bxxx06Vyyyyy is then returned if
-a response is received from unit
-xxx. yyyyy is as in the $? command.
-Data transfer commands
-Broadcast data. Send nn bytes $Bnn is returned immediately to
-(ddd…) to all units in range.
-confirm nn bytes have been
-Data (d) can be any printable or broadcast.
-non-printable byte value. nn is All units in range will output
-the number of transmitted bytes #Bxxxnnddd… (where xxx is the
-as two ASCII decimal digits (02- transmitting unit) when this
-64).
-message has been received.
-Unicast data. Send nn bytes
-(ddd…) to unit xxx.
-Data (d) can be any printable or
-non-printable byte value.
-Unicast data and acknowledge.
-Send nn bytes (ddd…) to unit xxx
-and request an ack to confirm
-delivery.
-Data (d) can be any printable or
-non-printable byte value.
-$Uxxxnn is returned immediately
-to confirm nn bytes sent to unit xxx.
-Unit xxx will output #Unnddd…
-when message has been received.
-$Mxxxnn is returned immediately
-to confirm nn bytes sent to unit xxx.
-Unit xxx will output #Unnddd…
-when message has been received.
-If message has been delivered the
-sending
-unit
-will
-receive
-#RxxxTyyyyy where yyyyy is the
-range count as in the ping
-command.
-Test and debug commands
-Request test message from unit $Txxx is returned immediately to
-xxx.
-acknowledge command.
-Unit xxx will broadcast the 64 byte
-message “Hello! This is a
-Nanomodem v3 DSSS test
-transmission at 640 bps.”
-Echo data. Request echo test of $Exxxnn is returned immediately to
-nn bytes (ddd…) from unit xxx. confirm nn bytes sent to unit xxx.
-Data (d) can be any printable or Unit xxx will transmit a broadcast
-non-printable byte value.
-message containing the same data
-but will not output to its serial
-port.
-$Cx is returned where x is the
-Get quality indicator.
-number of bytes corrected by the
-error correction code for the last
-data packet detected (this does not
-apply to ping responses or
-acknowledgements).
-$C-
-is
-returned if the last packet failed to
-decode.
+
+#### Status and setup commands
+
+| Command | Description | Responses |
+|---------|-------------|-----------|
+| `$Axxx` | Set node address to xxx (ascii decimal e.g. 123) | `#Axxx` – confirms node address has been set to xxx and stored in non-volatile memory. |
+| `$?` | Query status | `#AxxxVyyyyy` – where xxx is node address and yyyyy is a 16-bit supply voltage monitor value. To convert to a voltage: v = yyyyy * 15/65536 |
+| `$Pxxx` | Ping unit with address xxx | `$Pxxx` is returned immediately to acknowledge command. `#RxxxTyyyyy` is then returned if response is received from unit xxx. Range to unit xxx is given by R = yyyyy * c * 3.125e-5 where c is the sound velocity (assume 1500 m/s if no data is available). If no response is received, `#TO` is returned after 4s. Another ping request may be sent earlier than this and timing is reset. |
+| `$Vxxx` | Get supply voltage on unit xxx | `$Vxxx` to acknowledge command. `#Bxxx06Vyyyyy` is then returned if a response is received from unit xxx. yyyyy is as in the `$?` command. |
+
+#### Data transfer commands
+
+| Command | Description | Responses |
+|---------|-------------|-----------|
+| `$Bnnddd…` | Broadcast data. Send nn bytes (ddd…) to all units in range. Data (d) can be any printable or non-printable byte value. nn is the number of transmitted bytes as two ASCII decimal digits (02-64). | `$Bnn` is returned immediately to confirm nn bytes have been broadcast. All units in range will output `#Bxxxnnddd…` (where xxx is the transmitting unit) when this message has been received. |
+| `$Uxxxnnddd…` | Unicast data. Send nn bytes (ddd…) to unit xxx. Data (d) can be any printable or non-printable byte value. | `$Uxxxnn` is returned immediately to confirm nn bytes sent to unit xxx. Unit xxx will output `#Unnddd…` when message has been received. |
+| `$Mxxxnnddd…` | Unicast data and acknowledge. Send nn bytes (ddd…) to unit xxx and request an ack to confirm delivery. Data (d) can be any printable or non-printable byte value. | `$Mxxxnn` is returned immediately to confirm nn bytes sent to unit xxx. Unit xxx will output `#Unnddd…` when message has been received. If message has been delivered the sending unit will receive `#RxxxTyyyyy` where yyyyy is the range count as in the ping command. |
+
+#### Test and debug commands
+
+| Command | Description | Responses |
+|---------|-------------|-----------|
+| `$Txxx` | Request test message from unit xxx. | `$Txxx` is returned immediately to acknowledge command. Unit xxx will broadcast the 64 byte message "Hello! This is a Nanomodem v3 DSSS test transmission at 640 bps." |
+| `$Exxxnnddd…` | Echo data. Request echo test of nn bytes (ddd…) from unit xxx. Data (d) can be any printable or non-printable byte value. | `$Exxxnn` is returned immediately to confirm nn bytes sent to unit xxx. Unit xxx will transmit a broadcast message containing the same data but will not output to its serial port. |
+| `$Q` | Get quality indicator. | `$Cx` is returned where x is the number of bytes corrected by the error correction code for the last data packet detected (this does not apply to ping responses or acknowledgements). `$C-` is returned if the last packet failed to decode. |
 
 ### 5.2 Acoustic packet durations
 
