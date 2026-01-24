@@ -40,13 +40,13 @@ Nanomodems may be supplied in 2 different forms:
 
 ### PCB dimensions:
 
-Board width: 27.0mm
-Board Length: 45.0mm
-Board Thickness: 1.6mm
-Header Pin Pitch: 2.54mm
-Hole Centre to Centre: 20.0mm
-Hole Centres to Board Edge: 10.0mm
-Hole Size: M2.5 Clearance Hole (2.9mm diameter)
+- Board width: 27.0mm
+- Board Length: 45.0mm
+- Board Thickness: 1.6mm
+- Header Pin Pitch: 2.54mm
+- Hole Centre to Centre: 20.0mm
+- Hole Centres to Board Edge: 10.0mm
+- Hole Size: M2.5 Clearance Hole (2.9mm diameter)
 
 Potted modem (42mm diameter by 60mm long)
 
@@ -58,31 +58,35 @@ Orange: RxS
 
 ### J2 – Main connector
 
-1 Logic level UART TXD (2.5V)
-2 Hydrophone output (analog)
-3 Logic level UART RXD (2.5V)
-4 ADC input (ch 4a)
-5 RxS flag (2.5V logic)
-6 ADC input (ch 3)
-7 Vbat (+ve supply) *
-8 Vbat (+ve supply) *
-9 GND (0V) *
-10 GND (0V) *
-11 Serial TXD (RS232 output)
-12 DAC output
-13 Serial RXD (RS232 input)
-14 SPI MISO
-15 RxM flag (2.5V logic)
-16 SPI MOSI
-17 I2C SCL
-18 SPI SCK
-19 I2C SCA
-20 SPI CS
+| Pin | Description |
+|-----|-------------|
+| 1 | Logic level UART TXD (2.5V) |
+| 2 | Hydrophone output (analog) |
+| 3 | Logic level UART RXD (2.5V) |
+| 4 | ADC input (ch 4a) |
+| 5 | RxS flag (2.5V logic) |
+| 6 | ADC input (ch 3) |
+| 7 | Vbat (+ve supply) * |
+| 8 | Vbat (+ve supply) * |
+| 9 | GND (0V) * |
+| 10 | GND (0V) * |
+| 11 | Serial TXD (RS232 output) |
+| 12 | DAC output |
+| 13 | Serial RXD (RS232 input) |
+| 14 | SPI MISO |
+| 15 | RxM flag (2.5V logic) |
+| 16 | SPI MOSI |
+| 17 | I2C SCL |
+| 18 | SPI SCK |
+| 19 | I2C SCA |
+| 20 | SPI CS |
 
-#### J3 - Transducer
+### J3 - Transducer
 
-1 Inner electrode (signal)
-2 Outer electrode (GND)
+| Pin | Description |
+|-----|-------------|
+| 1 | Inner electrode (signal) |
+| 2 | Outer electrode (GND) |
 
 Connections shown in grey are for possible future expansion (software enabled).
 
