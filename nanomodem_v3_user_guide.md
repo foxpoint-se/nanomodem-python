@@ -15,38 +15,22 @@ long baseline positioning (LBL) operation is possible.
 This document describes the operation, electrical interfacing and protocols for these devices.
 
 ## 2. Specification
-Supply voltage
-Supply current (5V supply)
-Acoustic frequency
-Acoustic source level
-Acoustic directivity
-Physical layer
-Acoustic data rate (raw)
-Acoustic throughput (max)
-Addressing
-Ranging increment
-Ranging variance
-Maximum Range
-RS232 interface
-3 – 6.5V dc (5V or 6V supply recommended)
-Listening: 2.5 mA
-Receiving: 5mA
-Transmitting: max 300mA
-24-32kHz
-~168 dB re 1uPa @ 1m
-Near omnidirectional (reduction around
-cable entry of potted unit).
-Aperiodic orthogonal code keying with
-BPSK modulation and error correction code.
-640 bits/s, unicast and broadcast data
-messages up to 64 bytes in length.
-463 bits/s
-Up to 256 units (addresses 0-255)
-4.7 cm (c=1500m/s)
-~10 cm
-> 2 km
-9600 Baud, 8-bit, no parity, 1 stop bit, no
-flow control
+
+| Specification | Value |
+|---------------|-------|
+| Supply voltage | 3 – 6.5V dc (5V or 6V supply recommended) |
+| Supply current (5V supply) | Listening: 2.5 mA<br>Receiving: 5mA<br>Transmitting: max 300mA |
+| Acoustic frequency | 24-32kHz |
+| Acoustic source level | ~168 dB re 1uPa @ 1m |
+| Acoustic directivity | Near omnidirectional (reduction around cable entry of potted unit). |
+| Physical layer | Aperiodic orthogonal code keying with BPSK modulation and error correction code. |
+| Acoustic data rate (raw) | 640 bits/s, unicast and broadcast data messages up to 64 bytes in length. |
+| Acoustic throughput (max) | 463 bits/s |
+| Addressing | Up to 256 units (addresses 0-255) |
+| Ranging increment | 4.7 cm (c=1500m/s) |
+| Ranging variance | ~10 cm |
+| Maximum Range | > 2 km |
+| RS232 interface | 9600 Baud, 8-bit, no parity, 1 stop bit, no flow control |
 
 ## 3. Components
 Nanomodems may be supplied in 2 different forms:
