@@ -7,12 +7,7 @@ Jeff Neasham
 School of Engineering
 
 ## 1. Introduction
-Nanomodems are a low-cost, low-power, miniature acoustic communication and ranging
-device for underwater vehicles, divers and subsea instruments. Data messages may be
-exchanged between units and an efficient “ping” protocol is implemented for range
-measurement by transponder operation. If multiple units are deployed in known locations, then
-long baseline positioning (LBL) operation is possible.
-This document describes the operation, electrical interfacing and protocols for these devices.
+Nanomodems are a low-cost, low-power, miniature acoustic communication and ranging device for underwater vehicles, divers and subsea instruments. Data messages may be exchanged between units and an efficient “ping” protocol is implemented for range measurement by transponder operation. If multiple units are deployed in known locations, then long baseline positioning (LBL) operation is possible. This document describes the operation, electrical interfacing and protocols for these devices.
 
 ## 2. Specification
 
@@ -51,7 +46,7 @@ Nanomodems may be supplied in 2 different forms:
 Potted modem (42mm diameter by 60mm long)
 
 Black: Vbat
-White:GND
+White: GND
 Red: TXD
 Green: RXD
 Orange: RxS
@@ -101,25 +96,15 @@ polarity as no reverse polarity protection is provided on board.
 1. Connect 6V battery pack or power supply (5V recommended) between Vbat and GND on each modem. (Each modem will start up in receiving mode and draw no more han 2.5mA of current). A short audible tone will be emitted by the modem to confirm startup.
 2. Connect unit(s) via RS232 serial cable (TXD, RXD, GND) to PC running a terminal programme (Termite is highly recommended) and configured with serial port settings (9600, 8, n, 1).
 
-## 5.Serial Communication protocol
+## 5. Serial Communication protocol
 
-### 5.1Format
+### 5.1 Format
 
-Serial communication format is (9600, 8, n, 1) with no flow control. All commands issued to
-the modem are prefixed with ‘$’ and require no terminating characters. All responses from the
-modem are prefixed with ‘$’ (for a local acknowledgement) or ‘#’ (for the result of an executed
-command) and terminated with <CR><LF>. Unrecognised or invalid commands return ‘E’ to
-indicate an error.
-Serial commands should be sent to the modem as a contiguous string with no more than ~ 2ms
-between bytes. If the delay between bytes exceeds this the serial handler will time out and
-return ‘E’.
+Serial communication format is (9600, 8, n, 1) with no flow control. All commands issued to the modem are prefixed with ‘$’ and require no terminating characters. All responses from the modem are prefixed with ‘$’ (for a local acknowledgement) or ‘#’ (for the result of an executed command) and terminated with <CR><LF>. Unrecognised or invalid commands return ‘E’ to indicate an error. Serial commands should be sent to the modem as a contiguous string with no more than ~ 2ms between bytes. If the delay between bytes exceeds this the serial handler will time out and return ‘E’.
 
 ### 5.2 Node addressing
 
-Each modem must be allocated a unique 8-bit node address (0-255) which is stored in non-
-volatile memory on the device. This is set and queried via a modem command as described in
-section 5.2. An error will be returned if you attempt to send a message to the address of the
-sending unit e.g. entering $P000 on unit 000.
+Each modem must be allocated a unique 8-bit node address (0-255) which is stored in non-volatile memory on the device. This is set and queried via a modem command as described in section 5.2. An error will be returned if you attempt to send a message to the address of the sending unit e.g. entering $P000 on unit 000.
 
 ### 5.2 Modem commands
 
@@ -183,32 +168,14 @@ bytes
 32 x L chips
 200 ms
 
-The acoustic packet format for both data packets and ping/command packets is shown above.
-All packets have a robust frame header waveform which the modems detect, followed by a
-message header which contains message length, address and control information. The message
-header has error control coding to maximise reliability. The variable length data payload has a
-fixed amount of redundancy (16 bytes) for an error correction code which enables up to 8 bytes
-to be corrected in any packet. If all errors cannot be corrected then a packet is rejected.
-Communication performance may be monitored by using the $Q command to report the
-number of errors corrected – packet reliability can be increased if necessary by reducing the
-payload size (and hence increasing the error rate that may be corrected).
+The acoustic packet format for both data packets and ping/command packets is shown above. All packets have a robust frame header waveform which the modems detect, followed by a message header which contains message length, address and control information. The message header has error control coding to maximise reliability. The variable length data payload has a fixed amount of redundancy (16 bytes) for an error correction code which enables up to 8 bytes to be corrected in any packet. If all errors cannot be corrected then a packet is rejected. Communication performance may be monitored by using the $Q command to report the number of errors corrected – packet reliability can be increased if necessary by reducing the payload size (and hence increasing the error rate that may be corrected).
 
 ### 5.4 Acoustic receive flags RxS and RxM
 
-When the start of any acoustic packet is detected by a Nanomodem, the RxS flag is raised. The
-timing of this rising edge coincides precisely with the detection of the packet header waveform
-and so it may be used for time difference of arrival (TDOA) estimates where multiple
-Nanomodems are placed in an array. The RxS flag returns to zero at the end of the acoustic
-packet.
+When the start of any acoustic packet is detected by a Nanomodem, the RxS flag is raised. The timing of this rising edge coincides precisely with the detection of the packet header waveform and so it may be used for time difference of arrival (TDOA) estimates where multiple Nanomodems are placed in an array. The RxS flag returns to zero at the end of the acoustic packet.
 
-When a Nanomodem receives a unicast data message addressed to that unit, the RxM flag is
-raised for a short period corresponding to the transmissions of the received serial data. This
-signal may be used, for example, to wake up connected circuitry from a low power state.
+When a Nanomodem receives a unicast data message addressed to that unit, the RxM flag is raised for a short period corresponding to the transmissions of the received serial data. This signal may be used, for example, to wake up connected circuitry from a low power state.
 
 ### 5.5 In air acoustic testing
 
-Nanomodems can communicate through air over at least 5m in a typical office/lab
-environment. For best results in air, modems should be aligned end to end i.e. with the circular
-faces pointed at each other (this does not apply in water where the transducer beam pattern is
-more omnidirectional). Ranging information is accurate if you apply the speed of sound in air
-which is c = 340 m/s.
+Nanomodems can communicate through air over at least 5m in a typical office/lab environment. For best results in air, modems should be aligned end to end i.e. with the circular faces pointed at each other (this does not apply in water where the transducer beam pattern is more omnidirectional). Ranging information is accurate if you apply the speed of sound in air which is c = 340 m/s.
