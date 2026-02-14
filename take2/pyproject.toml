@@ -1,0 +1,21 @@
+[project]
+name = "take2"
+version = "0.1.0"
+description = "Acoustic modem localization system"
+requires-python = ">=3.12"
+dependencies = [
+    "scipy>=1.10.0",
+    "pyserial>=3.5",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+]
+
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
