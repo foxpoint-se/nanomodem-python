@@ -54,9 +54,19 @@ pip install -e ".[dev]"
 
 ### Mock demo (no hardware needed)
 
+From the **parent** of `take2` (repo root):
+
 ```bash
 python -m take2
 ```
+
+From **inside** the `take2` folder (e.g. after `cd take2`):
+
+```bash
+PYTHONPATH=.. python -m take2
+```
+
+Do not run `python -m __main__` or `python __main__.py` from inside `take2` — the package must be imported as `take2` for relative imports to work.
 
 Runs a scripted demo: 3 surface beacons + 1 submerged host. Beacons broadcast positions, host ranges to each, position is auto-calculated via trilateration.
 
