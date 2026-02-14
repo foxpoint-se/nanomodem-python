@@ -86,6 +86,12 @@ python -m pytest tests/ -v
 
 52+ tests covering all layers: node, codec, transport, calculation, and integration.
 
+If you have ROS sourced (e.g. `source /opt/ros/jazzy/setup.bash`), pytest may load ROS pytest plugins and fail with `ModuleNotFoundError: No module named 'yaml'`. Run with a clean path so only the venv is used:
+
+```bash
+PYTHONPATH= python -m pytest tests/ -v
+```
+
 ## Node capabilities
 
 Nodes have two boolean capabilities that gate automatic behavior:
