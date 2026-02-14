@@ -4,17 +4,30 @@ Layered system for underwater localization using acoustic modems (Nanomodem v3).
 
 ## Architecture
 
-```
-Client (ROS, CLI, GUI, test)
-    |
-    v
-AcousticNode  ──>  Calculation (pure math)
-    |
-    v
-TransportInterface
-    |
-    ├── MockTransport + MockEther (in-memory simulation)
-    └── NanomodemTransport + Codec (real serial hardware)
+```mermaid
+graph TD
+    Client["Client (ROS, CLI, GUI, test)"]
+    Node["AcousticNode"]
+    Caps["NodeCapabilities"]
+    Registry["KnownNodes registry"]
+    Transport["TransportInterface"]
+    Calc["Calculation"]
+    NanoTransport["NanomodemTransport"]
+    Codec["Codec (encode/decode bodies)"]
+    MockTransport["MockTransport"]
+    MockEther["MockEther (shared bus)"]
+    Serial["Serial Port"]
+
+    Client --> Node
+    Node --> Caps
+    Node --> Registry
+    Node --> Transport
+    Node --> Calc
+    Transport -.-> NanoTransport
+    Transport -.-> MockTransport
+    NanoTransport --> Codec
+    NanoTransport --> Serial
+    MockTransport --> MockEther
 ```
 
 **AcousticNode** is the only stateful class. It holds its own position, depth, known nodes, and distances. Orchestrates communication and calculation via injected dependencies.
