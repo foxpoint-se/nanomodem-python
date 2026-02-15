@@ -5,9 +5,9 @@ and doesn't require a real serial port. The serial I/O is trivial
 and best tested with actual hardware.
 """
 
-from take2.codec import Codec
-from take2.nanomodem_transport import NanomodemTransport
-from take2.types import (
+from nanomodem.codec import Codec
+from nanomodem.nanomodem_transport import NanomodemTransport
+from nanomodem.types import (
     Coord,
     PositionMessage,
     RangeResponseMessage,

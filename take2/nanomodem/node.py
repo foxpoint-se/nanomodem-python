@@ -8,9 +8,9 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Optional
+from typing import Callable, Optional
 
-from .calculation import CalculationInterface
+from .calculation import Calculation, CalculationInterface
 from .transport import TransportInterface
 from .types import (
     Coord,
@@ -25,6 +25,21 @@ from .types import (
 logger = logging.getLogger(__name__)
 
 
+def _validate_node_id(node_id: str) -> None:
+    """Validate that node_id is a 3-digit string representing 1-255."""
+    if not isinstance(node_id, str):
+        raise TypeError(f"node_id must be a str, got {type(node_id).__name__}")
+    if len(node_id) != 3 or not node_id.isdigit():
+        raise ValueError(
+            f"node_id must be a 3-digit numeric string (e.g. '001'), got '{node_id}'"
+        )
+    numeric = int(node_id)
+    if numeric < 1 or numeric > 255:
+        raise ValueError(
+            f"node_id must represent 1-255, got {numeric}"
+        )
+
+
 class AcousticNode:
     """A single node in the acoustic modem network."""
 
@@ -32,17 +47,24 @@ class AcousticNode:
         self,
         node_id: str,
         transport: TransportInterface,
-        calculation: CalculationInterface,
+        calculation: Optional[CalculationInterface] = None,
         position: Optional[Coord] = None,
         sound_speed: float = 1500.0,
+        on_state_changed: Optional[Callable[[], None]] = None,
+        on_message_received: Optional[Callable[[Message], None]] = None,
     ) -> None:
+        _validate_node_id(node_id)
+
         self._node_id = node_id
         self._transport = transport
-        self._calculation = calculation
+        self._calculation: CalculationInterface = calculation or Calculation()
         self._position = position
         self._sound_speed = sound_speed
         self._capabilities = NodeCapabilities()
         self._known_nodes: dict[str, KnownNode] = {}
+
+        self._on_state_changed = on_state_changed
+        self._on_message_received = on_message_received
 
         self._transport.on_message(self._handle_message)
 
@@ -70,11 +92,12 @@ class AcousticNode:
     def get_known_nodes(self) -> dict[str, KnownNode]:
         return dict(self._known_nodes)
 
-    # --- Setters (Step 2) ---
+    # --- Setters ---
 
     def set_position(self, position: Optional[Coord]) -> None:
         self._position = position
         self._on_position_changed()
+        self._notify_state_changed()
 
     def set_depth(self, depth: float) -> None:
         if self._position is not None:
@@ -84,8 +107,8 @@ class AcousticNode:
                 depth=depth,
             )
         else:
-            # No lat/lon yet — create a coord with just depth.
             self._position = Coord(lat=0.0, lon=0.0, depth=depth)
+        self._notify_state_changed()
 
     # --- Actions ---
 
@@ -123,7 +146,6 @@ class AcousticNode:
             assert kn.last_range is not None
 
             distance = kn.last_range
-            # Project 3D distance to 2D if we have depth
             if self._position is not None and self._position.depth != 0.0:
                 distance = self._calculation.project_3d_to_2d(
                     distance, self._position.depth, kn.position.depth
@@ -134,10 +156,10 @@ class AcousticNode:
 
         result = self._calculation.trilaterate(positions, distances)
 
-        # Preserve own depth if set
         depth = self._position.depth if self._position is not None else 0.0
         self._position = Coord(lat=result.lat, lon=result.lon, depth=depth)
 
+        self._notify_state_changed()
         return self._position
 
     # --- Message handling ---
@@ -159,7 +181,16 @@ class AcousticNode:
             case UnknownMessage(raw=raw):
                 logger.info("Unhandled message: %s", raw)
 
+        self._notify_state_changed()
+        if self._on_message_received is not None:
+            self._on_message_received(msg)
+
     # --- Internal helpers ---
+
+    def _notify_state_changed(self) -> None:
+        """Notify the GUI (or any listener) that node state has changed."""
+        if self._on_state_changed is not None:
+            self._on_state_changed()
 
     def _on_position_changed(self) -> None:
         """Called whenever own position changes. Triggers auto-broadcast if enabled."""

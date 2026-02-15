@@ -1,7 +1,7 @@
 """Tests for MockTransport + MockEther."""
 
-from take2.transport import MockEther, MockTransport
-from take2.types import Coord, Message, PositionMessage, RangeResponseMessage, UnknownMessage
+from nanomodem.transport import MockEther, MockTransport
+from nanomodem.types import Coord, Message, PositionMessage, RangeResponseMessage, UnknownMessage
 
 
 def _collect_messages(transport: MockTransport) -> list[Message]:

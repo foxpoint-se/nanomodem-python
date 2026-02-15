@@ -2,10 +2,12 @@
 
 import logging
 
-from take2.calculation import Calculation
-from take2.node import AcousticNode
-from take2.transport import MockEther, MockTransport
-from take2.types import Coord, PositionMessage, RangeResponseMessage, UnknownMessage
+import pytest
+
+from nanomodem.calculation import Calculation
+from nanomodem.node import AcousticNode
+from nanomodem.transport import MockEther, MockTransport
+from nanomodem.types import Coord, PositionMessage, RangeResponseMessage, UnknownMessage
 
 
 def _make_node(
@@ -340,3 +342,95 @@ def test_should_not_calculate_when_is_inferring_own_position_disabled() -> None:
     assert pos is not None
     assert pos.lat == 63.0005  # Unchanged
     assert pos.lon == 10.0005  # Unchanged
+
+
+# --- Node ID validation ---
+
+
+def test_should_raise_on_non_string_node_id() -> None:
+    ether = MockEther()
+    transport = MockTransport("001", ether)
+    with pytest.raises(TypeError):
+        AcousticNode(node_id=123, transport=transport)  # type: ignore[arg-type]
+
+
+def test_should_raise_on_short_node_id() -> None:
+    ether = MockEther()
+    transport = MockTransport("1", ether)
+    with pytest.raises(ValueError):
+        AcousticNode(node_id="1", transport=transport)
+
+
+def test_should_raise_on_node_id_zero() -> None:
+    ether = MockEther()
+    transport = MockTransport("000", ether)
+    with pytest.raises(ValueError):
+        AcousticNode(node_id="000", transport=transport)
+
+
+def test_should_raise_on_node_id_above_255() -> None:
+    ether = MockEther()
+    transport = MockTransport("256", ether)
+    with pytest.raises(ValueError):
+        AcousticNode(node_id="256", transport=transport)
+
+
+def test_should_accept_valid_node_id_boundaries() -> None:
+    ether = MockEther()
+    t1 = MockTransport("001", ether)
+    t2 = MockTransport("255", ether)
+    node1 = AcousticNode(node_id="001", transport=t1)
+    node2 = AcousticNode(node_id="255", transport=t2)
+    assert node1.node_id == "001"
+    assert node2.node_id == "255"
+
+
+# --- Callbacks ---
+
+
+def test_should_call_on_state_changed_when_position_set() -> None:
+    ether = MockEther()
+    transport = MockTransport("001", ether)
+    calls: list[bool] = []
+    node = AcousticNode(
+        node_id="001",
+        transport=transport,
+        on_state_changed=lambda: calls.append(True),
+    )
+    node.set_position(Coord(lat=63.0, lon=10.0))
+    assert len(calls) == 1
+
+
+def test_should_call_on_state_changed_when_message_received() -> None:
+    ether = MockEther()
+    transport = MockTransport("001", ether)
+    calls: list[bool] = []
+    node = AcousticNode(
+        node_id="001",
+        transport=transport,
+        on_state_changed=lambda: calls.append(True),
+    )
+    transport.deliver(PositionMessage(node_id="002", coord=Coord(lat=63.0, lon=10.0)))
+    assert len(calls) >= 1
+
+
+def test_should_call_on_message_received_with_message() -> None:
+    ether = MockEther()
+    transport = MockTransport("001", ether)
+    received: list[object] = []
+    node = AcousticNode(
+        node_id="001",
+        transport=transport,
+        on_message_received=lambda msg: received.append(msg),
+    )
+    msg = PositionMessage(node_id="002", coord=Coord(lat=63.0, lon=10.0))
+    transport.deliver(msg)
+    assert len(received) == 1
+    assert received[0] == msg
+
+
+def test_should_create_default_calculation_when_not_injected() -> None:
+    ether = MockEther()
+    transport = MockTransport("001", ether)
+    node = AcousticNode(node_id="001", transport=transport)
+    assert node.calculation is not None

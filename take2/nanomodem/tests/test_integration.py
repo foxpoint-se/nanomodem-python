@@ -1,9 +1,9 @@
 """Integration test: full localization cycle with mock transport."""
 
-from take2.calculation import Calculation
-from take2.node import AcousticNode
-from take2.transport import MockEther, MockTransport
-from take2.types import Coord
+from nanomodem.calculation import Calculation
+from nanomodem.node import AcousticNode
+from nanomodem.transport import MockEther, MockTransport
+from nanomodem.types import Coord
 
 
 def _make_beacon(

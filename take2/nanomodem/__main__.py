@@ -1,8 +1,8 @@
 """Entry point for the acoustic modem localization system.
 
 Usage:
-    Mock mode (demo):   python -m take2
-    Real serial:        python -m take2 --port /dev/ttyUSB0 --baud 9600 --node-id 001
+    Mock mode (demo):   python -m nanomodem
+    Real serial:        python -m nanomodem --port /dev/ttyUSB0 --baud 9600 --node-id 001
 """
 
 from __future__ import annotations

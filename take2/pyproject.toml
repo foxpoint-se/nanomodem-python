@@ -1,11 +1,12 @@
 [project]
-name = "take2"
+name = "acoustic-modem-localization"
 version = "0.1.0"
 description = "Acoustic modem localization system"
 requires-python = ">=3.12"
 dependencies = [
     "scipy>=1.10.0",
     "pyserial>=3.5",
+    "tkintermapview>=1.29",
 ]
 
 [project.optional-dependencies]
@@ -19,7 +20,7 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["take2*"]
+include = ["nanomodem*", "gui*"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["nanomodem/tests"]

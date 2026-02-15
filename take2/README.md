@@ -2,6 +2,28 @@
 
 Layered system for underwater localization using acoustic modems (Nanomodem v3).
 
+## Project structure
+
+```
+take2/
+├── nanomodem/          # Core library (pure logic, no GUI)
+│   ├── node.py         # AcousticNode — the only stateful class
+│   ├── transport.py    # TransportInterface, MockTransport, MockEther
+│   ├── nanomodem_transport.py  # Real serial transport
+│   ├── codec.py        # Encode/decode message bodies
+│   ├── calculation.py  # Trilateration, projection, timestamp conversion
+│   ├── types.py        # Coord, KnownNode, Message union, etc.
+│   ├── __main__.py     # CLI entry point (mock demo)
+│   └── tests/          # 71 unit + integration tests
+├── gui/                # Tkinter GUI application
+│   ├── controller.py   # Per-node ControllerWindow
+│   ├── launcher.py     # Boots nodes + windows
+│   └── __main__.py     # python -m gui
+├── pyproject.toml
+├── TODO.md
+└── README.md
+```
+
 ## Architecture
 
 ```mermaid
@@ -57,23 +79,26 @@ pip install -e ".[dev]"
 From the **parent** of `take2` (repo root):
 
 ```bash
-python -m take2
+python -m nanomodem
 ```
 
-From **inside** the `take2` folder (e.g. after `cd take2`):
+From **inside** the `take2` folder:
 
 ```bash
-PYTHONPATH=.. python -m take2
+PYTHONPATH=. python -m nanomodem
 ```
 
-Do not run `python -m __main__` or `python __main__.py` from inside `take2` — the package must be imported as `take2` for relative imports to work.
+### GUI (mock mode)
 
-Runs a scripted demo: 3 surface beacons + 1 submerged host. Beacons broadcast positions, host ranges to each, position is auto-calculated via trilateration.
+```bash
+cd take2
+PYTHONPATH=. python -m gui
+```
 
 ### Real hardware
 
 ```bash
-python -m take2 --port /dev/ttyUSB0 --baud 9600 --node-id 001
+python -m nanomodem --port /dev/ttyUSB0 --baud 9600 --node-id 001
 ```
 
 (NanomodemTransport is implemented but not yet wired into the entry point's main loop.)
@@ -81,16 +106,12 @@ python -m take2 --port /dev/ttyUSB0 --baud 9600 --node-id 001
 ## Tests
 
 ```bash
-python -m pytest tests/ -v
+PYTHONPATH= python -m pytest nanomodem/tests/ -v
 ```
 
-52+ tests covering all layers: node, codec, transport, calculation, and integration.
+71 tests covering all layers: node, codec, transport, calculation, and integration.
 
-If you have ROS sourced (e.g. `source /opt/ros/jazzy/setup.bash`), pytest may load ROS pytest plugins and fail with `ModuleNotFoundError: No module named 'yaml'`. Run with a clean path so only the venv is used:
-
-```bash
-PYTHONPATH= python -m pytest tests/ -v
-```
+If you have ROS sourced, pytest may load ROS pytest plugins. The `PYTHONPATH=` prefix clears this so only the venv is used.
 
 ## Node capabilities
 
@@ -101,47 +122,11 @@ Nodes have two boolean capabilities that gate automatic behavior:
 
 A "beacon" node sets `is_broadcasting_own_position = True`. A "submerged host" sets `is_inferring_own_position = True`. Both can be toggled independently on any node.
 
-## ROS transport (conceptual)
+## Callbacks
 
-A ROS transport would implement `TransportInterface` using ROS topics as the communication medium. Each node runs in its own process, publishes to and subscribes from a shared topic. No intermediate routing node needed.
+AcousticNode accepts two optional callbacks:
 
-```python
-import rclpy
-from rclpy.node import Node as RosNode
-from std_msgs.msg import String
+- `on_state_changed: Callable[[], None]` -- called whenever node state changes (position set, depth changed, message received)
+- `on_message_received: Callable[[Message], None]` -- called with each incoming message for logging/display
 
-class RosTransport:
-    """TransportInterface implementation using ROS2 topics."""
-
-    def __init__(self, node_id: str, ros_node: RosNode, topic: str = "/acoustic") -> None:
-        self.node_id = node_id
-        self._callback = None
-        self._pub = ros_node.create_publisher(String, topic, 10)
-        self._sub = ros_node.create_subscription(
-            String, topic, self._on_ros_message, 10,
-        )
-
-    def broadcast_position(self, coord):
-        # Encode and publish; all subscribers receive it
-        msg = String()
-        msg.data = f"{self.node_id}|POS|{coord.lat},{coord.lon},{coord.depth}"
-        self._pub.publish(msg)
-
-    def request_range(self, target_id):
-        # Publish range request; target's transport picks it up
-        msg = String()
-        msg.data = f"{self.node_id}|RANGE_REQ|{target_id}"
-        self._pub.publish(msg)
-
-    def on_message(self, callback):
-        self._callback = callback
-
-    def _on_ros_message(self, ros_msg):
-        # Filter own messages
-        parts = ros_msg.data.split("|")
-        if parts[0] == self.node_id:
-            return
-        # Parse and deliver to callback...
-```
-
-This is a conceptual example. The actual ROS transport would need proper message types, QoS settings, and threading considerations.
+GUI controllers use these with `root.after(0, ...)` for thread-safe reactive UI updates.

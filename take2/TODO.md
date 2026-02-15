@@ -1,14 +1,8 @@
 # TODO
 
-## Visualization
+## Debug / God view
 
-- [ ] GUI with OpenStreetMap (lat/lon coordinates)
-- [ ] Two windows: state visualization + state setting (simulation)
-- [ ] Depth slider for simulated depth
-- [ ] Buttons for executing functions (range to node, broadcast position)
-- [ ] Draggable beacon nodes on the simulation canvas
-- [ ] Estimated position marker on the visualization canvas
-- [ ] Range circles around beacons
+- [ ] Optional "god view" window for mock mode debugging — shows all nodes' ground-truth positions on a single map, regardless of what individual nodes know. Useful for validating the system visually, but not part of the primary design.
 
 ## MockEther enhancements
 

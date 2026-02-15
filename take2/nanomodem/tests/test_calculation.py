@@ -2,8 +2,8 @@
 
 import math
 
-from take2.calculation import Calculation
-from take2.types import Coord
+from nanomodem.calculation import Calculation
+from nanomodem.types import Coord
 
 import pytest
 
