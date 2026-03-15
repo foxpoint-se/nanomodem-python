@@ -67,8 +67,13 @@ class MockEther:
         if sender is None:
             return
 
-        if target is None or target.position is None or sender.position is None:
-            # Target unreachable — nothing is lost
+        if target is None:
+            # Target not in network — simulate timeout
+            sender.deliver(UnknownMessage(raw="#TO"))
+            return
+
+        if target.position is None or sender.position is None:
+            # Position missing — we can't compute distance, so simulate timeout
             sender.deliver(UnknownMessage(raw="#TO"))
             return
 

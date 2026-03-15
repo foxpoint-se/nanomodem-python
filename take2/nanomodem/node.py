@@ -110,6 +110,32 @@ class AcousticNode:
             self._position = Coord(lat=0.0, lon=0.0, depth=depth)
         self._notify_state_changed()
 
+    def set_known_node_position(self, node_id: str, position: Optional[Coord]) -> None:
+        """Manually set or update the position of a node in the registry."""
+        self._ensure_known_node(node_id)
+        self._known_nodes[node_id].position = position
+        self._notify_state_changed()
+
+    def set_known_node_depth(self, node_id: str, depth: float) -> None:
+        """Manually update the depth of a node in the registry."""
+        self._ensure_known_node(node_id)
+        kn = self._known_nodes[node_id]
+        if kn.position is not None:
+            kn.position = Coord(
+                lat=kn.position.lat,
+                lon=kn.position.lon,
+                depth=depth,
+            )
+        else:
+            kn.position = Coord(lat=0.0, lon=0.0, depth=depth)
+        self._notify_state_changed()
+
+    def delete_known_node(self, node_id: str) -> None:
+        """Remove a node from the registry."""
+        if node_id in self._known_nodes:
+            del self._known_nodes[node_id]
+            self._notify_state_changed()
+
     # --- Actions ---
 
     def request_range(self, target_id: str) -> None:

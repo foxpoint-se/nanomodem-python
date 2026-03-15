@@ -11,7 +11,7 @@ import math
 import tkinter as tk
 from datetime import datetime
 from tkinter import ttk
-from typing import Optional
+from typing import Callable, Optional
 
 from tkintermapview import TkinterMapView
 
@@ -27,6 +27,7 @@ from nanomodem.types import (
 
 NODE_COLORS = ["#3498db", "#2ecc71", "#f39c12", "#9b59b6", "#e67e22", "#1abc9c"]
 OWN_COLOR = "#e74c3c"
+SIM_COLOR = "#f1c40f"
 
 
 def _circle_coords(
@@ -62,12 +63,25 @@ class ControllerWindow:
         map_zoom: int = 17,
         position: Optional[Coord] = None,
         window_geometry: Optional[str] = None,
+        get_sim_pos_callback: Optional[Callable[[], Optional[Coord]]] = None,
+        set_sim_pos_callback: Optional[Callable[[Coord], None]] = None,
     ) -> None:
         self._root = root
         self._peer_ids = peer_ids
-        self._pending_click: Optional[tuple[float, float]] = None
         self._map_markers: list[object] = []
         self._map_paths: list[object] = []
+
+        # Edit state
+        self._editing_target: Optional[str] = None  # "me_pos", "me_depth", "sim_pos", or node_id
+        self._editing_type: Optional[str] = None    # "pos" or "depth"
+        self._edit_lat_var = tk.StringVar()
+        self._edit_lon_var = tk.StringVar()
+        self._edit_depth_var = tk.StringVar()
+
+        # Simulated position callbacks
+        self._get_sim_pos = get_sim_pos_callback
+        self._set_sim_pos = set_sim_pos_callback
+        self._show_sim_pos_var = tk.BooleanVar(value=True)
 
         # --- Create the window ---
         self._window = tk.Toplevel(root)
@@ -78,12 +92,13 @@ class ControllerWindow:
 
         # --- Build all UI panels ---
         self._build_map(map_center, map_zoom)
-        self._build_position_panel()
-        self._build_known_nodes_panel()
+        self._build_my_node_panel()
+        self._build_simulated_pos_panel()
+        self._build_registry_panel()
         self._build_actions_panel()
         self._build_console()
 
-        # --- Create AcousticNode (after UI so callbacks can schedule updates) ---
+        # --- Create AcousticNode ---
         self._node = AcousticNode(
             node_id=node_id,
             transport=transport,
@@ -91,10 +106,6 @@ class ControllerWindow:
             on_state_changed=lambda: root.after(0, self._refresh_ui),
             on_message_received=lambda msg: root.after(0, self._log_message, msg),
         )
-
-        # Sync MockTransport position (duck-typed: only MockTransport has .position)
-        if position is not None and hasattr(transport, "position"):
-            transport.position = position
 
         self._refresh_ui()
 
@@ -110,54 +121,34 @@ class ControllerWindow:
         frame = ttk.LabelFrame(self._window, text="Map — what this node knows")
         frame.pack(fill=tk.X, padx=6, pady=(6, 3))
 
-        self._map = TkinterMapView(frame, width=420, height=250, corner_radius=0)
+        self._map = TkinterMapView(frame, width=420, height=240, corner_radius=0)
         self._map.pack(fill=tk.X, padx=2, pady=2)
         self._map.set_position(center[0], center[1])
         self._map.set_zoom(zoom)
         self._map.add_left_click_map_command(self._on_map_click)
 
-    def _build_position_panel(self) -> None:
-        frame = ttk.LabelFrame(self._window, text="Own Position")
-        frame.pack(fill=tk.X, padx=6, pady=3)
-
-        # Readout row
-        readout = ttk.Frame(frame)
-        readout.pack(fill=tk.X, padx=4, pady=(4, 2))
-
-        self._lat_var = tk.StringVar(value="—")
-        self._lon_var = tk.StringVar(value="—")
-        self._depth_display_var = tk.StringVar(value="—")
-
-        for label, var in [
-            ("Lat:", self._lat_var),
-            ("Lon:", self._lon_var),
-            ("Depth:", self._depth_display_var),
-        ]:
-            ttk.Label(readout, text=label, foreground="gray").pack(side=tk.LEFT, padx=(0, 2))
-            ttk.Label(readout, textvariable=var).pack(side=tk.LEFT, padx=(0, 12))
-
-        # Controls row
-        controls = ttk.Frame(frame)
-        controls.pack(fill=tk.X, padx=4, pady=(2, 4))
-
-        ttk.Label(controls, text="Depth:").pack(side=tk.LEFT)
-        self._depth_entry = ttk.Entry(controls, width=6)
-        self._depth_entry.insert(0, "0.0")
-        self._depth_entry.pack(side=tk.LEFT, padx=(4, 2))
-        ttk.Label(controls, text="m").pack(side=tk.LEFT, padx=(0, 4))
-        ttk.Button(controls, text="Set depth", command=self._on_set_depth).pack(
-            side=tk.LEFT, padx=2
+        self._map_hint_label = ttk.Label(
+            frame, text="Editing position → click map to fill input", foreground="orange"
         )
-        ttk.Button(
-            controls, text="Set position from map", command=self._on_set_position_from_map
-        ).pack(side=tk.RIGHT)
+        # Hidden by default, shown during position edit
 
-    def _build_known_nodes_panel(self) -> None:
-        outer = ttk.LabelFrame(self._window, text="Known Nodes")
-        outer.pack(fill=tk.X, padx=6, pady=3)
+    def _build_my_node_panel(self) -> None:
+        frame = ttk.LabelFrame(self._window, text="My node")
+        frame.pack(fill=tk.X, padx=6, pady=3)
+        self._my_node_frame = ttk.Frame(frame)
+        self._my_node_frame.pack(fill=tk.X, padx=4, pady=4)
 
-        self._known_nodes_frame = ttk.Frame(outer)
-        self._known_nodes_frame.pack(fill=tk.X, padx=4, pady=4)
+    def _build_simulated_pos_panel(self) -> None:
+        self._sim_pos_panel = ttk.LabelFrame(self._window, text="Simulated position (for ranging)")
+        self._sim_pos_panel.pack(fill=tk.X, padx=6, pady=3)
+        self._sim_pos_frame = ttk.Frame(self._sim_pos_panel)
+        self._sim_pos_frame.pack(fill=tk.X, padx=4, pady=4)
+
+    def _build_registry_panel(self) -> None:
+        frame = ttk.LabelFrame(self._window, text="Registry (known nodes)")
+        frame.pack(fill=tk.X, padx=6, pady=3)
+        self._registry_frame = ttk.Frame(frame)
+        self._registry_frame.pack(fill=tk.X, padx=4, pady=4)
 
     def _build_actions_panel(self) -> None:
         frame = ttk.LabelFrame(self._window, text="Actions")
@@ -168,11 +159,7 @@ class ControllerWindow:
         range_row.pack(fill=tk.X, padx=4, pady=(4, 2))
 
         ttk.Label(range_row, text="Range to:").pack(side=tk.LEFT)
-        self._range_target = ttk.Combobox(
-            range_row, values=self._peer_ids, width=6, state="readonly"
-        )
-        if self._peer_ids:
-            self._range_target.current(0)
+        self._range_target = ttk.Combobox(range_row, width=6)
         self._range_target.pack(side=tk.LEFT, padx=4)
         ttk.Button(range_row, text="Request range", command=self._on_request_range).pack(
             side=tk.LEFT
@@ -195,14 +182,12 @@ class ControllerWindow:
 
         self._console = tk.Text(
             frame,
-            height=7,
+            height=6,
             state=tk.DISABLED,
             wrap=tk.WORD,
             font=("monospace", 9),
             bg="#1e1e1e",
             fg="#cccccc",
-            insertbackground="#cccccc",
-            selectbackground="#3a5a8c",
         )
         scrollbar = ttk.Scrollbar(frame, orient=tk.VERTICAL, command=self._console.yview)
         self._console.configure(yscrollcommand=scrollbar.set)
@@ -214,41 +199,102 @@ class ControllerWindow:
     # ------------------------------------------------------------------ #
 
     def _on_map_click(self, coords: tuple[float, float]) -> None:
-        self._pending_click = coords
-        self._log(f"Map clicked: ({coords[0]:.6f}, {coords[1]:.6f})")
-        self._refresh_map()
+        if self._editing_target and self._editing_type == "pos":
+            self._edit_lat_var.set(f"{coords[0]:.6f}")
+            self._edit_lon_var.set(f"{coords[1]:.6f}")
 
-    def _on_set_position_from_map(self) -> None:
-        if self._pending_click is None:
-            self._log("No map position selected — click the map first.")
-            return
+    def _start_edit(self, target: str, edit_type: str) -> None:
+        self._editing_target = target
+        self._editing_type = edit_type
+        
+        # Initialize vars
+        if target == "me_pos":
+            pos = self._node.get_position()
+            self._edit_lat_var.set(f"{pos.lat:.6f}" if pos else "")
+            self._edit_lon_var.set(f"{pos.lon:.6f}" if pos else "")
+            self._edit_depth_var.set(f"{pos.depth:.1f}" if pos else "0.0")
+        elif target == "me_depth":
+            pos = self._node.get_position()
+            self._edit_depth_var.set(f"{pos.depth:.1f}" if pos else "0.0")
+        elif target == "sim_pos":
+            pos = self._get_sim_pos() if self._get_sim_pos else None
+            self._edit_lat_var.set(f"{pos.lat:.6f}" if pos else "")
+            self._edit_lon_var.set(f"{pos.lon:.6f}" if pos else "")
+            self._edit_depth_var.set(f"{pos.depth:.1f}" if pos else "0.0")
+        else:
+            # Registry node
+            kn = self._node.get_known_nodes().get(target)
+            if edit_type == "pos":
+                self._edit_lat_var.set(f"{kn.position.lat:.6f}" if kn and kn.position else "")
+                self._edit_lon_var.set(f"{kn.position.lon:.6f}" if kn and kn.position else "")
+                self._edit_depth_var.set(f"{kn.position.depth:.1f}" if kn and kn.position else "0.0")
+            else:
+                self._edit_depth_var.set(f"{kn.position.depth:.1f}" if kn and kn.position else "0.0")
 
-        lat, lon = self._pending_click
-        depth = self._parse_depth()
-        coord = Coord(lat=lat, lon=lon, depth=depth)
+        if edit_type == "pos":
+            self._map_hint_label.pack(pady=2)
+        
+        self._refresh_ui()
 
-        self._node.set_position(coord)
-        self._sync_transport_position(coord)
-        self._pending_click = None
-        self._log(f"Position set: ({coord.lat:.6f}, {coord.lon:.6f}, {coord.depth:.1f})")
+    def _cancel_edit(self) -> None:
+        self._editing_target = None
+        self._editing_type = None
+        self._map_hint_label.pack_forget()
+        self._refresh_ui()
 
-    def _on_set_depth(self) -> None:
+    def _save_edit(self) -> None:
+        target = self._editing_target
+        etype = self._editing_type
+        
         try:
-            depth = float(self._depth_entry.get())
+            if etype == "pos":
+                lat = float(self._edit_lat_var.get())
+                lon = float(self._edit_lon_var.get())
+                depth = float(self._edit_depth_var.get())
+                coord = Coord(lat=lat, lon=lon, depth=depth)
+                
+                if target == "me_pos":
+                    self._node.set_position(coord)
+                elif target == "sim_pos":
+                    if self._set_sim_pos:
+                        self._set_sim_pos(coord)
+                else:
+                    self._node.set_known_node_position(target, coord)
+            else:
+                depth = float(self._edit_depth_var.get())
+                if target == "me_depth":
+                    self._node.set_depth(depth)
+                else:
+                    self._node.set_known_node_depth(target, depth)
         except ValueError:
-            self._log("Invalid depth value.")
-            return
+            self._log("Invalid input values.")
 
-        self._node.set_depth(depth)
-        pos = self._node.get_position()
-        if pos is not None:
-            self._sync_transport_position(pos)
-        self._log(f"Depth set to {depth:.1f}m")
+        self._cancel_edit()
+
+    def _on_add_node(self) -> None:
+        # Simple dialog for ID
+        dialog = tk.Toplevel(self._window)
+        dialog.title("Add Node")
+        dialog.geometry("200x100")
+        ttk.Label(dialog, text="Node ID (3 digits):").pack(pady=5)
+        entry = ttk.Entry(dialog)
+        entry.pack(pady=5)
+        def confirm():
+            nid = entry.get()
+            if len(nid) == 3 and nid.isdigit():
+                self._node.set_known_node_position(nid, None)
+                dialog.destroy()
+                self._start_edit(nid, "pos")
+            else:
+                self._log("Invalid ID.")
+        ttk.Button(dialog, text="Add", command=confirm).pack()
+
+    def _on_delete_node(self, node_id: str) -> None:
+        self._node.delete_known_node(node_id)
 
     def _on_request_range(self) -> None:
         target = self._range_target.get()
         if not target:
-            self._log("No target selected.")
             return
         self._log(f"Ranging to {target}...")
         self._node.request_range(target)
@@ -263,7 +309,6 @@ class ControllerWindow:
     def _on_calculate(self) -> None:
         result = self._node.calculate_position()
         if result is not None:
-            self._sync_transport_position(result)
             self._log(f"Calculated position: ({result.lat:.6f}, {result.lon:.6f})")
         else:
             self._log("Cannot calculate: need 3+ nodes with position and range.")
@@ -279,125 +324,166 @@ class ControllerWindow:
             self._root.quit()
 
     # ------------------------------------------------------------------ #
-    #  UI refresh (called via on_state_changed callback)                   #
+    #  UI refresh                                                          #
     # ------------------------------------------------------------------ #
 
     def _refresh_ui(self) -> None:
-        self._refresh_position_display()
-        self._refresh_known_nodes()
+        self._refresh_my_node_panel()
+        self._refresh_sim_pos_panel()
+        self._refresh_registry_panel()
+        self._refresh_actions_dropdown()
         self._refresh_map()
 
-    def _refresh_position_display(self) -> None:
+    def _refresh_my_node_panel(self) -> None:
+        for w in self._my_node_frame.winfo_children(): w.destroy()
         pos = self._node.get_position()
-        if pos is not None:
-            self._lat_var.set(f"{pos.lat:.6f}")
-            self._lon_var.set(f"{pos.lon:.6f}")
-            self._depth_display_var.set(f"{pos.depth:.1f}m")
+        
+        # Position row
+        row = ttk.Frame(self._my_node_frame)
+        row.pack(fill=tk.X, pady=2)
+        ttk.Label(row, text="Position:", foreground="gray", width=10).pack(side=tk.LEFT)
+        
+        if self._editing_target == "me_pos":
+            ttk.Entry(row, textvariable=self._edit_lat_var, width=10).pack(side=tk.LEFT, padx=2)
+            ttk.Entry(row, textvariable=self._edit_lon_var, width=10).pack(side=tk.LEFT, padx=2)
+            ttk.Entry(row, textvariable=self._edit_depth_var, width=5).pack(side=tk.LEFT, padx=2)
+            ttk.Button(row, text="Save", command=self._save_edit).pack(side=tk.LEFT, padx=2)
+            ttk.Button(row, text="X", command=self._cancel_edit).pack(side=tk.LEFT)
         else:
-            self._lat_var.set("—")
-            self._lon_var.set("—")
-            self._depth_display_var.set("—")
+            val = f"{pos.lat:.6f}, {pos.lon:.6f}" if pos else "—"
+            ttk.Label(row, text=val, font="monospace").pack(side=tk.LEFT)
+            ttk.Button(row, text="Edit", command=lambda: self._start_edit("me_pos", "pos")).pack(side=tk.RIGHT)
 
-    def _refresh_known_nodes(self) -> None:
-        for widget in self._known_nodes_frame.winfo_children():
-            widget.destroy()
+        # Depth row
+        row = ttk.Frame(self._my_node_frame)
+        row.pack(fill=tk.X, pady=2)
+        ttk.Label(row, text="Depth:", foreground="gray", width=10).pack(side=tk.LEFT)
+        
+        if self._editing_target == "me_depth":
+            ttk.Entry(row, textvariable=self._edit_depth_var, width=10).pack(side=tk.LEFT, padx=2)
+            ttk.Button(row, text="Save", command=self._save_edit).pack(side=tk.LEFT, padx=2)
+            ttk.Button(row, text="X", command=self._cancel_edit).pack(side=tk.LEFT)
+        else:
+            val = f"{pos.depth:.1f} m" if pos else "—"
+            ttk.Label(row, text=val, font="monospace").pack(side=tk.LEFT)
+            ttk.Button(row, text="Edit", command=lambda: self._start_edit("me_depth", "depth")).pack(side=tk.RIGHT)
 
-        known = self._node.get_known_nodes()
-        if not known:
-            ttk.Label(
-                self._known_nodes_frame, text="No known nodes", foreground="gray"
-            ).pack(anchor=tk.W)
+    def _refresh_sim_pos_panel(self) -> None:
+        for w in self._sim_pos_frame.winfo_children(): w.destroy()
+        
+        if self._get_sim_pos is None:
+            # Real mode - disabled look
+            ttk.Label(self._sim_pos_frame, text="N/A (real mode)", foreground="gray").pack()
             return
 
-        for i, (nid, kn) in enumerate(sorted(known.items())):
-            color = NODE_COLORS[i % len(NODE_COLORS)]
-            row = ttk.Frame(self._known_nodes_frame)
+        pos = self._get_sim_pos()
+        row = ttk.Frame(self._sim_pos_frame)
+        row.pack(fill=tk.X)
+        ttk.Label(row, text="Position:", foreground="gray", width=10).pack(side=tk.LEFT)
+        
+        if self._editing_target == "sim_pos":
+            ttk.Entry(row, textvariable=self._edit_lat_var, width=10).pack(side=tk.LEFT, padx=2)
+            ttk.Entry(row, textvariable=self._edit_lon_var, width=10).pack(side=tk.LEFT, padx=2)
+            ttk.Entry(row, textvariable=self._edit_depth_var, width=5).pack(side=tk.LEFT, padx=2)
+            ttk.Button(row, text="Save", command=self._save_edit).pack(side=tk.LEFT, padx=2)
+            ttk.Button(row, text="X", command=self._cancel_edit).pack(side=tk.LEFT)
+        else:
+            val = f"{pos.lat:.6f}, {pos.lon:.6f}, {pos.depth:.1f}" if pos else "—"
+            ttk.Label(row, text=val, font="monospace").pack(side=tk.LEFT)
+            ttk.Button(row, text="Edit", command=lambda: self._start_edit("sim_pos", "pos")).pack(side=tk.RIGHT)
+        
+        ttk.Checkbutton(
+            self._sim_pos_frame, text="Show simulated position on map", 
+            variable=self._show_sim_pos_var, command=self._refresh_map
+        ).pack(anchor=tk.W, pady=(4, 0))
+
+    def _refresh_registry_panel(self) -> None:
+        for w in self._registry_frame.winfo_children(): w.destroy()
+        
+        known = self._node.get_known_nodes()
+        
+        # Table headers
+        header = ttk.Frame(self._registry_frame)
+        header.pack(fill=tk.X)
+        ttk.Label(header, text="ID", width=5, font="TkDefaultFont 9 bold").pack(side=tk.LEFT)
+        ttk.Label(header, text="Position", width=20, font="TkDefaultFont 9 bold").pack(side=tk.LEFT)
+        ttk.Label(header, text="Depth", width=8, font="TkDefaultFont 9 bold").pack(side=tk.LEFT)
+        ttk.Label(header, text="Range", width=8, font="TkDefaultFont 9 bold").pack(side=tk.LEFT)
+
+        for nid, kn in sorted(known.items()):
+            row = ttk.Frame(self._registry_frame)
             row.pack(fill=tk.X, pady=1)
-
-            dot = tk.Canvas(row, width=10, height=10, highlightthickness=0)
-            dot.create_oval(1, 1, 9, 9, fill=color, outline="")
-            dot.pack(side=tk.LEFT, padx=(0, 4))
-
-            ttk.Label(row, text=nid, font=("monospace", 10, "bold")).pack(
-                side=tk.LEFT, padx=(0, 8)
-            )
-
-            if kn.position is not None:
-                ttk.Label(
-                    row,
-                    text=f"({kn.position.lat:.4f}, {kn.position.lon:.4f})",
-                    foreground="gray",
-                ).pack(side=tk.LEFT, padx=(0, 8))
+            
+            if self._editing_target == nid:
+                # Editing row
+                ttk.Label(row, text=nid, width=5, font="monospace").pack(side=tk.LEFT)
+                edit_f = ttk.Frame(row)
+                edit_f.pack(side=tk.LEFT, fill=tk.X, expand=True)
+                
+                if self._editing_type == "pos":
+                    ttk.Entry(edit_f, textvariable=self._edit_lat_var, width=10).pack(side=tk.LEFT, padx=1)
+                    ttk.Entry(edit_f, textvariable=self._edit_lon_var, width=10).pack(side=tk.LEFT, padx=1)
+                    ttk.Entry(edit_f, textvariable=self._edit_depth_var, width=4).pack(side=tk.LEFT, padx=1)
+                else:
+                    ttk.Entry(edit_f, textvariable=self._edit_depth_var, width=10).pack(side=tk.LEFT, padx=1)
+                
+                ttk.Button(edit_f, text="Save", command=self._save_edit).pack(side=tk.LEFT, padx=1)
+                ttk.Button(edit_f, text="X", command=self._cancel_edit).pack(side=tk.LEFT)
             else:
-                ttk.Label(row, text="pos unknown", foreground="gray").pack(
-                    side=tk.LEFT, padx=(0, 8)
-                )
+                # Display row
+                ttk.Label(row, text=nid, width=5, font="monospace").pack(side=tk.LEFT)
+                pos_val = f"{kn.position.lat:.4f}, {kn.position.lon:.4f}" if kn.position else "—"
+                ttk.Label(row, text=pos_val, width=20, font="monospace", foreground="gray").pack(side=tk.LEFT)
+                depth_val = f"{kn.position.depth:.1f}m" if kn.position else "—"
+                ttk.Label(row, text=depth_val, width=8, font="monospace", foreground="gray").pack(side=tk.LEFT)
+                range_val = f"{kn.last_range:.1f}m" if kn.last_range is not None else "—"
+                ttk.Label(row, text=range_val, width=8, font="monospace", foreground="green").pack(side=tk.LEFT)
+                
+                ttk.Button(row, text="Del", width=4, command=lambda n=nid: self._on_delete_node(n)).pack(side=tk.RIGHT)
+                ttk.Button(row, text="D", width=3, command=lambda n=nid: self._start_edit(n, "depth")).pack(side=tk.RIGHT, padx=1)
+                ttk.Button(row, text="P", width=3, command=lambda n=nid: self._start_edit(n, "pos")).pack(side=tk.RIGHT)
 
-            if kn.last_range is not None:
-                ttk.Label(row, text=f"{kn.last_range:.1f}m", foreground="green").pack(
-                    side=tk.LEFT
-                )
-            else:
-                ttk.Label(row, text="no range", foreground="gray").pack(side=tk.LEFT)
+        ttk.Button(self._registry_frame, text="+ Add node", command=self._on_add_node).pack(anchor=tk.W, pady=4)
+
+    def _refresh_actions_dropdown(self) -> None:
+        ids = sorted(self._node.get_known_nodes().keys())
+        self._range_target["values"] = ids
 
     def _refresh_map(self) -> None:
-        # Remove old markers and paths
         for m in self._map_markers:
-            try:
-                m.delete()  # type: ignore[union-attr]
-            except Exception:
-                pass
+            try: m.delete()
+            except: pass
         for p in self._map_paths:
-            try:
-                p.delete()  # type: ignore[union-attr]
-            except Exception:
-                pass
+            try: p.delete()
+            except: pass
         self._map_markers.clear()
         self._map_paths.clear()
 
         # Own position (red)
         pos = self._node.get_position()
-        if pos is not None:
-            m = self._map.set_marker(
-                pos.lat,
-                pos.lon,
-                text=f"{self._node.node_id} (me)",
-                marker_color_circle=OWN_COLOR,
-                marker_color_outside=OWN_COLOR,
-            )
+        if pos:
+            m = self._map.set_marker(pos.lat, pos.lon, text=f"{self._node.node_id} (me)",
+                                   marker_color_circle=OWN_COLOR, marker_color_outside=OWN_COLOR)
             self._map_markers.append(m)
 
-        # Pending click (yellow)
-        if self._pending_click is not None:
-            m = self._map.set_marker(
-                self._pending_click[0],
-                self._pending_click[1],
-                text="click",
-                marker_color_circle="#f1c40f",
-                marker_color_outside="#f1c40f",
-            )
-            self._map_markers.append(m)
+        # Simulated position (dashed yellow)
+        if self._show_sim_pos_var.get() and self._get_sim_pos:
+            sim_pos = self._get_sim_pos()
+            if sim_pos:
+                m = self._map.set_marker(sim_pos.lat, sim_pos.lon, text="simulated",
+                                       marker_color_circle=SIM_COLOR, marker_color_outside=SIM_COLOR)
+                self._map_markers.append(m)
 
-        # Known nodes + range circles
+        # Known nodes
         known = self._node.get_known_nodes()
         for i, (nid, kn) in enumerate(sorted(known.items())):
             color = NODE_COLORS[i % len(NODE_COLORS)]
-
-            if kn.position is not None:
-                m = self._map.set_marker(
-                    kn.position.lat,
-                    kn.position.lon,
-                    text=nid,
-                    marker_color_circle=color,
-                    marker_color_outside=color,
-                )
+            if kn.position:
+                m = self._map.set_marker(kn.position.lat, kn.position.lon, text=nid,
+                                       marker_color_circle=color, marker_color_outside=color)
                 self._map_markers.append(m)
-
-                # Range circle
                 if kn.last_range is not None and kn.last_range > 0:
-                    pts = _circle_coords(
-                        kn.position.lat, kn.position.lon, kn.last_range
-                    )
+                    pts = _circle_coords(kn.position.lat, kn.position.lon, kn.last_range)
                     p = self._map.set_path(pts, color=color, width=2)
                     self._map_paths.append(p)
 
@@ -406,38 +492,19 @@ class ControllerWindow:
     # ------------------------------------------------------------------ #
 
     def _log(self, text: str) -> None:
-        timestamp = datetime.now().strftime("%H:%M:%S")
+        ts = datetime.now().strftime("%H:%M:%S")
         self._console.configure(state=tk.NORMAL)
-        self._console.insert(tk.END, f"[{timestamp}] {text}\n")
+        self._console.insert(tk.END, f"[{ts}] {text}\n")
         self._console.see(tk.END)
         self._console.configure(state=tk.DISABLED)
 
     def _log_message(self, msg: Message) -> None:
         match msg:
             case PositionMessage(node_id=nid, coord=c):
-                self._log(
-                    f"Received position from {nid}: ({c.lat:.4f}, {c.lon:.4f}, {c.depth:.1f})"
-                )
+                self._log(f"Recv POS from {nid}: ({c.lat:.4f}, {c.lon:.4f}, {c.depth:.1f})")
             case RangeResponseMessage(node_id=nid, timestamp=ts):
                 kn = self._node.get_known_nodes().get(nid)
-                if kn and kn.last_range is not None:
-                    self._log(f"Range to {nid}: {kn.last_range:.2f}m (ts={ts})")
-                else:
-                    self._log(f"Range response from {nid}: ts={ts}")
+                dist = f"{kn.last_range:.2f}m" if kn and kn.last_range is not None else "??m"
+                self._log(f"Recv RANGE from {nid}: {dist} (ts={ts})")
             case UnknownMessage(raw=raw):
-                self._log(f"Unknown: {raw}")
-
-    # ------------------------------------------------------------------ #
-    #  Helpers                                                             #
-    # ------------------------------------------------------------------ #
-
-    def _sync_transport_position(self, coord: Coord) -> None:
-        """Keep MockTransport.position in sync (duck-typed, no-op for real serial)."""
-        if hasattr(self._node.transport, "position"):
-            self._node.transport.position = coord  # type: ignore[union-attr]
-
-    def _parse_depth(self) -> float:
-        try:
-            return float(self._depth_entry.get())
-        except ValueError:
-            return 0.0
+                self._log(f"Recv UNKNOWN: {raw}")
