@@ -68,8 +68,9 @@ class ControllerWindow:
     ) -> None:
         self._root = root
         self._peer_ids = peer_ids
-        self._map_markers: list[object] = []
-        self._map_paths: list[object] = []
+        self._markers: dict[str, object] = {}  # node_id -> marker
+        self._paths: dict[str, object] = {}    # node_id -> path (range circle)
+        self._registry_rows: dict[str, dict[str, ttk.Frame | ttk.Label]] = {}
 
         # Edit state
         self._editing_target: Optional[str] = None  # "me_pos", "me_depth", "sim_pos", or node_id
@@ -138,17 +139,93 @@ class ControllerWindow:
         self._my_node_frame = ttk.Frame(frame)
         self._my_node_frame.pack(fill=tk.X, padx=4, pady=4)
 
+        # --- Position Row ---
+        self._me_pos_row = ttk.Frame(self._my_node_frame)
+        self._me_pos_row.pack(fill=tk.X, pady=2)
+        ttk.Label(self._me_pos_row, text="Position:", foreground="gray", width=10).pack(side=tk.LEFT)
+        
+        # Display sub-frame
+        self._me_pos_display_f = ttk.Frame(self._me_pos_row)
+        self._me_pos_val_label = ttk.Label(self._me_pos_display_f, text="—", font="monospace")
+        self._me_pos_val_label.pack(side=tk.LEFT)
+        ttk.Button(self._me_pos_display_f, text="Edit", command=lambda: self._start_edit("me_pos", "pos")).pack(side=tk.RIGHT)
+        
+        # Edit sub-frame
+        self._me_pos_edit_f = ttk.Frame(self._me_pos_row)
+        ttk.Entry(self._me_pos_edit_f, textvariable=self._edit_lat_var, width=10).pack(side=tk.LEFT, padx=2)
+        ttk.Entry(self._me_pos_edit_f, textvariable=self._edit_lon_var, width=10).pack(side=tk.LEFT, padx=2)
+        ttk.Entry(self._me_pos_edit_f, textvariable=self._edit_depth_var, width=5).pack(side=tk.LEFT, padx=2)
+        ttk.Button(self._me_pos_edit_f, text="Save", command=self._save_edit).pack(side=tk.LEFT, padx=2)
+        ttk.Button(self._me_pos_edit_f, text="X", command=self._cancel_edit).pack(side=tk.LEFT)
+
+        # --- Depth Row ---
+        self._me_depth_row = ttk.Frame(self._my_node_frame)
+        self._me_depth_row.pack(fill=tk.X, pady=2)
+        ttk.Label(self._me_depth_row, text="Depth:", foreground="gray", width=10).pack(side=tk.LEFT)
+        
+        # Display sub-frame
+        self._me_depth_display_f = ttk.Frame(self._me_depth_row)
+        self._me_depth_val_label = ttk.Label(self._me_depth_display_f, text="—", font="monospace")
+        self._me_depth_val_label.pack(side=tk.LEFT)
+        ttk.Button(self._me_depth_display_f, text="Edit", command=lambda: self._start_edit("me_depth", "depth")).pack(side=tk.RIGHT)
+        
+        # Edit sub-frame
+        self._me_depth_edit_f = ttk.Frame(self._me_depth_row)
+        ttk.Entry(self._me_depth_edit_f, textvariable=self._edit_depth_var, width=10).pack(side=tk.LEFT, padx=2)
+        ttk.Button(self._me_depth_edit_f, text="Save", command=self._save_edit).pack(side=tk.LEFT, padx=2)
+        ttk.Button(self._me_depth_edit_f, text="X", command=self._cancel_edit).pack(side=tk.LEFT)
+
     def _build_simulated_pos_panel(self) -> None:
         self._sim_pos_panel = ttk.LabelFrame(self._window, text="Simulated position (for ranging)")
         self._sim_pos_panel.pack(fill=tk.X, padx=6, pady=3)
         self._sim_pos_frame = ttk.Frame(self._sim_pos_panel)
         self._sim_pos_frame.pack(fill=tk.X, padx=4, pady=4)
 
+        if self._get_sim_pos is None:
+            ttk.Label(self._sim_pos_frame, text="N/A (real mode)", foreground="gray").pack()
+            return
+
+        self._sim_pos_row = ttk.Frame(self._sim_pos_frame)
+        self._sim_pos_row.pack(fill=tk.X)
+        ttk.Label(self._sim_pos_row, text="Position:", foreground="gray", width=10).pack(side=tk.LEFT)
+
+        # Display sub-frame
+        self._sim_pos_display_f = ttk.Frame(self._sim_pos_row)
+        self._sim_pos_val_label = ttk.Label(self._sim_pos_display_f, text="—", font="monospace")
+        self._sim_pos_val_label.pack(side=tk.LEFT)
+        ttk.Button(self._sim_pos_display_f, text="Edit", command=lambda: self._start_edit("sim_pos", "pos")).pack(side=tk.RIGHT)
+
+        # Edit sub-frame
+        self._sim_pos_edit_f = ttk.Frame(self._sim_pos_row)
+        ttk.Entry(self._sim_pos_edit_f, textvariable=self._edit_lat_var, width=10).pack(side=tk.LEFT, padx=2)
+        ttk.Entry(self._sim_pos_edit_f, textvariable=self._edit_lon_var, width=10).pack(side=tk.LEFT, padx=2)
+        ttk.Entry(self._sim_pos_edit_f, textvariable=self._edit_depth_var, width=5).pack(side=tk.LEFT, padx=2)
+        ttk.Button(self._sim_pos_edit_f, text="Save", command=self._save_edit).pack(side=tk.LEFT, padx=2)
+        ttk.Button(self._sim_pos_edit_f, text="X", command=self._cancel_edit).pack(side=tk.LEFT)
+
+        ttk.Checkbutton(
+            self._sim_pos_frame, text="Show simulated position on map", 
+            variable=self._show_sim_pos_var, command=self._refresh_map
+        ).pack(anchor=tk.W, pady=(4, 0))
+
     def _build_registry_panel(self) -> None:
         frame = ttk.LabelFrame(self._window, text="Registry (known nodes)")
         frame.pack(fill=tk.X, padx=6, pady=3)
         self._registry_frame = ttk.Frame(frame)
         self._registry_frame.pack(fill=tk.X, padx=4, pady=4)
+
+        # Table headers
+        self._registry_header = ttk.Frame(self._registry_frame)
+        self._registry_header.pack(fill=tk.X)
+        ttk.Label(self._registry_header, text="ID", width=5, font="TkDefaultFont 9 bold").pack(side=tk.LEFT)
+        ttk.Label(self._registry_header, text="Position", width=20, font="TkDefaultFont 9 bold").pack(side=tk.LEFT)
+        ttk.Label(self._registry_header, text="Depth", width=8, font="TkDefaultFont 9 bold").pack(side=tk.LEFT)
+        ttk.Label(self._registry_header, text="Range", width=8, font="TkDefaultFont 9 bold").pack(side=tk.LEFT)
+
+        self._registry_rows_container = ttk.Frame(self._registry_frame)
+        self._registry_rows_container.pack(fill=tk.X)
+
+        ttk.Button(self._registry_frame, text="+ Add node", command=self._on_add_node).pack(anchor=tk.W, pady=4)
 
     def _build_actions_panel(self) -> None:
         frame = ttk.LabelFrame(self._window, text="Actions")
@@ -335,157 +412,207 @@ class ControllerWindow:
         self._refresh_map()
 
     def _refresh_my_node_panel(self) -> None:
-        for w in self._my_node_frame.winfo_children(): w.destroy()
         pos = self._node.get_position()
         
-        # Position row
-        row = ttk.Frame(self._my_node_frame)
-        row.pack(fill=tk.X, pady=2)
-        ttk.Label(row, text="Position:", foreground="gray", width=10).pack(side=tk.LEFT)
-        
+        # Update Position Row
         if self._editing_target == "me_pos":
-            ttk.Entry(row, textvariable=self._edit_lat_var, width=10).pack(side=tk.LEFT, padx=2)
-            ttk.Entry(row, textvariable=self._edit_lon_var, width=10).pack(side=tk.LEFT, padx=2)
-            ttk.Entry(row, textvariable=self._edit_depth_var, width=5).pack(side=tk.LEFT, padx=2)
-            ttk.Button(row, text="Save", command=self._save_edit).pack(side=tk.LEFT, padx=2)
-            ttk.Button(row, text="X", command=self._cancel_edit).pack(side=tk.LEFT)
+            self._me_pos_display_f.pack_forget()
+            self._me_pos_edit_f.pack(side=tk.LEFT, fill=tk.X, expand=True)
         else:
+            self._me_pos_edit_f.pack_forget()
+            self._me_pos_display_f.pack(side=tk.LEFT, fill=tk.X, expand=True)
             val = f"{pos.lat:.6f}, {pos.lon:.6f}" if pos else "—"
-            ttk.Label(row, text=val, font="monospace").pack(side=tk.LEFT)
-            ttk.Button(row, text="Edit", command=lambda: self._start_edit("me_pos", "pos")).pack(side=tk.RIGHT)
+            self._me_pos_val_label.configure(text=val)
 
-        # Depth row
-        row = ttk.Frame(self._my_node_frame)
-        row.pack(fill=tk.X, pady=2)
-        ttk.Label(row, text="Depth:", foreground="gray", width=10).pack(side=tk.LEFT)
-        
+        # Update Depth Row
         if self._editing_target == "me_depth":
-            ttk.Entry(row, textvariable=self._edit_depth_var, width=10).pack(side=tk.LEFT, padx=2)
-            ttk.Button(row, text="Save", command=self._save_edit).pack(side=tk.LEFT, padx=2)
-            ttk.Button(row, text="X", command=self._cancel_edit).pack(side=tk.LEFT)
+            self._me_depth_display_f.pack_forget()
+            self._me_depth_edit_f.pack(side=tk.LEFT, fill=tk.X, expand=True)
         else:
+            self._me_depth_edit_f.pack_forget()
+            self._me_depth_display_f.pack(side=tk.LEFT, fill=tk.X, expand=True)
             val = f"{pos.depth:.1f} m" if pos else "—"
-            ttk.Label(row, text=val, font="monospace").pack(side=tk.LEFT)
-            ttk.Button(row, text="Edit", command=lambda: self._start_edit("me_depth", "depth")).pack(side=tk.RIGHT)
+            self._me_depth_val_label.configure(text=val)
 
     def _refresh_sim_pos_panel(self) -> None:
-        for w in self._sim_pos_frame.winfo_children(): w.destroy()
-        
         if self._get_sim_pos is None:
-            # Real mode - disabled look
-            ttk.Label(self._sim_pos_frame, text="N/A (real mode)", foreground="gray").pack()
             return
 
         pos = self._get_sim_pos()
-        row = ttk.Frame(self._sim_pos_frame)
-        row.pack(fill=tk.X)
-        ttk.Label(row, text="Position:", foreground="gray", width=10).pack(side=tk.LEFT)
-        
         if self._editing_target == "sim_pos":
-            ttk.Entry(row, textvariable=self._edit_lat_var, width=10).pack(side=tk.LEFT, padx=2)
-            ttk.Entry(row, textvariable=self._edit_lon_var, width=10).pack(side=tk.LEFT, padx=2)
-            ttk.Entry(row, textvariable=self._edit_depth_var, width=5).pack(side=tk.LEFT, padx=2)
-            ttk.Button(row, text="Save", command=self._save_edit).pack(side=tk.LEFT, padx=2)
-            ttk.Button(row, text="X", command=self._cancel_edit).pack(side=tk.LEFT)
+            self._sim_pos_display_f.pack_forget()
+            self._sim_pos_edit_f.pack(side=tk.LEFT, fill=tk.X, expand=True)
         else:
+            self._sim_pos_edit_f.pack_forget()
+            self._sim_pos_display_f.pack(side=tk.LEFT, fill=tk.X, expand=True)
             val = f"{pos.lat:.6f}, {pos.lon:.6f}, {pos.depth:.1f}" if pos else "—"
-            ttk.Label(row, text=val, font="monospace").pack(side=tk.LEFT)
-            ttk.Button(row, text="Edit", command=lambda: self._start_edit("sim_pos", "pos")).pack(side=tk.RIGHT)
-        
-        ttk.Checkbutton(
-            self._sim_pos_frame, text="Show simulated position on map", 
-            variable=self._show_sim_pos_var, command=self._refresh_map
-        ).pack(anchor=tk.W, pady=(4, 0))
+            self._sim_pos_val_label.configure(text=val)
 
     def _refresh_registry_panel(self) -> None:
-        for w in self._registry_frame.winfo_children(): w.destroy()
-        
         known = self._node.get_known_nodes()
         
-        # Table headers
-        header = ttk.Frame(self._registry_frame)
-        header.pack(fill=tk.X)
-        ttk.Label(header, text="ID", width=5, font="TkDefaultFont 9 bold").pack(side=tk.LEFT)
-        ttk.Label(header, text="Position", width=20, font="TkDefaultFont 9 bold").pack(side=tk.LEFT)
-        ttk.Label(header, text="Depth", width=8, font="TkDefaultFont 9 bold").pack(side=tk.LEFT)
-        ttk.Label(header, text="Range", width=8, font="TkDefaultFont 9 bold").pack(side=tk.LEFT)
+        # Remove widgets for nodes that are no longer in the registry
+        current_ids = set(known.keys())
+        stored_ids = set(self._registry_rows.keys())
+        for nid in stored_ids - current_ids:
+            self._registry_rows[nid]["row_frame"].destroy()
+            del self._registry_rows[nid]
 
+        # Add or update widgets for each node
         for nid, kn in sorted(known.items()):
-            row = ttk.Frame(self._registry_frame)
-            row.pack(fill=tk.X, pady=1)
+            if nid not in self._registry_rows:
+                # Create row frame
+                row_frame = ttk.Frame(self._registry_rows_container)
+                row_frame.pack(fill=tk.X, pady=1)
+                
+                # ID label
+                ttk.Label(row_frame, text=nid, width=5, font="monospace").pack(side=tk.LEFT)
+                
+                # Display sub-frame
+                display_f = ttk.Frame(row_frame)
+                pos_label = ttk.Label(display_f, text="—", width=20, font="monospace", foreground="gray")
+                pos_label.pack(side=tk.LEFT)
+                depth_label = ttk.Label(display_f, text="—", width=8, font="monospace", foreground="gray")
+                depth_label.pack(side=tk.LEFT)
+                range_label = ttk.Label(display_f, text="—", width=8, font="monospace", foreground="green")
+                range_label.pack(side=tk.LEFT)
+                
+                ttk.Button(display_f, text="Del", width=4, command=lambda n=nid: self._on_delete_node(n)).pack(side=tk.RIGHT)
+                ttk.Button(display_f, text="D", width=3, command=lambda n=nid: self._start_edit(n, "depth")).pack(side=tk.RIGHT, padx=1)
+                ttk.Button(display_f, text="P", width=3, command=lambda n=nid: self._start_edit(n, "pos")).pack(side=tk.RIGHT)
+                
+                # Edit sub-frame
+                edit_f = ttk.Frame(row_frame)
+                
+                self._registry_rows[nid] = {
+                    "row_frame": row_frame,
+                    "display_f": display_f,
+                    "pos_label": pos_label,
+                    "depth_label": depth_label,
+                    "range_label": range_label,
+                    "edit_f": edit_f,
+                }
+
+            row_info = self._registry_rows[nid]
             
             if self._editing_target == nid:
-                # Editing row
-                ttk.Label(row, text=nid, width=5, font="monospace").pack(side=tk.LEFT)
-                edit_f = ttk.Frame(row)
-                edit_f.pack(side=tk.LEFT, fill=tk.X, expand=True)
+                row_info["display_f"].pack_forget()
+                row_info["edit_f"].pack(side=tk.LEFT, fill=tk.X, expand=True)
+                
+                # Re-create edit widgets to ensure correct type (pos vs depth)
+                for w in row_info["edit_f"].winfo_children(): w.destroy()
                 
                 if self._editing_type == "pos":
-                    ttk.Entry(edit_f, textvariable=self._edit_lat_var, width=10).pack(side=tk.LEFT, padx=1)
-                    ttk.Entry(edit_f, textvariable=self._edit_lon_var, width=10).pack(side=tk.LEFT, padx=1)
-                    ttk.Entry(edit_f, textvariable=self._edit_depth_var, width=4).pack(side=tk.LEFT, padx=1)
+                    ttk.Entry(row_info["edit_f"], textvariable=self._edit_lat_var, width=10).pack(side=tk.LEFT, padx=1)
+                    ttk.Entry(row_info["edit_f"], textvariable=self._edit_lon_var, width=10).pack(side=tk.LEFT, padx=1)
+                    ttk.Entry(row_info["edit_f"], textvariable=self._edit_depth_var, width=4).pack(side=tk.LEFT, padx=1)
                 else:
-                    ttk.Entry(edit_f, textvariable=self._edit_depth_var, width=10).pack(side=tk.LEFT, padx=1)
+                    ttk.Entry(row_info["edit_f"], textvariable=self._edit_depth_var, width=10).pack(side=tk.LEFT, padx=1)
                 
-                ttk.Button(edit_f, text="Save", command=self._save_edit).pack(side=tk.LEFT, padx=1)
-                ttk.Button(edit_f, text="X", command=self._cancel_edit).pack(side=tk.LEFT)
+                ttk.Button(row_info["edit_f"], text="Save", command=self._save_edit).pack(side=tk.LEFT, padx=1)
+                ttk.Button(row_info["edit_f"], text="X", command=self._cancel_edit).pack(side=tk.LEFT)
             else:
-                # Display row
-                ttk.Label(row, text=nid, width=5, font="monospace").pack(side=tk.LEFT)
-                pos_val = f"{kn.position.lat:.4f}, {kn.position.lon:.4f}" if kn.position else "—"
-                ttk.Label(row, text=pos_val, width=20, font="monospace", foreground="gray").pack(side=tk.LEFT)
-                depth_val = f"{kn.position.depth:.1f}m" if kn.position else "—"
-                ttk.Label(row, text=depth_val, width=8, font="monospace", foreground="gray").pack(side=tk.LEFT)
-                range_val = f"{kn.last_range:.1f}m" if kn.last_range is not None else "—"
-                ttk.Label(row, text=range_val, width=8, font="monospace", foreground="green").pack(side=tk.LEFT)
+                row_info["edit_f"].pack_forget()
+                row_info["display_f"].pack(side=tk.LEFT, fill=tk.X, expand=True)
                 
-                ttk.Button(row, text="Del", width=4, command=lambda n=nid: self._on_delete_node(n)).pack(side=tk.RIGHT)
-                ttk.Button(row, text="D", width=3, command=lambda n=nid: self._start_edit(n, "depth")).pack(side=tk.RIGHT, padx=1)
-                ttk.Button(row, text="P", width=3, command=lambda n=nid: self._start_edit(n, "pos")).pack(side=tk.RIGHT)
-
-        ttk.Button(self._registry_frame, text="+ Add node", command=self._on_add_node).pack(anchor=tk.W, pady=4)
+                pos_val = f"{kn.position.lat:.4f}, {kn.position.lon:.4f}" if kn.position else "—"
+                row_info["pos_label"].configure(text=pos_val)
+                depth_val = f"{kn.position.depth:.1f}m" if kn.position else "—"
+                row_info["depth_label"].configure(text=depth_val)
+                range_val = f"{kn.last_range:.1f}m" if kn.last_range is not None else "—"
+                row_info["range_label"].configure(text=range_val)
 
     def _refresh_actions_dropdown(self) -> None:
         ids = sorted(self._node.get_known_nodes().keys())
         self._range_target["values"] = ids
 
     def _refresh_map(self) -> None:
-        for m in self._map_markers:
-            try: m.delete()
-            except: pass
-        for p in self._map_paths:
-            try: p.delete()
-            except: pass
-        self._map_markers.clear()
-        self._map_paths.clear()
+        known = self._node.get_known_nodes()
+        current_ids = set(known.keys()) | {"me", "simulated"}
+        stored_ids = set(self._markers.keys())
+        
+        # Remove markers for nodes no longer present
+        for nid in stored_ids - current_ids:
+            self._delete_marker(nid)
+            self._delete_path(nid)
 
-        # Own position (red)
+        # 1. Own position (red)
         pos = self._node.get_position()
         if pos:
-            m = self._map.set_marker(pos.lat, pos.lon, text=f"{self._node.node_id} (me)",
-                                   marker_color_circle=OWN_COLOR, marker_color_outside=OWN_COLOR)
-            self._map_markers.append(m)
+            self._update_or_create_marker(
+                "me", pos.lat, pos.lon, 
+                text=f"{self._node.node_id} (me)",
+                color=OWN_COLOR
+            )
+        else:
+            self._delete_marker("me")
 
-        # Simulated position (dashed yellow)
-        if self._show_sim_pos_var.get() and self._get_sim_pos:
-            sim_pos = self._get_sim_pos()
-            if sim_pos:
-                m = self._map.set_marker(sim_pos.lat, sim_pos.lon, text="simulated",
-                                       marker_color_circle=SIM_COLOR, marker_color_outside=SIM_COLOR)
-                self._map_markers.append(m)
+        # 2. Simulated position (dashed yellow)
+        sim_pos = self._get_sim_pos() if self._get_sim_pos else None
+        if self._show_sim_pos_var.get() and sim_pos:
+            self._update_or_create_marker(
+                "simulated", sim_pos.lat, sim_pos.lon,
+                text="simulated",
+                color=SIM_COLOR
+            )
+        else:
+            self._delete_marker("simulated")
 
-        # Known nodes
-        known = self._node.get_known_nodes()
+        # 3. Known nodes
         for i, (nid, kn) in enumerate(sorted(known.items())):
             color = NODE_COLORS[i % len(NODE_COLORS)]
             if kn.position:
-                m = self._map.set_marker(kn.position.lat, kn.position.lon, text=nid,
-                                       marker_color_circle=color, marker_color_outside=color)
-                self._map_markers.append(m)
+                self._update_or_create_marker(
+                    nid, kn.position.lat, kn.position.lon,
+                    text=nid,
+                    color=color
+                )
+                
+                # Range circle
                 if kn.last_range is not None and kn.last_range > 0:
                     pts = _circle_coords(kn.position.lat, kn.position.lon, kn.last_range)
-                    p = self._map.set_path(pts, color=color, width=2)
-                    self._map_paths.append(p)
+                    self._update_or_create_path(nid, pts, color=color)
+                else:
+                    self._delete_path(nid)
+            else:
+                self._delete_marker(nid)
+                self._delete_path(nid)
+
+    def _update_or_create_marker(self, key: str, lat: float, lon: float, text: str, color: str) -> None:
+        if key in self._markers:
+            marker = self._markers[key]
+            try:
+                marker.set_position(lat, lon) # type: ignore
+                marker.set_text(text) # type: ignore
+                return
+            except:
+                self._delete_marker(key)
+
+        m = self._map.set_marker(
+            lat, lon, text=text,
+            marker_color_circle=color,
+            marker_color_outside=color
+        )
+        self._markers[key] = m
+
+    def _update_or_create_path(self, key: str, position_list: list[tuple[float, float]], color: str) -> None:
+        # tkintermapview paths don't support set_position_list easily without flickering
+        # so we delete and recreate, but only for paths (less frequent than markers)
+        self._delete_path(key)
+        p = self._map.set_path(position_list, color=color, width=2)
+        self._paths[key] = p
+
+    def _delete_marker(self, key: str) -> None:
+        if key in self._markers:
+            try: self._markers[key].delete() # type: ignore
+            except: pass
+            del self._markers[key]
+
+    def _delete_path(self, key: str) -> None:
+        if key in self._paths:
+            try: self._paths[key].delete() # type: ignore
+            except: pass
+            del self._paths[key]
 
     # ------------------------------------------------------------------ #
     #  Console                                                             #
