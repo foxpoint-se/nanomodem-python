@@ -8,6 +8,7 @@ and a console for events.
 from __future__ import annotations
 
 import math
+import re
 import tkinter as tk
 from datetime import datetime
 from tkinter import ttk
@@ -94,9 +95,9 @@ class ControllerWindow:
         self._editing_target: Optional[str] = None  # "me_pos", "me_depth", "sim_pos", or node_id
         self._editing_type: Optional[str] = None    # "pos" or "depth"
         self._selection_marker_pos: Optional[tuple[float, float]] = None
-        self._edit_lat_var = tk.StringVar()
-        self._edit_lon_var = tk.StringVar()
-        self._edit_depth_var = tk.StringVar()
+        self._edit_var = tk.StringVar()
+        self._edit_var.trace_add("write", self._on_edit_var_changed)
+        self._debounce_timer: Optional[str] = None
 
         # Simulated position callbacks
         self._get_sim_pos = get_sim_pos_callback
@@ -167,13 +168,11 @@ class ControllerWindow:
         self._me_pos_display_f = ttk.Frame(self._me_pos_row)
         self._me_pos_val_label = ttk.Label(self._me_pos_display_f, text="—", font="monospace")
         self._me_pos_val_label.pack(side=tk.LEFT)
-        ttk.Button(self._me_pos_display_f, text="Edit", command=lambda: self._start_edit("me_pos", "pos")).pack(side=tk.RIGHT)
+        ttk.Button(self._me_pos_display_f, text="Edit pos", command=lambda: self._start_edit("me_pos", "pos")).pack(side=tk.RIGHT)
         
         # Edit sub-frame
         self._me_pos_edit_f = ttk.Frame(self._me_pos_row)
-        ttk.Entry(self._me_pos_edit_f, textvariable=self._edit_lat_var, width=10).pack(side=tk.LEFT, padx=2)
-        ttk.Entry(self._me_pos_edit_f, textvariable=self._edit_lon_var, width=10).pack(side=tk.LEFT, padx=2)
-        ttk.Entry(self._me_pos_edit_f, textvariable=self._edit_depth_var, width=5).pack(side=tk.LEFT, padx=2)
+        ttk.Entry(self._me_pos_edit_f, textvariable=self._edit_var, width=25).pack(side=tk.LEFT, padx=2)
         ttk.Button(self._me_pos_edit_f, text="Save", command=self._save_edit).pack(side=tk.LEFT, padx=2)
         ttk.Button(self._me_pos_edit_f, text="X", command=self._cancel_edit).pack(side=tk.LEFT)
 
@@ -186,11 +185,11 @@ class ControllerWindow:
         self._me_depth_display_f = ttk.Frame(self._me_depth_row)
         self._me_depth_val_label = ttk.Label(self._me_depth_display_f, text="—", font="monospace")
         self._me_depth_val_label.pack(side=tk.LEFT)
-        ttk.Button(self._me_depth_display_f, text="Edit", command=lambda: self._start_edit("me_depth", "depth")).pack(side=tk.RIGHT)
+        ttk.Button(self._me_depth_display_f, text="Edit depth", command=lambda: self._start_edit("me_depth", "depth")).pack(side=tk.RIGHT)
         
         # Edit sub-frame
         self._me_depth_edit_f = ttk.Frame(self._me_depth_row)
-        ttk.Entry(self._me_depth_edit_f, textvariable=self._edit_depth_var, width=10).pack(side=tk.LEFT, padx=2)
+        ttk.Entry(self._me_depth_edit_f, textvariable=self._edit_var, width=10).pack(side=tk.LEFT, padx=2)
         ttk.Button(self._me_depth_edit_f, text="Save", command=self._save_edit).pack(side=tk.LEFT, padx=2)
         ttk.Button(self._me_depth_edit_f, text="X", command=self._cancel_edit).pack(side=tk.LEFT)
 
@@ -212,13 +211,11 @@ class ControllerWindow:
         self._sim_pos_display_f = ttk.Frame(self._sim_pos_row)
         self._sim_pos_val_label = ttk.Label(self._sim_pos_display_f, text="—", font="monospace")
         self._sim_pos_val_label.pack(side=tk.LEFT)
-        ttk.Button(self._sim_pos_display_f, text="Edit", command=lambda: self._start_edit("sim_pos", "pos")).pack(side=tk.RIGHT)
+        ttk.Button(self._sim_pos_display_f, text="Edit mock pos", command=lambda: self._start_edit("sim_pos", "pos")).pack(side=tk.RIGHT)
 
         # Edit sub-frame
         self._sim_pos_edit_f = ttk.Frame(self._sim_pos_row)
-        ttk.Entry(self._sim_pos_edit_f, textvariable=self._edit_lat_var, width=10).pack(side=tk.LEFT, padx=2)
-        ttk.Entry(self._sim_pos_edit_f, textvariable=self._edit_lon_var, width=10).pack(side=tk.LEFT, padx=2)
-        ttk.Entry(self._sim_pos_edit_f, textvariable=self._edit_depth_var, width=5).pack(side=tk.LEFT, padx=2)
+        ttk.Entry(self._sim_pos_edit_f, textvariable=self._edit_var, width=25).pack(side=tk.LEFT, padx=2)
         ttk.Button(self._sim_pos_edit_f, text="Save", command=self._save_edit).pack(side=tk.LEFT, padx=2)
         ttk.Button(self._sim_pos_edit_f, text="X", command=self._cancel_edit).pack(side=tk.LEFT)
 
@@ -297,38 +294,53 @@ class ControllerWindow:
     def _on_map_click(self, coords: tuple[float, float]) -> None:
         if self._editing_target and self._editing_type == "pos":
             self._selection_marker_pos = coords
-            self._edit_lat_var.set(f"{coords[0]:.6f}")
-            self._edit_lon_var.set(f"{coords[1]:.6f}")
+            self._edit_var.set(f"{coords[0]:.6f}, {coords[1]:.6f}")
             self._refresh_map()
+
+    def _on_edit_var_changed(self, *args) -> None:
+        """Handle changes to the single edit input field."""
+        if not self._editing_target or self._editing_type != "pos":
+            return
+        
+        # If the field is empty, clear the selection marker immediately
+        if not self._edit_var.get().strip():
+            self._selection_marker_pos = None
+            self._refresh_map()
+            if self._debounce_timer:
+                self._root.after_cancel(self._debounce_timer)
+                self._debounce_timer = None
+            return
+
+        # Debounce the map update
+        if self._debounce_timer:
+            self._root.after_cancel(self._debounce_timer)
+        
+        self._debounce_timer = self._root.after(500, self._sync_selection_from_input)
+
+    def _sync_selection_from_input(self) -> None:
+        """Parse input and update selection marker if valid."""
+        self._debounce_timer = None
+        val = self._edit_var.get()
+        
+        # Strict pattern: Number.X, Number.Y
+        # Allows optional spaces, requires at least one decimal digit for both
+        match = re.match(r"^\s*(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)\s*$", val)
+        if match:
+            try:
+                lat = float(match.group(1))
+                lon = float(match.group(2))
+                self._selection_marker_pos = (lat, lon)
+                self._refresh_map()
+            except ValueError:
+                pass
 
     def _start_edit(self, target: str, edit_type: str) -> None:
         self._editing_target = target
         self._editing_type = edit_type
         self._selection_marker_pos = None
         
-        # Initialize vars
-        if target == "me_pos":
-            pos = self._node.get_position()
-            self._edit_lat_var.set(f"{pos.lat:.6f}" if pos else "")
-            self._edit_lon_var.set(f"{pos.lon:.6f}" if pos else "")
-            self._edit_depth_var.set(f"{pos.depth:.1f}" if pos else "0.0")
-        elif target == "me_depth":
-            pos = self._node.get_position()
-            self._edit_depth_var.set(f"{pos.depth:.1f}" if pos else "0.0")
-        elif target == "sim_pos":
-            pos = self._get_sim_pos() if self._get_sim_pos else None
-            self._edit_lat_var.set(f"{pos.lat:.6f}" if pos else "")
-            self._edit_lon_var.set(f"{pos.lon:.6f}" if pos else "")
-            self._edit_depth_var.set(f"{pos.depth:.1f}" if pos else "0.0")
-        else:
-            # Registry node
-            kn = self._node.get_known_nodes().get(target)
-            if edit_type == "pos":
-                self._edit_lat_var.set(f"{kn.position.lat:.6f}" if kn and kn.position else "")
-                self._edit_lon_var.set(f"{kn.position.lon:.6f}" if kn and kn.position else "")
-                self._edit_depth_var.set(f"{kn.position.depth:.1f}" if kn and kn.position else "0.0")
-            else:
-                self._edit_depth_var.set(f"{kn.position.depth:.1f}" if kn and kn.position else "0.0")
+        # Always start with an empty field as requested
+        self._edit_var.set("")
 
         if edit_type == "pos":
             self._map_hint_label.pack(pady=2)
@@ -345,13 +357,19 @@ class ControllerWindow:
     def _save_edit(self) -> None:
         target = self._editing_target
         etype = self._editing_type
+        val = self._edit_var.get()
         
         try:
             if etype == "pos":
-                lat = float(self._edit_lat_var.get())
-                lon = float(self._edit_lon_var.get())
-                depth = float(self._edit_depth_var.get())
-                coord = Coord(lat=lat, lon=lon, depth=depth)
+                # Use the same strict parsing as the debounced sync
+                match = re.match(r"^\s*(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)\s*$", val)
+                if not match:
+                    self._log("Invalid format. Use 'lat.x, lon.y'")
+                    return
+                
+                lat = float(match.group(1))
+                lon = float(match.group(2))
+                coord = Coord(lat=lat, lon=lon)
                 
                 if target == "me_pos":
                     self._node.set_position(coord)
@@ -361,13 +379,13 @@ class ControllerWindow:
                 else:
                     self._node.set_known_node_position(target, coord)
             else:
-                depth = float(self._edit_depth_var.get())
+                depth = float(val)
                 if target == "me_depth":
                     self._node.set_depth(depth)
                 else:
                     self._node.set_known_node_depth(target, depth)
         except ValueError:
-            self._log("Invalid input values.")
+            self._log("Invalid numeric values.")
 
         self._cancel_edit()
 
@@ -454,7 +472,8 @@ class ControllerWindow:
         else:
             self._me_depth_edit_f.pack_forget()
             self._me_depth_display_f.pack(side=tk.LEFT, fill=tk.X, expand=True)
-            val = f"{pos.depth:.1f} m" if pos else "—"
+            depth = self._node._depth
+            val = f"{depth:.1f} m"
             self._me_depth_val_label.configure(text=val)
 
     def _refresh_sim_pos_panel(self) -> None:
@@ -468,7 +487,7 @@ class ControllerWindow:
         else:
             self._sim_pos_edit_f.pack_forget()
             self._sim_pos_display_f.pack(side=tk.LEFT, fill=tk.X, expand=True)
-            val = f"{pos.lat:.6f}, {pos.lon:.6f}, {pos.depth:.1f}" if pos else "—"
+            val = f"{pos.lat:.6f}, {pos.lon:.6f}" if pos else "—"
             self._sim_pos_val_label.configure(text=val)
 
     def _refresh_registry_panel(self) -> None:
@@ -500,9 +519,9 @@ class ControllerWindow:
                 range_label = ttk.Label(display_f, text="—", width=8, font="monospace")
                 range_label.pack(side=tk.LEFT)
                 
-                ttk.Button(display_f, text="Del", width=4, command=lambda n=nid: self._on_delete_node(n)).pack(side=tk.RIGHT)
-                ttk.Button(display_f, text="D", width=3, command=lambda n=nid: self._start_edit(n, "depth")).pack(side=tk.RIGHT, padx=1)
-                ttk.Button(display_f, text="P", width=3, command=lambda n=nid: self._start_edit(n, "pos")).pack(side=tk.RIGHT)
+                ttk.Button(display_f, text="🗑", width=3, command=lambda n=nid: self._on_delete_node(n)).pack(side=tk.RIGHT)
+                ttk.Button(display_f, text="Edit depth", width=9, command=lambda n=nid: self._start_edit(n, "depth")).pack(side=tk.RIGHT, padx=1)
+                ttk.Button(display_f, text="Edit pos", width=8, command=lambda n=nid: self._start_edit(n, "pos")).pack(side=tk.RIGHT)
                 
                 # Edit sub-frame
                 edit_f = ttk.Frame(row_frame)
@@ -531,11 +550,9 @@ class ControllerWindow:
                 for w in row_info["edit_f"].winfo_children(): w.destroy()
                 
                 if self._editing_type == "pos":
-                    ttk.Entry(row_info["edit_f"], textvariable=self._edit_lat_var, width=10).pack(side=tk.LEFT, padx=1)
-                    ttk.Entry(row_info["edit_f"], textvariable=self._edit_lon_var, width=10).pack(side=tk.LEFT, padx=1)
-                    ttk.Entry(row_info["edit_f"], textvariable=self._edit_depth_var, width=4).pack(side=tk.LEFT, padx=1)
+                    ttk.Entry(row_info["edit_f"], textvariable=self._edit_var, width=22).pack(side=tk.LEFT, padx=1)
                 else:
-                    ttk.Entry(row_info["edit_f"], textvariable=self._edit_depth_var, width=10).pack(side=tk.LEFT, padx=1)
+                    ttk.Entry(row_info["edit_f"], textvariable=self._edit_var, width=10).pack(side=tk.LEFT, padx=1)
                 
                 ttk.Button(row_info["edit_f"], text="Save", command=self._save_edit).pack(side=tk.LEFT, padx=1)
                 ttk.Button(row_info["edit_f"], text="X", command=self._cancel_edit).pack(side=tk.LEFT)
@@ -545,7 +562,7 @@ class ControllerWindow:
                 
                 pos_val = f"{kn.position.lat:.4f}, {kn.position.lon:.4f}" if kn.position else "—"
                 row_info["pos_label"].configure(text=pos_val)
-                depth_val = f"{kn.position.depth:.1f}m" if kn.position else "—"
+                depth_val = f"{kn.depth:.1f}m"
                 row_info["depth_label"].configure(text=depth_val)
                 range_val = f"{kn.last_range:.1f}m" if kn.last_range is not None else "—"
                 row_info["range_label"].configure(text=range_val, foreground=color)

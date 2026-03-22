@@ -22,19 +22,22 @@ def _make_node(
     if position is not None:
         transport.position = position
     calculation = Calculation()
-    return AcousticNode(
+    node = AcousticNode(
         node_id=node_id,
         transport=transport,
         calculation=calculation,
         position=position,
     )
+    # Link mock transport to node depth
+    transport.get_depth_callback = node.get_depth
+    return node
 
 
 # --- Step 1: Initialization ---
 
 
 def test_should_return_position_when_initialized_with_coordinates() -> None:
-    coord = Coord(lat=63.0, lon=10.0, depth=5.0)
+    coord = Coord(lat=63.0, lon=10.0)
     node = _make_node(position=coord)
     assert node.get_position() == coord
 
@@ -72,7 +75,7 @@ def test_should_have_default_capabilities() -> None:
 
 def test_should_update_position_when_set_position_called() -> None:
     node = _make_node()
-    new_pos = Coord(lat=63.5, lon=10.5, depth=2.0)
+    new_pos = Coord(lat=63.5, lon=10.5)
     node.set_position(new_pos)
     assert node.get_position() == new_pos
 
@@ -84,22 +87,20 @@ def test_should_clear_position_when_set_position_called_with_none() -> None:
 
 
 def test_should_update_depth_when_set_depth_called() -> None:
-    node = _make_node(position=Coord(lat=63.0, lon=10.0, depth=0.0))
+    node = _make_node(position=Coord(lat=63.0, lon=10.0))
     node.set_depth(5.0)
     pos = node.get_position()
     assert pos is not None
-    assert pos.depth == 5.0
+    assert node._depth == 5.0
     # lat/lon preserved
     assert pos.lat == 63.0
     assert pos.lon == 10.0
 
 
-def test_should_create_position_with_depth_when_no_position_set() -> None:
+def test_should_update_depth_when_no_position_set() -> None:
     node = _make_node()
     node.set_depth(3.0)
-    pos = node.get_position()
-    assert pos is not None
-    assert pos.depth == 3.0
+    assert node._depth == 3.0
 
 
 # --- Step 5: Message handling ---
@@ -119,8 +120,9 @@ def test_should_store_position_of_other_node_when_position_message_received() ->
 
 def test_should_update_range_of_known_node_when_range_response_received() -> None:
     ether = MockEther(sound_speed=1500.0)
-    host = _make_node("001", position=Coord(lat=63.0, lon=10.0, depth=0.0), ether=ether)
-    beacon = _make_node("002", position=Coord(lat=63.0, lon=10.0, depth=10.0), ether=ether)
+    host = _make_node("001", position=Coord(lat=63.0, lon=10.0), ether=ether)
+    beacon = _make_node("002", position=Coord(lat=63.0, lon=10.0), ether=ether)
+    beacon.set_depth(10.0)
 
     host.request_range("002")
 
@@ -173,8 +175,9 @@ def test_should_request_range_and_receive_response() -> None:
     """End-to-end: host requests range to beacon, gets distance back."""
     ether = MockEther(sound_speed=1500.0)
 
-    host = _make_node("001", position=Coord(lat=63.0, lon=10.0, depth=5.0), ether=ether)
-    _beacon = _make_node("002", position=Coord(lat=63.0, lon=10.0, depth=0.0), ether=ether)
+    host = _make_node("001", position=Coord(lat=63.0, lon=10.0), ether=ether)
+    host.set_depth(5.0)
+    _beacon = _make_node("002", position=Coord(lat=63.0, lon=10.0), ether=ether)
 
     host.request_range("002")
 
@@ -192,7 +195,7 @@ def test_should_calculate_own_position_when_three_distances_and_positions_availa
     """Host receives positions and ranges from 3 beacons, then trilaterates."""
     ether = MockEther(sound_speed=1500.0)
 
-    host_pos = Coord(lat=63.0005, lon=10.0005, depth=0.0)
+    host_pos = Coord(lat=63.0005, lon=10.0005)
     host = _make_node("001", position=host_pos, ether=ether)
 
     # Create 3 beacons in a triangle
@@ -235,12 +238,13 @@ def test_should_use_projected_2d_distances_when_depth_is_set() -> None:
     ether = MockEther(sound_speed=1500.0)
 
     # Host is submerged at 5m depth
-    host = _make_node("001", position=Coord(lat=63.0005, lon=10.0005, depth=5.0), ether=ether)
+    host = _make_node("001", position=Coord(lat=63.0005, lon=10.0005), ether=ether)
+    host.set_depth(5.0)
 
     # Surface beacons at depth=0
-    b1 = _make_node("002", position=Coord(lat=63.0, lon=10.0, depth=0.0), ether=ether)
-    b2 = _make_node("003", position=Coord(lat=63.001, lon=10.0, depth=0.0), ether=ether)
-    b3 = _make_node("004", position=Coord(lat=63.0005, lon=10.001, depth=0.0), ether=ether)
+    b1 = _make_node("002", position=Coord(lat=63.0, lon=10.0), ether=ether)
+    b2 = _make_node("003", position=Coord(lat=63.001, lon=10.0), ether=ether)
+    b3 = _make_node("004", position=Coord(lat=63.0005, lon=10.001), ether=ether)
 
     b1.broadcast_position()
     b2.broadcast_position()
@@ -255,8 +259,8 @@ def test_should_use_projected_2d_distances_when_depth_is_set() -> None:
     # Should still find the approximate horizontal position
     assert abs(result.lat - 63.0005) < 1e-3
     assert abs(result.lon - 10.0005) < 1e-3
-    # Depth should be preserved
-    assert result.depth == 5.0
+    # Depth should be preserved in the node's state
+    assert host._depth == 5.0
 
 
 # --- Step 8: Capabilities (modes) ---

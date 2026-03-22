@@ -21,6 +21,8 @@ def _make_beacon(
         calculation=calc,
         position=position,
     )
+    # Link mock transport to node depth
+    transport.get_depth_callback = node.get_depth
     node.capabilities.is_broadcasting_own_position = True
     return node
 
@@ -40,6 +42,8 @@ def _make_host(
         calculation=calc,
         position=position,
     )
+    # Link mock transport to node depth
+    transport.get_depth_callback = node.get_depth
     node.capabilities.is_inferring_own_position = True
     return node
 
@@ -50,13 +54,15 @@ def test_submerged_node_localizes_from_three_surface_beacons() -> None:
     calc = Calculation()
 
     # Surface beacons
-    b1 = _make_beacon("002", Coord(lat=63.0, lon=10.0, depth=0.0), ether, calc)
-    b2 = _make_beacon("003", Coord(lat=63.001, lon=10.0, depth=0.0), ether, calc)
-    b3 = _make_beacon("004", Coord(lat=63.0005, lon=10.001, depth=0.0), ether, calc)
+    b1 = _make_beacon("002", Coord(lat=63.0, lon=10.0), ether, calc)
+    b2 = _make_beacon("003", Coord(lat=63.001, lon=10.0), ether, calc)
+    b3 = _make_beacon("004", Coord(lat=63.0005, lon=10.001), ether, calc)
 
     # Submerged host — actual position
-    actual_pos = Coord(lat=63.0004, lon=10.0003, depth=5.0)
+    actual_pos = Coord(lat=63.0004, lon=10.0003)
+    actual_depth = 5.0
     host = _make_host("001", actual_pos, ether, calc)
+    host.set_depth(actual_depth)
 
     # Beacons broadcast positions
     b1.broadcast_position()
@@ -85,8 +91,8 @@ def test_submerged_node_localizes_from_three_surface_beacons() -> None:
     assert lat_error_m < 5.0, f"Latitude error too large: {lat_error_m:.1f}m"
     assert lon_error_m < 5.0, f"Longitude error too large: {lon_error_m:.1f}m"
 
-    # Depth should be preserved
-    assert result.depth == 5.0
+    # Depth should be preserved in logical state
+    assert host._depth == 5.0
 
 
 def test_host_without_enough_beacons_cannot_localize() -> None:

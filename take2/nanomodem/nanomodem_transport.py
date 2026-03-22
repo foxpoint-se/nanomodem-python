@@ -89,9 +89,9 @@ class NanomodemTransport:
 
     # --- TransportInterface methods ---
 
-    def broadcast_position(self, coord: Coord) -> None:
+    def broadcast_position(self, coord: Coord, depth: float) -> None:
         """Broadcast position using $Bnnddd... command."""
-        payload = self._codec.encode_position(self.node_id, coord)
+        payload = self._codec.encode_position(self.node_id, coord, depth)
         nn = f"{len(payload):02d}"
         cmd = f"$B{nn}".encode("ascii") + payload
         self._write(cmd)

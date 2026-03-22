@@ -8,11 +8,10 @@ from typing import Optional
 
 @dataclass(frozen=True)
 class Coord:
-    """An immutable geographic coordinate with optional depth."""
+    """An immutable geographic coordinate (lat, lon)."""
 
     lat: float
     lon: float
-    depth: float = 0.0
 
 
 @dataclass
@@ -21,6 +20,7 @@ class KnownNode:
 
     node_id: str
     position: Optional[Coord] = None
+    depth: float = 0.0
     last_range: Optional[float] = None
     last_seen: Optional[float] = None
 
@@ -42,6 +42,7 @@ class PositionMessage:
 
     node_id: str
     coord: Coord
+    depth: float = 0.0
 
 
 @dataclass(frozen=True)

@@ -59,6 +59,11 @@ class AcousticNode:
         self._transport = transport
         self._calculation: CalculationInterface = calculation or Calculation()
         self._position = position
+        self._depth = 0.0
+        if position is not None:
+            # If position was provided, we don't have a separate depth yet
+            # unless we want to extract it, but Coord no longer has depth.
+            pass
         self._sound_speed = sound_speed
         self._capabilities = NodeCapabilities()
         self._known_nodes: dict[str, KnownNode] = {}
@@ -92,6 +97,9 @@ class AcousticNode:
     def get_known_nodes(self) -> dict[str, KnownNode]:
         return dict(self._known_nodes)
 
+    def get_depth(self) -> float:
+        return self._depth
+
     # --- Setters ---
 
     def set_position(self, position: Optional[Coord]) -> None:
@@ -100,14 +108,7 @@ class AcousticNode:
         self._notify_state_changed()
 
     def set_depth(self, depth: float) -> None:
-        if self._position is not None:
-            self._position = Coord(
-                lat=self._position.lat,
-                lon=self._position.lon,
-                depth=depth,
-            )
-        else:
-            self._position = Coord(lat=0.0, lon=0.0, depth=depth)
+        self._depth = depth
         self._notify_state_changed()
 
     def set_known_node_position(self, node_id: str, position: Optional[Coord]) -> None:
@@ -119,15 +120,7 @@ class AcousticNode:
     def set_known_node_depth(self, node_id: str, depth: float) -> None:
         """Manually update the depth of a node in the registry."""
         self._ensure_known_node(node_id)
-        kn = self._known_nodes[node_id]
-        if kn.position is not None:
-            kn.position = Coord(
-                lat=kn.position.lat,
-                lon=kn.position.lon,
-                depth=depth,
-            )
-        else:
-            kn.position = Coord(lat=0.0, lon=0.0, depth=depth)
+        self._known_nodes[node_id].depth = depth
         self._notify_state_changed()
 
     def delete_known_node(self, node_id: str) -> None:
@@ -146,7 +139,14 @@ class AcousticNode:
     def broadcast_position(self) -> None:
         """Broadcast own position to all other nodes."""
         if self._position is not None:
-            self._transport.broadcast_position(self._position)
+            msg = PositionMessage(
+                node_id=self._node_id,
+                coord=self._position,
+                depth=self._depth
+            )
+            # The transport interface needs to be updated to accept PositionMessage
+            # OR we update the transport interface to accept (Coord, depth)
+            self._transport.broadcast_position(self._position, self._depth)
 
     def calculate_position(self) -> Optional[Coord]:
         """Calculate own position using trilateration from known nodes.
@@ -172,9 +172,14 @@ class AcousticNode:
             assert kn.last_range is not None
 
             distance = kn.last_range
-            if self._position is not None and self._position.depth != 0.0:
+            
+            # Use depth if available on either side
+            own_depth = self._depth
+            kn_depth = kn.depth
+
+            if own_depth != 0.0 or kn_depth != 0.0:
                 distance = self._calculation.project_3d_to_2d(
-                    distance, self._position.depth, kn.position.depth
+                    distance, own_depth, kn_depth
                 )
 
             positions.append(kn.position)
@@ -182,8 +187,7 @@ class AcousticNode:
 
         result = self._calculation.trilaterate(positions, distances)
 
-        depth = self._position.depth if self._position is not None else 0.0
-        self._position = Coord(lat=result.lat, lon=result.lon, depth=depth)
+        self._position = Coord(lat=result.lat, lon=result.lon)
 
         self._notify_state_changed()
         return self._position
@@ -192,9 +196,10 @@ class AcousticNode:
 
     def _handle_message(self, msg: Message) -> None:
         match msg:
-            case PositionMessage(node_id=nid, coord=c):
+            case PositionMessage(node_id=nid, coord=c, depth=d):
                 self._ensure_known_node(nid)
                 self._known_nodes[nid].position = c
+                self._known_nodes[nid].depth = d
                 self._known_nodes[nid].last_seen = time.time()
             case RangeResponseMessage(node_id=nid, timestamp=ts):
                 self._ensure_known_node(nid)
@@ -233,7 +238,7 @@ class AcousticNode:
                     self._node_id,
                     result.lat,
                     result.lon,
-                    result.depth,
+                    self._depth,
                 )
 
     def _ensure_known_node(self, node_id: str) -> None:

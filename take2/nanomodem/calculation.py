@@ -72,7 +72,7 @@ class Calculation:
         est_lat = origin.lat + result.x[0] / lat_scale
         est_lon = origin.lon + result.x[1] / lon_scale
 
-        return Coord(lat=est_lat, lon=est_lon, depth=0.0)
+        return Coord(lat=est_lat, lon=est_lon)
 
     def project_3d_to_2d(
         self, distance_3d: float, host_depth: float, beacon_depth: float

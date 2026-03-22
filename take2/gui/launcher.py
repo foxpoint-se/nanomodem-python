@@ -32,13 +32,14 @@ def launch_mock(root: tk.Tk) -> list[ControllerWindow]:
     host_config = {
         "id": "001",
         "name": "Host (Tracker)",
-        "sim_pos": Coord(lat=59.310153, lon=17.975189, depth=5.0),
+        "sim_pos": Coord(lat=59.310153, lon=17.975189),
+        "initial_depth": 5.0,
     }
 
     beacons_config = [
-        {"id": "002", "name": "Beacon 1", "sim_pos": Coord(lat=59.310500, lon=17.974500, depth=0.0)},
-        {"id": "003", "name": "Beacon 2", "sim_pos": Coord(lat=59.310800, lon=17.976000, depth=0.0)},
-        {"id": "004", "name": "Beacon 3", "sim_pos": Coord(lat=59.309500, lon=17.975500, depth=0.0)},
+        {"id": "002", "name": "Beacon 1", "sim_pos": Coord(lat=59.310500, lon=17.974500)},
+        {"id": "003", "name": "Beacon 2", "sim_pos": Coord(lat=59.310800, lon=17.976000)},
+        {"id": "004", "name": "Beacon 3", "sim_pos": Coord(lat=59.309500, lon=17.975500)},
     ]
 
     all_ids = [host_config["id"]] + [b["id"] for b in beacons_config]
@@ -80,9 +81,16 @@ def launch_mock(root: tk.Tk) -> list[ControllerWindow]:
         set_sim_pos_callback=set_sim_pos,
     )
     
+    # Set the initial logical depth for the host
+    host_controller.node.set_depth(host_config["initial_depth"])
+    
+    # Link the mock transport to pull depth from the node
+    host_transport.get_depth_callback = host_controller.node.get_depth
+    
     # Pre-populate host registry with beacon positions (simulating a known environment)
     for b in beacons_config:
         host_controller.node.set_known_node_position(b["id"], b["sim_pos"])
+        host_controller.node.set_known_node_depth(b["id"], 0.0)
     
     controllers.append(host_controller)
 
@@ -107,6 +115,10 @@ def launch_mock(root: tk.Tk) -> list[ControllerWindow]:
         
         # Beacons know their own position in this scenario
         b_controller.node.set_position(b["sim_pos"])
+        b_controller.node.set_depth(0.0)
+        
+        # Link the mock transport to pull depth from the node
+        b_transport.get_depth_callback = b_controller.node.get_depth
         
         controllers.append(b_controller)
 

@@ -48,7 +48,7 @@ def test_should_write_P_command_format() -> None:
 def test_should_write_B_command_format() -> None:
     """Verify the format of a broadcast command string."""
     codec = Codec()
-    payload = codec.encode_position("001", Coord(lat=63.0, lon=10.0))
+    payload = codec.encode_position("001", Coord(lat=63.0, lon=10.0), depth=0.0)
     nn = f"{len(payload):02d}"
     cmd = f"$B{nn}".encode("ascii") + payload
     assert cmd.startswith(b"$B32")  # 32-byte position payload
@@ -58,7 +58,7 @@ def test_should_decode_broadcast_data_via_codec() -> None:
     """#Bxxxnnddd... → codec decodes the body."""
     transport = _make_parser()
     codec = Codec()
-    body = codec.encode_position("002", Coord(lat=63.0, lon=10.0, depth=5.0))
+    body = codec.encode_position("002", Coord(lat=63.0, lon=10.0), depth=5.0)
     line = f"#B002{len(body):02d}" + body.decode("ascii")
     msg = transport._parse_line(line)
     assert isinstance(msg, PositionMessage)
@@ -70,7 +70,7 @@ def test_should_decode_unicast_data_via_codec() -> None:
     """#Unnddd... → codec decodes the body (sender ID in payload)."""
     transport = _make_parser()
     codec = Codec()
-    body = codec.encode_position("003", Coord(lat=63.5, lon=10.5))
+    body = codec.encode_position("003", Coord(lat=63.5, lon=10.5), depth=0.0)
     line = f"#U{len(body):02d}" + body.decode("ascii")
     msg = transport._parse_line(line)
     assert isinstance(msg, PositionMessage)
@@ -108,7 +108,7 @@ def test_should_forward_unrecognized_serial_line_as_unknown_message() -> None:
 def test_should_write_M_command_format() -> None:
     """Verify the expected format of a unicast-with-ack command."""
     codec = Codec()
-    payload = codec.encode_position("001", Coord(lat=63.0, lon=10.0))
+    payload = codec.encode_position("001", Coord(lat=63.0, lon=10.0), depth=0.0)
     target = "002"
     nn = f"{len(payload):02d}"
     cmd = f"$M{target}{nn}".encode("ascii") + payload

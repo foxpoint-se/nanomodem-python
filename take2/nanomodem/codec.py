@@ -25,7 +25,7 @@ from .types import Coord, Message, PositionMessage, UnknownMessage
 class CodecInterface(Protocol):
     """Interface for body encoding/decoding."""
 
-    def encode_position(self, node_id: str, coord: Coord) -> bytes: ...
+    def encode_position(self, node_id: str, coord: Coord, depth: float) -> bytes: ...
 
     def decode(self, payload: bytes) -> Message: ...
 
@@ -36,14 +36,15 @@ MSG_TYPE_POSITION = ord("P")
 class Codec:
     """Concrete codec for the nanomodem protocol body format."""
 
-    def encode_position(self, node_id: str, coord: Coord) -> bytes:
+    def encode_position(self, node_id: str, coord: Coord, depth: float) -> bytes:
         """Encode a position message body.
 
         Format: 'P' + node_id(3) + lat(10) + lon(11) + depth(7) = 32 bytes.
         """
         lat_str = f"{coord.lat:+010.6f}"  # e.g. "+63.000000"
         lon_str = f"{coord.lon:+011.6f}"  # e.g. "+010.000000"
-        depth_str = f"{coord.depth:07.3f}"  # e.g. "005.000"
+        depth_str = f"{depth:07.3f}"  # e.g. "005.000"
+        
         body = f"P{node_id[:3]:>03s}{lat_str}{lon_str}{depth_str}"
         return body.encode("ascii")
 
@@ -75,7 +76,8 @@ class Codec:
             depth = float(text[25:32])
             return PositionMessage(
                 node_id=node_id,
-                coord=Coord(lat=lat, lon=lon, depth=depth),
+                coord=Coord(lat=lat, lon=lon),
+                depth=depth,
             )
         except (ValueError, IndexError):
             return UnknownMessage(raw=text)

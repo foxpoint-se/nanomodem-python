@@ -23,7 +23,7 @@ def test_should_deliver_broadcast_to_all_registered_nodes() -> None:
     msgs_a = _collect_messages(receiver_a)
     msgs_b = _collect_messages(receiver_b)
 
-    sender.broadcast_position(Coord(lat=63.0, lon=10.0))
+    sender.broadcast_position(Coord(lat=63.0, lon=10.0), depth=0.0)
 
     assert len(msgs_a) == 1
     assert len(msgs_b) == 1
@@ -37,7 +37,7 @@ def test_should_not_deliver_broadcast_to_sender() -> None:
     _other = MockTransport("002", ether)
 
     sender_msgs = _collect_messages(sender)
-    sender.broadcast_position(Coord(lat=63.0, lon=10.0))
+    sender.broadcast_position(Coord(lat=63.0, lon=10.0), depth=0.0)
 
     assert len(sender_msgs) == 0
 
@@ -48,9 +48,9 @@ def test_should_not_deliver_broadcast_to_sender() -> None:
 def test_should_deliver_range_response_when_target_is_reachable() -> None:
     ether = MockEther(sound_speed=1500.0)
     sender = MockTransport("001", ether)
-    sender.position = Coord(lat=63.0, lon=10.0, depth=0.0)
+    sender.position = Coord(lat=63.0, lon=10.0)
     target = MockTransport("002", ether)
-    target.position = Coord(lat=63.0, lon=10.0, depth=0.0)
+    target.position = Coord(lat=63.0, lon=10.0)
 
     msgs = _collect_messages(sender)
     sender.request_range("002")
@@ -93,10 +93,10 @@ def test_should_calculate_correct_range_timestamp() -> None:
 
     sender = MockTransport("001", ether)
     # 1 degree lat ≈ 111320m, so ~0.01348 degrees ≈ 1500m
-    sender.position = Coord(lat=63.0, lon=10.0, depth=0.0)
+    sender.position = Coord(lat=63.0, lon=10.0)
 
     target = MockTransport("002", ether)
-    target.position = Coord(lat=63.0 + 1500.0 / 111320.0, lon=10.0, depth=0.0)
+    target.position = Coord(lat=63.0 + 1500.0 / 111320.0, lon=10.0)
 
     msgs = _collect_messages(sender)
     sender.request_range("002")
@@ -112,10 +112,13 @@ def test_should_calculate_range_with_depth_difference() -> None:
     ether = MockEther(sound_speed=1500.0)
 
     sender = MockTransport("001", ether)
-    sender.position = Coord(lat=63.0, lon=10.0, depth=0.0)
+    sender.position = Coord(lat=63.0, lon=10.0)
+    # Mock depth pull manually for this test since there's no AcousticNode
+    sender.get_depth_callback = lambda: 0.0
 
     target = MockTransport("002", ether)
-    target.position = Coord(lat=63.0, lon=10.0, depth=10.0)
+    target.position = Coord(lat=63.0, lon=10.0)
+    target.get_depth_callback = lambda: 10.0
 
     msgs = _collect_messages(sender)
     sender.request_range("002")
@@ -145,6 +148,6 @@ def test_should_unregister_transport() -> None:
     msgs = _collect_messages(receiver)
 
     ether.unregister("002")
-    sender.broadcast_position(Coord(lat=63.0, lon=10.0))
+    sender.broadcast_position(Coord(lat=63.0, lon=10.0), depth=0.0)
 
     assert len(msgs) == 0

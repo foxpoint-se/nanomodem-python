@@ -24,7 +24,7 @@ class TransportInterface(Protocol):
     MockTransport routes typed messages directly).
     """
 
-    def broadcast_position(self, coord: Coord) -> None: ...
+    def broadcast_position(self, coord: Coord, depth: float) -> None: ...
 
     def request_range(self, target_id: str) -> None: ...
 
@@ -77,7 +77,7 @@ class MockEther:
             sender.deliver(UnknownMessage(raw="#TO"))
             return
 
-        distance = self._calculate_distance(sender.position, target.position)
+        distance = self._calculate_distance(sender, target)
 
         # Convert to timestamp in 100µs units (per modem spec):
         # timestamp = round(travel_time / 3.125e-5)
@@ -86,16 +86,21 @@ class MockEther:
 
         sender.deliver(RangeResponseMessage(node_id=target_id, timestamp=timestamp))
 
-    def _calculate_distance(self, a: Coord, b: Coord) -> float:
+    def _calculate_distance(self, a: MockTransport, b: MockTransport) -> float:
         """Euclidean distance in meters using flat-earth approximation.
 
         - 1 degree lat ≈ 111320 m
         - 1 degree lon ≈ 111320 * cos(lat) m
         """
-        lat_m = (b.lat - a.lat) * 111320.0
-        avg_lat = math.radians((a.lat + b.lat) / 2.0)
-        lon_m = (b.lon - a.lon) * 111320.0 * math.cos(avg_lat)
+        assert a.position is not None
+        assert b.position is not None
+
+        lat_m = (b.position.lat - a.position.lat) * 111320.0
+        avg_lat = math.radians((a.position.lat + b.position.lat) / 2.0)
+        lon_m = (b.position.lon - a.position.lon) * 111320.0 * math.cos(avg_lat)
+        
         depth_m = b.depth - a.depth
+        
         return math.sqrt(lat_m**2 + lon_m**2 + depth_m**2)
 
 
@@ -108,13 +113,21 @@ class MockTransport:
     def __init__(self, node_id: str, ether: MockEther) -> None:
         self.node_id = node_id
         self.position: Optional[Coord] = None
+        self.get_depth_callback: Optional[Callable[[], float]] = None
         self._ether = ether
         self._callback: OnMessageCallback | None = None
         ether.register(self)
 
-    def broadcast_position(self, coord: Coord) -> None:
+    @property
+    def depth(self) -> float:
+        """Pull the logical depth from the node via callback."""
+        if self.get_depth_callback is not None:
+            return self.get_depth_callback()
+        return 0.0
+
+    def broadcast_position(self, coord: Coord, depth: float) -> None:
         """Broadcast own position to all other nodes."""
-        msg = PositionMessage(node_id=self.node_id, coord=coord)
+        msg = PositionMessage(node_id=self.node_id, coord=coord, depth=depth)
         self._ether.broadcast(self.node_id, msg)
 
     def request_range(self, target_id: str) -> None:
