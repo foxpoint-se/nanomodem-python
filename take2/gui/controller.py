@@ -13,6 +13,7 @@ from datetime import datetime
 from tkinter import ttk
 from typing import Callable, Optional
 
+from PIL import Image, ImageDraw, ImageTk
 from tkintermapview import TkinterMapView
 
 from nanomodem.node import AcousticNode
@@ -25,9 +26,25 @@ from nanomodem.types import (
     UnknownMessage,
 )
 
-NODE_COLORS = ["#3498db", "#2ecc71", "#f39c12", "#9b59b6", "#e67e22", "#1abc9c"]
-OWN_COLOR = "#e74c3c"
-SIM_COLOR = "#f1c40f"
+NODE_COLORS = [
+    "#3498db",  # Blue
+    "#2ecc71",  # Green
+    "#e67e22",  # Orange
+    "#9b59b6",  # Purple
+    "#1abc9c",  # Turquoise
+    "#f39c12",  # Yellow
+    "#d35400",  # Pumpkin
+    "#c0392b",  # Pomegranate
+    "#8e44ad",  # Wisteria
+    "#273c75",  # Mazarine Blue
+]
+OWN_COLOR_OUTSIDE = "black"
+OWN_COLOR_CIRCLE = "white"
+SIM_COLOR_OUTSIDE = "black"
+SIM_COLOR_CIRCLE = "white"
+KNOWN_COLOR_CIRCLE = "white"
+MAP_SELECTION_COLOR_OUTSIDE = "grey"
+MAP_SELECTION_COLOR_CIRCLE = "white"
 
 
 def _circle_coords(
@@ -71,10 +88,12 @@ class ControllerWindow:
         self._markers: dict[str, object] = {}  # node_id -> marker
         self._paths: dict[str, object] = {}    # node_id -> path (range circle)
         self._registry_rows: dict[str, dict[str, ttk.Frame | ttk.Label]] = {}
+        self._icon_cache: dict[str, ImageTk.PhotoImage] = {}
 
         # Edit state
         self._editing_target: Optional[str] = None  # "me_pos", "me_depth", "sim_pos", or node_id
         self._editing_type: Optional[str] = None    # "pos" or "depth"
+        self._selection_marker_pos: Optional[tuple[float, float]] = None
         self._edit_lat_var = tk.StringVar()
         self._edit_lon_var = tk.StringVar()
         self._edit_depth_var = tk.StringVar()
@@ -277,12 +296,15 @@ class ControllerWindow:
 
     def _on_map_click(self, coords: tuple[float, float]) -> None:
         if self._editing_target and self._editing_type == "pos":
+            self._selection_marker_pos = coords
             self._edit_lat_var.set(f"{coords[0]:.6f}")
             self._edit_lon_var.set(f"{coords[1]:.6f}")
+            self._refresh_map()
 
     def _start_edit(self, target: str, edit_type: str) -> None:
         self._editing_target = target
         self._editing_type = edit_type
+        self._selection_marker_pos = None
         
         # Initialize vars
         if target == "me_pos":
@@ -316,6 +338,7 @@ class ControllerWindow:
     def _cancel_edit(self) -> None:
         self._editing_target = None
         self._editing_type = None
+        self._selection_marker_pos = None
         self._map_hint_label.pack_forget()
         self._refresh_ui()
 
@@ -474,7 +497,7 @@ class ControllerWindow:
                 pos_label.pack(side=tk.LEFT)
                 depth_label = ttk.Label(display_f, text="—", width=8, font="monospace", foreground="gray")
                 depth_label.pack(side=tk.LEFT)
-                range_label = ttk.Label(display_f, text="—", width=8, font="monospace", foreground="green")
+                range_label = ttk.Label(display_f, text="—", width=8, font="monospace")
                 range_label.pack(side=tk.LEFT)
                 
                 ttk.Button(display_f, text="Del", width=4, command=lambda n=nid: self._on_delete_node(n)).pack(side=tk.RIGHT)
@@ -495,6 +518,11 @@ class ControllerWindow:
 
             row_info = self._registry_rows[nid]
             
+            # Deterministic color based on ID
+            try: color_idx = int(nid) % len(NODE_COLORS)
+            except: color_idx = hash(nid) % len(NODE_COLORS)
+            color = NODE_COLORS[color_idx]
+
             if self._editing_target == nid:
                 row_info["display_f"].pack_forget()
                 row_info["edit_f"].pack(side=tk.LEFT, fill=tk.X, expand=True)
@@ -520,7 +548,7 @@ class ControllerWindow:
                 depth_val = f"{kn.position.depth:.1f}m" if kn.position else "—"
                 row_info["depth_label"].configure(text=depth_val)
                 range_val = f"{kn.last_range:.1f}m" if kn.last_range is not None else "—"
-                row_info["range_label"].configure(text=range_val)
+                row_info["range_label"].configure(text=range_val, foreground=color)
 
     def _refresh_actions_dropdown(self) -> None:
         ids = sorted(self._node.get_known_nodes().keys())
@@ -528,7 +556,7 @@ class ControllerWindow:
 
     def _refresh_map(self) -> None:
         known = self._node.get_known_nodes()
-        current_ids = set(known.keys()) | {"me", "simulated"}
+        current_ids = set(known.keys()) | {"me", "simulated", "selection"}
         stored_ids = set(self._markers.keys())
         
         # Remove markers for nodes no longer present
@@ -536,36 +564,46 @@ class ControllerWindow:
             self._delete_marker(nid)
             self._delete_path(nid)
 
-        # 1. Own position (red)
+        # 1. Own position (Regular Black Pin)
         pos = self._node.get_position()
         if pos:
             self._update_or_create_marker(
                 "me", pos.lat, pos.lon, 
                 text=f"{self._node.node_id} (me)",
-                color=OWN_COLOR
+                icon=None,  # Use default pin
+                color_circle=OWN_COLOR_CIRCLE,
+                color_outside=OWN_COLOR_OUTSIDE
             )
         else:
             self._delete_marker("me")
 
-        # 2. Simulated position (dashed yellow)
+        # 2. Simulated position (Black ring, transparent center)
         sim_pos = self._get_sim_pos() if self._get_sim_pos else None
         if self._show_sim_pos_var.get() and sim_pos:
+            icon = self._get_circle_icon("black", transparent=True)
             self._update_or_create_marker(
                 "simulated", sim_pos.lat, sim_pos.lon,
-                text="simulated",
-                color=SIM_COLOR
+                text="Physical (Mock)",
+                icon=icon
             )
         else:
             self._delete_marker("simulated")
 
-        # 3. Known nodes
+        # 3. Known nodes (Colored ring, transparent center)
         for i, (nid, kn) in enumerate(sorted(known.items())):
-            color = NODE_COLORS[i % len(NODE_COLORS)]
+            # Deterministic color based on ID
+            try:
+                color_idx = int(nid) % len(NODE_COLORS)
+            except ValueError:
+                color_idx = hash(nid) % len(NODE_COLORS)
+            color = NODE_COLORS[color_idx]
+
             if kn.position:
+                icon = self._get_circle_icon(color, transparent=True)
                 self._update_or_create_marker(
                     nid, kn.position.lat, kn.position.lon,
                     text=nid,
-                    color=color
+                    icon=icon
                 )
                 
                 # Range circle
@@ -578,7 +616,42 @@ class ControllerWindow:
                 self._delete_marker(nid)
                 self._delete_path(nid)
 
-    def _update_or_create_marker(self, key: str, lat: float, lon: float, text: str, color: str) -> None:
+        # 4. Map Selection (Grey ring, transparent center)
+        if self._selection_marker_pos:
+            icon = self._get_circle_icon("grey", transparent=True)
+            self._update_or_create_marker(
+                "selection", self._selection_marker_pos[0], self._selection_marker_pos[1],
+                text="Selection",
+                icon=icon
+            )
+        else:
+            self._delete_marker("selection")
+
+    def _get_circle_icon(self, color: str, size: int = 16, thickness: int = 2, transparent: bool = True) -> ImageTk.PhotoImage:
+        """Create or retrieve a circular icon from cache."""
+        cache_key = f"{color}_{size}_{thickness}_{transparent}"
+        if cache_key in self._icon_cache:
+            return self._icon_cache[cache_key]
+
+        # Create RGBA image with transparent background
+        img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(img)
+        
+        if transparent:
+            # Draw only the outline
+            draw.ellipse((0, 0, size-1, size-1), outline=color, width=thickness)
+        else:
+            # Draw solid circle
+            draw.ellipse((0, 0, size-1, size-1), fill=color)
+            
+        icon = ImageTk.PhotoImage(img)
+        self._icon_cache[cache_key] = icon
+        return icon
+
+    def _update_or_create_marker(self, key: str, lat: float, lon: float, text: str, 
+                                 icon: Optional[ImageTk.PhotoImage] = None,
+                                 color_circle: Optional[str] = None,
+                                 color_outside: Optional[str] = None) -> None:
         if key in self._markers:
             marker = self._markers[key]
             try:
@@ -588,11 +661,20 @@ class ControllerWindow:
             except:
                 self._delete_marker(key)
 
-        m = self._map.set_marker(
-            lat, lon, text=text,
-            marker_color_circle=color,
-            marker_color_outside=color
-        )
+        if icon:
+            m = self._map.set_marker(
+                lat, lon, text=text,
+                icon=icon,
+                icon_anchor="center",
+                text_color="black"
+            )
+        else:
+            m = self._map.set_marker(
+                lat, lon, text=text,
+                marker_color_circle=color_circle,
+                marker_color_outside=color_outside,
+                text_color="black"
+            )
         self._markers[key] = m
 
     def _update_or_create_path(self, key: str, position_list: list[tuple[float, float]], color: str) -> None:
@@ -604,15 +686,19 @@ class ControllerWindow:
 
     def _delete_marker(self, key: str) -> None:
         if key in self._markers:
-            try: self._markers[key].delete() # type: ignore
-            except: pass
-            del self._markers[key]
+            marker = self._markers.pop(key)
+            try:
+                marker.delete() # type: ignore
+            except:
+                pass
 
     def _delete_path(self, key: str) -> None:
         if key in self._paths:
-            try: self._paths[key].delete() # type: ignore
-            except: pass
-            del self._paths[key]
+            path_obj = self._paths.pop(key)
+            try:
+                path_obj.delete() # type: ignore
+            except:
+                pass
 
     # ------------------------------------------------------------------ #
     #  Console                                                             #
