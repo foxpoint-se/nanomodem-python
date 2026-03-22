@@ -730,8 +730,8 @@ class ControllerWindow:
 
     def _log_message(self, msg: Message) -> None:
         match msg:
-            case PositionMessage(node_id=nid, coord=c):
-                self._log(f"Recv POS from {nid}: ({c.lat:.4f}, {c.lon:.4f}, {c.depth:.1f})")
+            case PositionMessage(node_id=nid, coord=c, depth=d):
+                self._log(f"Recv POS from {nid}: ({c.lat:.4f}, {c.lon:.4f}, {d:.1f}m)")
             case RangeResponseMessage(node_id=nid, timestamp=ts):
                 kn = self._node.get_known_nodes().get(nid)
                 dist = f"{kn.last_range:.2f}m" if kn and kn.last_range is not None else "??m"
