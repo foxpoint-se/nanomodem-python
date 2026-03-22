@@ -19,81 +19,95 @@ MAP_ZOOM = 17
 
 
 def launch_mock(root: tk.Tk) -> list[ControllerWindow]:
-    """Create a mock scenario with 4 nodes, each in its own ControllerWindow."""
+    """Create a mock scenario with 4 nodes, each in its own ControllerWindow.
+    
+    The 'Host' node is the primary unit we are testing, so it receives
+    simulation callbacks to control its 'physical' position in the mock ether.
+    The 'Beacons' are static units that do not receive simulation controls.
+    """
 
     ether = MockEther(sound_speed=1500.0)
 
-    # Initial positions for simulation (mock ether)
-    # Host starts at center, beacons in a triangle around it
-    initial_sim_positions = {
-        "001": Coord(lat=59.310153, lon=17.975189, depth=5.0),
-        "002": Coord(lat=59.310500, lon=17.974500, depth=0.0),
-        "003": Coord(lat=59.310800, lon=17.976000, depth=0.0),
-        "004": Coord(lat=59.309500, lon=17.975500, depth=0.0),
+    # 1. Scenario Configuration
+    host_config = {
+        "id": "001",
+        "name": "Host (Tracker)",
+        "sim_pos": Coord(lat=59.310153, lon=17.975189, depth=5.0),
     }
 
-    nodes_config: list[tuple[str, str]] = [
-        ("001", "Host"),
-        ("002", "Beacon 1"),
-        ("003", "Beacon 2"),
-        ("004", "Beacon 3"),
+    beacons_config = [
+        {"id": "002", "name": "Beacon 1", "sim_pos": Coord(lat=59.310500, lon=17.974500, depth=0.0)},
+        {"id": "003", "name": "Beacon 2", "sim_pos": Coord(lat=59.310800, lon=17.976000, depth=0.0)},
+        {"id": "004", "name": "Beacon 3", "sim_pos": Coord(lat=59.309500, lon=17.975500, depth=0.0)},
     ]
 
-    all_ids = [nid for nid, _ in nodes_config]
+    all_ids = [host_config["id"]] + [b["id"] for b in beacons_config]
 
-    # Compute window tiling (2x2 grid)
+    # 2. Window Tiling Logic
     screen_w = root.winfo_screenwidth()
     screen_h = root.winfo_screenheight()
     win_w = min(480, screen_w // 2)
     win_h = min(780, screen_h // 2)
 
-    controllers: list[ControllerWindow] = []
-
-    for i, (node_id, pretty_name) in enumerate(nodes_config):
-        transport = MockTransport(node_id, ether)
-        
-        # Initialize simulated position for mock
-        if node_id in initial_sim_positions:
-            transport.position = initial_sim_positions[node_id]
-
-        peer_ids = [nid for nid in all_ids if nid != node_id]
-
-        col = i % 2
-        row = i // 2
+    def get_geometry(index: int) -> str:
+        col = index % 2
+        row = index // 2
         x = col * win_w
         y = row * win_h
-        geometry = f"{win_w}x{win_h}+{x}+{y}"
+        return f"{win_w}x{win_h}+{x}+{y}"
 
-        # Define mock-only callbacks for simulated position
-        def get_sim_pos(t=transport):
-            return t.position
-        
-        def set_sim_pos(coord, t=transport):
-            t.position = coord
+    controllers: list[ControllerWindow] = []
 
-        controller = ControllerWindow(
+    # 3. Instantiate the Host (The node we pretend we are using)
+    # This one gets the callbacks so we can move its "Physical" location 
+    # while its "Logical" location remains unknown.
+    host_transport = MockTransport(host_config["id"], ether)
+    host_transport.position = host_config["sim_pos"]
+
+    def get_sim_pos(t=host_transport): return t.position
+    def set_sim_pos(coord, t=host_transport): t.position = coord
+
+    host_controller = ControllerWindow(
+        root=root,
+        node_id=host_config["id"],
+        pretty_name=host_config["name"],
+        transport=host_transport,
+        peer_ids=[b["id"] for b in beacons_config],
+        map_center=MAP_CENTER,
+        map_zoom=MAP_ZOOM,
+        window_geometry=get_geometry(0),
+        get_sim_pos_callback=get_sim_pos,
+        set_sim_pos_callback=set_sim_pos,
+    )
+    
+    # Pre-populate host registry with beacon positions (simulating a known environment)
+    for b in beacons_config:
+        host_controller.node.set_known_node_position(b["id"], b["sim_pos"])
+    
+    controllers.append(host_controller)
+
+    # 4. Instantiate Beacons (Physical units that just "exist" at a spot)
+    # These do NOT get simulation callbacks because they are static in this scenario.
+    for i, b in enumerate(beacons_config, start=1):
+        b_transport = MockTransport(b["id"], ether)
+        b_transport.position = b["sim_pos"]
+
+        b_controller = ControllerWindow(
             root=root,
-            node_id=node_id,
-            pretty_name=pretty_name,
-            transport=transport,
-            peer_ids=peer_ids,
+            node_id=b["id"],
+            pretty_name=b["name"],
+            transport=b_transport,
+            peer_ids=[nid for nid in all_ids if nid != b["id"]],
             map_center=MAP_CENTER,
             map_zoom=MAP_ZOOM,
-            window_geometry=geometry,
-            get_sim_pos_callback=get_sim_pos,
-            set_sim_pos_callback=set_sim_pos,
+            window_geometry=get_geometry(i),
+            get_sim_pos_callback=None,  # Disabled for beacons
+            set_sim_pos_callback=None,
         )
         
-        # Pre-populate registry for the Host (001)
-        # In a real experiment, you'd know where your beacons are.
-        if node_id == "001":
-            for bid in ["002", "003", "004"]:
-                controller.node.set_known_node_position(bid, initial_sim_positions[bid])
+        # Beacons know their own position in this scenario
+        b_controller.node.set_position(b["sim_pos"])
         
-        # For beacons, they might also know where each other are
-        if node_id in ["002", "003", "004"]:
-            controller.node.set_position(initial_sim_positions[node_id])
-
-        controllers.append(controller)
+        controllers.append(b_controller)
 
     return controllers
