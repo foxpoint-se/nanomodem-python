@@ -17,9 +17,9 @@ from typing import Callable, Optional
 from PIL import Image, ImageDraw, ImageTk
 from tkintermapview import TkinterMapView
 
-from nanomodem.node import AcousticNode
-from nanomodem.transport import TransportInterface
-from nanomodem.types import (
+from foxpoint.nanomodem.node import AcousticNode
+from foxpoint.nanomodem.transport import TransportInterface
+from foxpoint.nanomodem.types import (
     Coord,
     Message,
     PositionMessage,

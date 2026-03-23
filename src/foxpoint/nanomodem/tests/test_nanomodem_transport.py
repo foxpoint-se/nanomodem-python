@@ -5,9 +5,9 @@ and doesn't require a real serial port. The serial I/O is trivial
 and best tested with actual hardware.
 """
 
-from nanomodem.codec import Codec
-from nanomodem.nanomodem_transport import NanomodemTransport
-from nanomodem.types import (
+from foxpoint.nanomodem.codec import Codec
+from foxpoint.nanomodem.nanomodem_transport import NanomodemTransport
+from foxpoint.nanomodem.types import (
     Coord,
     PositionMessage,
     RangeResponseMessage,

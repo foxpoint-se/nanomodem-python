@@ -1,7 +1,7 @@
 """Tests for MockTransport + MockEther."""
 
-from nanomodem.transport import MockEther, MockTransport
-from nanomodem.types import Coord, Message, PositionMessage, RangeResponseMessage, UnknownMessage
+from foxpoint.nanomodem.transport import MockEther, MockTransport
+from foxpoint.nanomodem.types import Coord, Message, PositionMessage, RangeResponseMessage, UnknownMessage
 
 
 def _collect_messages(transport: MockTransport) -> list[Message]:

@@ -2,8 +2,8 @@
 
 import math
 
-from nanomodem.calculation import Calculation
-from nanomodem.types import Coord
+from foxpoint.nanomodem.calculation import Calculation
+from foxpoint.nanomodem.types import Coord
 
 import pytest
 

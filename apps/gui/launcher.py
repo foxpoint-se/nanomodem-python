@@ -9,8 +9,8 @@ from __future__ import annotations
 
 import tkinter as tk
 
-from nanomodem.transport import MockEther, MockTransport
-from nanomodem.types import Coord
+from foxpoint.nanomodem.transport import MockEther, MockTransport
+from foxpoint.nanomodem.types import Coord
 
 from .controller import ControllerWindow
 

@@ -1,9 +1,9 @@
 """Integration test: full localization cycle with mock transport."""
 
-from nanomodem.calculation import Calculation
-from nanomodem.node import AcousticNode
-from nanomodem.transport import MockEther, MockTransport
-from nanomodem.types import Coord
+from foxpoint.nanomodem.calculation import Calculation
+from foxpoint.nanomodem.node import AcousticNode
+from foxpoint.nanomodem.transport import MockEther, MockTransport
+from foxpoint.nanomodem.types import Coord
 
 
 def _make_beacon(

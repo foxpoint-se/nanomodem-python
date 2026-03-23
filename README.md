@@ -1,26 +1,28 @@
-# Acoustic Modem Localization System
+# Foxpoint Nanomodem Library
 
-Layered system for underwater localization using acoustic modems (Nanomodem v3).
+Professional, namespaced Python library (`foxpoint.nanomodem`) for underwater localization using acoustic modems (Nanomodem v3).
 
-## Project structure
+## Project Structure
 
-```
-take2/
-├── nanomodem/          # Core library (pure logic, no GUI)
-│   ├── node.py         # AcousticNode — the only stateful class
-│   ├── transport.py    # TransportInterface, MockTransport, MockEther
-│   ├── nanomodem_transport.py  # Real serial transport
-│   ├── codec.py        # Encode/decode message bodies
-│   ├── calculation.py  # Trilateration, projection, timestamp conversion
-│   ├── types.py        # Coord, KnownNode, Message union, etc.
-│   ├── __main__.py     # CLI entry point (mock demo)
-│   └── tests/          # 71 unit + integration tests
-├── gui/                # Tkinter GUI application
-│   ├── controller.py   # Per-node ControllerWindow
-│   ├── launcher.py     # Boots nodes + windows
-│   └── __main__.py     # python -m gui
+```text
+.
+├── src/
+│   └── foxpoint/
+│       └── nanomodem/          # Core library (foxpoint.nanomodem)
+│           ├── node.py         # AcousticNode — the only stateful class
+│           ├── transport.py    # TransportInterface, MockTransport, MockEther
+│           ├── nanomodem_transport.py  # Real serial transport
+│           ├── codec.py        # Encode/decode message bodies
+│           ├── calculation.py  # Trilateration, projection, timestamp conversion
+│           ├── types.py        # Coord, KnownNode, Message union, etc.
+│           ├── __main__.py     # CLI entry point (mock demo)
+│           └── tests/          # 71 unit + integration tests
+├── apps/
+│   └── gui/                    # Tkinter GUI application
+│       ├── controller.py       # Per-node ControllerWindow
+│       ├── launcher.py         # Boots nodes + windows
+│       └── __main__.py         # python -m gui
 ├── pyproject.toml
-├── TODO.md
 └── README.md
 ```
 
@@ -63,57 +65,50 @@ graph TD
 
 **Codec** encodes/decodes message bodies (position data). Stateless, pure, injected into NanomodemTransport. The node never knows it exists.
 
-## Install
+## Installation
+
+From the repository root:
 
 ```bash
-cd take2
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
 ```
 
-## Run
+## Usage
 
-### Mock demo (no hardware needed)
-
-From the **parent** of `take2` (repo root):
+### Mock Demo (No hardware needed)
 
 ```bash
-python -m nanomodem
+export PYTHONPATH=$PYTHONPATH:$(pwd)/src
+python3 -m foxpoint.nanomodem
 ```
 
-From **inside** the `take2` folder:
+### GUI (Mock mode)
 
 ```bash
-PYTHONPATH=. python -m nanomodem
+export PYTHONPATH=$PYTHONPATH:$(pwd)/src:$(pwd)/apps
+python3 -m gui
 ```
 
-### GUI (mock mode)
+### Real Hardware
 
 ```bash
-cd take2
-PYTHONPATH=. python -m gui
+export PYTHONPATH=$PYTHONPATH:$(pwd)/src
+python3 -m foxpoint.nanomodem --port /dev/ttyUSB0 --baud 9600 --node-id 001
 ```
 
-### Real hardware
+## Development
+
+### Running Tests
 
 ```bash
-python -m nanomodem --port /dev/ttyUSB0 --baud 9600 --node-id 001
+pytest
 ```
 
-(NanomodemTransport is implemented but not yet wired into the entry point's main loop.)
+(The `pyproject.toml` is configured to look in `src/` and find the tests automatically.)
 
-## Tests
-
-```bash
-PYTHONPATH= python -m pytest nanomodem/tests/ -v
-```
-
-71 tests covering all layers: node, codec, transport, calculation, and integration.
-
-If you have ROS sourced, pytest may load ROS pytest plugins. The `PYTHONPATH=` prefix clears this so only the venv is used.
-
-## Node capabilities
+### Node Capabilities
 
 Nodes have two boolean capabilities that gate automatic behavior:
 
@@ -122,7 +117,7 @@ Nodes have two boolean capabilities that gate automatic behavior:
 
 A "beacon" node sets `is_broadcasting_own_position = True`. A "submerged host" sets `is_inferring_own_position = True`. Both can be toggled independently on any node.
 
-## Callbacks
+### Callbacks
 
 AcousticNode accepts two optional callbacks:
 
