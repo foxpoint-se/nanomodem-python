@@ -4,10 +4,10 @@ This plan outlines the steps to transform this "hacking" repo into a professiona
 
 ### Phase 0: Cleanup & Branching
 *Goal: Start fresh and remove legacy clutter.*
-- [ ] Create a new development branch: `git checkout -b refactor/modernize-library`.
-- [ ] Delete the old `gui/` folder (not the one in `take2`).
+- [x] Create a new development branch: `git checkout -b refactor/modernize-library`.
+- [x] Delete the old `gui/` folder (not the one in `take2`).
 - [ ] Move contents of `take2/` to the root (temporarily) to flatten the structure.
-- [ ] Delete any other "dead" files or folders identified during the move.
+- [x] Delete any other "dead" files or folders identified during the move.
 
 ### Phase 1: Repository & Branding
 *Goal: Establish the new identity and clean the slate.*
