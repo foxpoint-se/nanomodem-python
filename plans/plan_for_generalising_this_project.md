@@ -6,7 +6,7 @@ This plan outlines the steps to transform this "hacking" repo into a professiona
 *Goal: Start fresh and remove legacy clutter.*
 - [x] Create a new development branch: `git checkout -b refactor/modernize-library`.
 - [x] Delete the old `gui/` folder (not the one in `take2`).
-- [ ] Move contents of `take2/` to the root (temporarily) to flatten the structure.
+- [x] Move contents of `take2/` to the root (temporarily) to flatten the structure.
 - [x] Delete any other "dead" files or folders identified during the move.
 
 ### Phase 1: Repository & Branding
@@ -14,11 +14,11 @@ This plan outlines the steps to transform this "hacking" repo into a professiona
 - [x] Rename GitHub Repository to `nanomodem-python` (or similar).
 - [x] Rename local folder: `mv testing-acoustic-modems nanomodem-python`.
 - [x] Update local git remote: `git remote set-url origin <new-url>`.
-- [ ] Create a `.gitignore` if missing (ensure `__pycache__`, `.venv`, and `dist/` are ignored).
+- [x] Create a `.gitignore` if missing (ensure `__pycache__`, `.venv`, and `dist/` are ignored).
 
 ### Phase 2: Package Structure (The "Namespace")
 *Goal: Organize files so they can be imported as `foxpoint.nanomodem`.*
-- [ ] Create the nested directory structure: `mkdir -p src/foxpoint/nanomodem`.
+- [x] Create the nested directory structure: `mkdir -p src/foxpoint/nanomodem`.
 - [ ] Create `src/foxpoint/__init__.py` (leave empty, this enables the namespace).
 - [ ] Create `src/foxpoint/nanomodem/__init__.py` (this will be your public API).
 - [ ] Create sub-folders for organization: `mkdir -p src/foxpoint/nanomodem/{transports,codecs,drivers}`.
