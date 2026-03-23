@@ -19,9 +19,9 @@ This plan outlines the steps to transform this "hacking" repo into a professiona
 ### Phase 2: Package Structure (The "Namespace")
 *Goal: Organize files so they can be imported as `foxpoint.nanomodem`.*
 - [x] Create the nested directory structure: `mkdir -p src/foxpoint/nanomodem`.
-- [ ] Create `src/foxpoint/__init__.py` (leave empty, this enables the namespace).
-- [ ] Create `src/foxpoint/nanomodem/__init__.py` (this will be your public API).
-- [ ] Create sub-folders for organization: `mkdir -p src/foxpoint/nanomodem/{transports,codecs,drivers}`.
+- [x] Create `src/foxpoint/__init__.py` (leave empty, this enables the namespace).
+- [x] Create `src/foxpoint/nanomodem/__init__.py` (this will be your public API).
+- [x] Create sub-folders for organization: `mkdir -p src/foxpoint/nanomodem/{transports,codecs,drivers}`.
 
 ### Phase 3: Core Logic Refactor
 *Goal: Implement the "Pluggable" architecture we discussed.*
