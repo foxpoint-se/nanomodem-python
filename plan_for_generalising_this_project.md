@@ -11,9 +11,9 @@ This plan outlines the steps to transform this "hacking" repo into a professiona
 
 ### Phase 1: Repository & Branding
 *Goal: Establish the new identity and clean the slate.*
-- [ ] Rename GitHub Repository to `nanomodem-python` (or similar).
-- [ ] Rename local folder: `mv testing-acoustic-modems nanomodem-python`.
-- [ ] Update local git remote: `git remote set-url origin <new-url>`.
+- [x] Rename GitHub Repository to `nanomodem-python` (or similar).
+- [x] Rename local folder: `mv testing-acoustic-modems nanomodem-python`.
+- [x] Update local git remote: `git remote set-url origin <new-url>`.
 - [ ] Create a `.gitignore` if missing (ensure `__pycache__`, `.venv`, and `dist/` are ignored).
 
 ### Phase 2: Package Structure (The "Namespace")
