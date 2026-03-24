@@ -29,6 +29,7 @@ clean-env:
 		echo "Virtual environment not found (nothing to clean)."; \
 	fi
 
+lint:
 	ruff check src apps
 
 format:

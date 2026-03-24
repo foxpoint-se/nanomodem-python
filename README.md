@@ -69,24 +69,29 @@ graph TD
 From the repository root:
 
 ```bash
-python3 -m venv .venv
+make install
+```
+
+This creates `.venv/` and installs dependencies. To activate:
+
+```bash
 source .venv/bin/activate
-pip install -e ".[dev]"
 ```
 
 ## Usage
 
 ### Mock Demo (No hardware needed)
 
+**GUI with 4 mock nodes (1 host + 3 beacons):**
+
 ```bash
-python3 -m nanomodem
+python3 -m apps.gui
 ```
 
-### GUI (Mock mode)
+**CLI demo:**
 
 ```bash
-export PYTHONPATH=$PYTHONPATH:$(pwd)/apps
-python3 -m gui
+python3 -m nanomodem
 ```
 
 ### Real Hardware
@@ -99,22 +104,19 @@ python3 -m nanomodem --port /dev/ttyUSB0 --baud 9600 --node-id 001
 
 ### Setup
 
-For development, it is recommended to install the library in editable mode with development dependencies:
-
 ```bash
-pip install -e ".[dev]"
+make install
 ```
 
-### Quality Control (Makefile)
+### Quality Control
 
-A `Makefile` is provided to simplify common development tasks. Run `make help` to see all available commands.
+A `Makefile` is provided to simplify common development tasks. Run `make help` to see all available commands:
 
 ```bash
 make test      # Run all tests
 make lint      # Check for style and logical errors (Ruff)
 make format    # Automatically format code (Ruff)
 make typecheck # Run strict type checking (Mypy)
-make check     # Run lint, typecheck, and test
 ```
 
 ### IDE Integration
@@ -123,6 +125,10 @@ To ensure your IDE matches the project's quality standards:
 1. **Ruff Extension**: Install the [Ruff extension](https://marketplace.visualstudio.com/items?itemName=charliermarsh.ruff) for Cursor/VS Code.
 2. **Format on Save**: Enable "Format on Save" in your editor settings and set Ruff as the default formatter. This will ensure your code is always formatted according to the project's rules (Black-compatible).
 3. **Mypy**: The `pyproject.toml` is configured for strict type checking. Most IDEs will pick this up automatically if you have a Python type-checking extension installed.
+
+---
+
+## API Reference
 
 ### Node Capabilities
 
