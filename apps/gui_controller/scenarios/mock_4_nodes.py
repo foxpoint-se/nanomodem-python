@@ -13,7 +13,7 @@ from typing import Optional
 from nanomodem.transport import MockEther, MockTransport
 from nanomodem.types import Coord
 
-from .controller import ControllerWindow
+from ..controller import ControllerWindow
 
 MAP_CENTER = (59.310153, 17.975189)
 MAP_ZOOM = 17
@@ -131,3 +131,16 @@ def launch_mock(root: tk.Tk) -> list[ControllerWindow]:
         controllers.append(b_controller)
 
     return controllers
+
+
+def main() -> None:
+    root = tk.Tk()
+    root.withdraw()  # Hide root window; ControllerWindows are Toplevels
+
+    _controllers = launch_mock(root)
+
+    root.mainloop()
+
+
+if __name__ == "__main__":
+    main()

@@ -17,10 +17,12 @@ Python library for underwater localization using acoustic modems (Nanomodem v3).
 │       ├── __main__.py         # CLI entry point (mock demo)
 │       └── tests/              # 71 unit + integration tests
 ├── apps/
-│   └── gui/                    # Tkinter GUI application
+│   └── gui_controller/         # Tkinter GUI application
 │       ├── controller.py       # Per-node ControllerWindow
-│       ├── launcher.py         # Boots nodes + windows
-│       └── __main__.py         # python -m gui
+│       ├── scenarios/          # Launch configurations
+│       │   ├── mock_4_nodes.py # 4-node simulation
+│       │   └── single_node.py  # Single node UI
+│       └── __main__.py         # Help/Scenario directory
 ├── pyproject.toml
 └── README.md
 ```
@@ -85,7 +87,13 @@ source .venv/bin/activate
 **GUI with 4 mock nodes (1 host + 3 beacons):**
 
 ```bash
-python3 -m apps.gui
+python3 -m apps.gui_controller.scenarios.mock_4_nodes
+```
+
+**Single node GUI (requires node ID):**
+
+```bash
+python3 -m apps.gui_controller.scenarios.single_node 001
 ```
 
 **CLI demo:**
