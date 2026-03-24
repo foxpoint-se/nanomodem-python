@@ -1,7 +1,7 @@
 [project]
-name = "foxpoint-nanomodem"
+name = "nanomodem"
 version = "0.1.0"
-description = "Acoustic modem localization system (foxpoint.nanomodem)"
+description = "Acoustic modem localization system"
 requires-python = ">=3.12"
 dependencies = [
     "scipy>=1.10.0",
@@ -22,10 +22,10 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 where = ["src"]
-include = ["foxpoint*"]
+include = ["nanomodem*"]
 
 [tool.pytest.ini_options]
-testpaths = ["src/foxpoint/nanomodem/tests"]
+testpaths = ["src/nanomodem/tests"]
 pythonpath = ["src"]
 
 [tool.mypy]

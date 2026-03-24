@@ -1,7 +1,7 @@
 """Tests for MockTransport + MockEther."""
 
-from foxpoint.nanomodem.transport import MockEther, MockTransport
-from foxpoint.nanomodem.types import (
+from nanomodem.transport import MockEther, MockTransport
+from nanomodem.types import (
     Coord,
     Message,
     PositionMessage,

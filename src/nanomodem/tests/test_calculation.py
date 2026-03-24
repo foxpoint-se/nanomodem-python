@@ -4,8 +4,8 @@ import math
 
 import pytest
 
-from foxpoint.nanomodem.calculation import Calculation
-from foxpoint.nanomodem.types import Coord
+from nanomodem.calculation import Calculation
+from nanomodem.types import Coord
 
 calc = Calculation()
 

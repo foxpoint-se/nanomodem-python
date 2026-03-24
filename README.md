@@ -1,22 +1,21 @@
-# Foxpoint Nanomodem Library
+# Nanomodem Library
 
-Professional, namespaced Python library (`foxpoint.nanomodem`) for underwater localization using acoustic modems (Nanomodem v3).
+Python library for underwater localization using acoustic modems (Nanomodem v3).
 
 ## Project Structure
 
 ```text
 .
 ├── src/
-│   └── foxpoint/
-│       └── nanomodem/          # Core library (foxpoint.nanomodem)
-│           ├── node.py         # AcousticNode — the only stateful class
-│           ├── transport.py    # TransportInterface, MockTransport, MockEther
-│           ├── nanomodem_transport.py  # Real serial transport
-│           ├── codec.py        # Encode/decode message bodies
-│           ├── calculation.py  # Trilateration, projection, timestamp conversion
-│           ├── types.py        # Coord, KnownNode, Message union, etc.
-│           ├── __main__.py     # CLI entry point (mock demo)
-│           └── tests/          # 71 unit + integration tests
+│   └── nanomodem/              # Core library (nanomodem)
+│       ├── node.py             # AcousticNode — the only stateful class
+│       ├── transport.py        # TransportInterface, MockTransport, MockEther
+│       ├── nanomodem_transport.py  # Real serial transport
+│       ├── codec.py            # Encode/decode message bodies
+│       ├── calculation.py       # Trilateration, projection, timestamp conversion
+│       ├── types.py            # Coord, KnownNode, Message union, etc.
+│       ├── __main__.py         # CLI entry point (mock demo)
+│       └── tests/              # 71 unit + integration tests
 ├── apps/
 │   └── gui/                    # Tkinter GUI application
 │       ├── controller.py       # Per-node ControllerWindow
@@ -80,22 +79,20 @@ pip install -e ".[dev]"
 ### Mock Demo (No hardware needed)
 
 ```bash
-export PYTHONPATH=$PYTHONPATH:$(pwd)/src
-python3 -m foxpoint.nanomodem
+python3 -m nanomodem
 ```
 
 ### GUI (Mock mode)
 
 ```bash
-export PYTHONPATH=$PYTHONPATH:$(pwd)/src:$(pwd)/apps
+export PYTHONPATH=$PYTHONPATH:$(pwd)/apps
 python3 -m gui
 ```
 
 ### Real Hardware
 
 ```bash
-export PYTHONPATH=$PYTHONPATH:$(pwd)/src
-python3 -m foxpoint.nanomodem --port /dev/ttyUSB0 --baud 9600 --node-id 001
+python3 -m nanomodem --port /dev/ttyUSB0 --baud 9600 --node-id 001
 ```
 
 ## Development

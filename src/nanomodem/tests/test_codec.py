@@ -1,7 +1,7 @@
 """Tests for Codec."""
 
-from foxpoint.nanomodem.codec import Codec
-from foxpoint.nanomodem.types import Coord, PositionMessage, UnknownMessage
+from nanomodem.codec import Codec
+from nanomodem.types import Coord, PositionMessage, UnknownMessage
 
 
 def test_should_encode_position_as_bytes() -> None:

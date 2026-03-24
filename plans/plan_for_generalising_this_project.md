@@ -22,7 +22,7 @@ This plan outlines the steps to transform this "hacking" repo into a professiona
 - [x] Create `src/foxpoint/__init__.py` (leave empty, this enables the namespace).
 - [x] Create `src/foxpoint/nanomodem/__init__.py` (this will be your public API).
 - [x] Create sub-folders for organization: `mkdir -p src/foxpoint/nanomodem/{transports,codecs,drivers}`.
-- [ ] Skip the namespacing completely
+- [x] Skip the namespacing completely
 - [ ] Remove foxpoint from readme. Are there more occurrences of this?
 - [ ] Remove words like "professional" and other silly stuff like that.
 - [ ] Rename gui to gui_controller or something similar?

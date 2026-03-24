@@ -10,8 +10,8 @@ from __future__ import annotations
 import tkinter as tk
 from typing import Optional
 
-from foxpoint.nanomodem.transport import MockEther, MockTransport
-from foxpoint.nanomodem.types import Coord
+from nanomodem.transport import MockEther, MockTransport
+from nanomodem.types import Coord
 
 from .controller import ControllerWindow
 

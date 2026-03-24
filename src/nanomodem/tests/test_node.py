@@ -2,10 +2,10 @@
 
 import pytest
 
-from foxpoint.nanomodem.calculation import Calculation
-from foxpoint.nanomodem.node import AcousticNode
-from foxpoint.nanomodem.transport import MockEther, MockTransport
-from foxpoint.nanomodem.types import Coord, PositionMessage, UnknownMessage
+from nanomodem.calculation import Calculation
+from nanomodem.node import AcousticNode
+from nanomodem.transport import MockEther, MockTransport
+from nanomodem.types import Coord, PositionMessage, UnknownMessage
 
 
 def _make_node(
