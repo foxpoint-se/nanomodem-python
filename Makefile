@@ -1,15 +1,11 @@
-.PHONY: help test lint format typecheck check
+.PHONY: help lint format typecheck test
 
 help:
 	@echo "Available commands:"
-	@echo "  make test      - Run tests using pytest"
 	@echo "  make lint      - Check code style and quality using ruff"
 	@echo "  make format    - Format code using ruff"
 	@echo "  make typecheck - Check types using mypy"
-	@echo "  make check     - Run lint, typecheck, and test"
-
-test:
-	pytest
+	@echo "  make test      - Run all code checks and tests using pytest"
 
 lint:
 	ruff check src apps
@@ -20,4 +16,5 @@ format:
 typecheck:
 	mypy src apps
 
-check: lint typecheck test
+test: lint typecheck
+	pytest
