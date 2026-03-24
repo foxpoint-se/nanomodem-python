@@ -1,6 +1,6 @@
 # Modernization Plan: Foxpoint Nanomodem Library
 
-This plan outlines the steps to transform this "hacking" repo into a professional, namespaced Python library (`foxpoint.nanomodem`) that is easy to consume in ROS2, GUI apps, and other projects.
+This plan outlines the steps to transform this "hacking" repo into a Python library (`foxpoint.nanomodem`) that is easy to consume in ROS2, GUI apps, and other projects.
 
 ### Phase 0: Cleanup & Branching
 *Goal: Start fresh and remove legacy clutter.*
@@ -23,8 +23,8 @@ This plan outlines the steps to transform this "hacking" repo into a professiona
 - [x] Create `src/foxpoint/nanomodem/__init__.py` (this will be your public API).
 - [x] Create sub-folders for organization: `mkdir -p src/foxpoint/nanomodem/{transports,codecs,drivers}`.
 - [x] Skip the namespacing completely
-- [ ] Remove foxpoint from readme. Are there more occurrences of this?
-- [ ] Remove words like "professional" and other silly stuff like that.
+- [x] Remove foxpoint from readme. Are there more occurrences of this?
+- [x] Remove words like "professional" and other silly stuff like that.
 - [ ] Rename gui to gui_controller or something similar?
 
 ### Intermediate phase
@@ -65,7 +65,6 @@ This plan outlines the steps to transform this "hacking" repo into a professiona
 
 ---
 **Note on Decisions:**
-- We chose **`foxpoint.nanomodem`** as the namespace to avoid collisions and look professional.
 - We chose **`dataclasses`** over `TypedDict` for better Intellisense and methods.
 - We chose **Poetry** for the modern "NPM-like" experience.
 - We are **skipping** automatic tagging for now to stay fast.
