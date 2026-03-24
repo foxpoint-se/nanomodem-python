@@ -1,8 +1,6 @@
 """Launcher: creates Tkinter root, MockEther, and tiled ControllerWindows.
 
-Usage:
-    Called from gui/__main__.py.
-    Creates a mock scenario with 1 host + 3 beacons.
+Creates a mock scenario with 1 host + 3 beacons.
 """
 
 from __future__ import annotations

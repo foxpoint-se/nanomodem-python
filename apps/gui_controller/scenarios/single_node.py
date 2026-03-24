@@ -1,8 +1,4 @@
-"""Launcher for a single, clean controller instance.
-
-Usage:
-    PYTHONPATH=. python -m gui.launcher_single <node_id>
-"""
+"""Launcher for a single, clean controller instance."""
 
 from __future__ import annotations
 
@@ -54,8 +50,8 @@ def launch_single(root: tk.Tk, node_id: str) -> ControllerWindow:
 def main() -> None:
     if len(sys.argv) < 2:
         print("\nError: Missing node ID.")
-        print("Usage: PYTHONPATH=. python -m gui.launcher_single <node_id>")
-        print("Example: PYTHONPATH=. python -m gui.launcher_single 001\n")
+        print("Usage: nanomodem-node <node_id>")
+        print("Example: nanomodem-node 001\n")
         sys.exit(1)
 
     node_id = sys.argv[1]

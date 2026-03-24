@@ -16,6 +16,10 @@ dev = [
     "ruff>=0.3.0",
 ]
 
+[project.scripts]
+nanomodem-demo = "apps.gui_controller.scenarios.mock_4_nodes:main"
+nanomodem-node = "apps.gui_controller.scenarios.single_node:main"
+
 [build-system]
 requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"

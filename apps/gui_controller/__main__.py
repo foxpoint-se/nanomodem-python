@@ -1,8 +1,4 @@
-"""GUI Controller entry point.
-
-Usage:
-    python -m apps.gui_controller
-"""
+"""GUI Controller entry point."""
 
 from __future__ import annotations
 

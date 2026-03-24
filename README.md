@@ -87,13 +87,13 @@ source .venv/bin/activate
 **GUI with 4 mock nodes (1 host + 3 beacons):**
 
 ```bash
-python3 -m apps.gui_controller.scenarios.mock_4_nodes
+nanomodem-demo
 ```
 
 **Single node GUI (requires node ID):**
 
 ```bash
-python3 -m apps.gui_controller.scenarios.single_node 001
+nanomodem-node 001
 ```
 
 **CLI demo:**
