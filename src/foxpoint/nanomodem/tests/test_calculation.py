@@ -2,11 +2,10 @@
 
 import math
 
-from foxpoint.nanomodem.calculation import Calculation
-from foxpoint.nanomodem.types import Coord
-
 import pytest
 
+from foxpoint.nanomodem.calculation import Calculation
+from foxpoint.nanomodem.types import Coord
 
 calc = Calculation()
 

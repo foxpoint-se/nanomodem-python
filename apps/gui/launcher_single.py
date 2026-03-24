@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import sys
 import tkinter as tk
+from typing import Optional
 
 from foxpoint.nanomodem.transport import MockEther, MockTransport
 from foxpoint.nanomodem.types import Coord
@@ -20,14 +21,17 @@ MAP_ZOOM = 17
 
 def launch_single(root: tk.Tk, node_id: str) -> ControllerWindow:
     """Create a single clean controller with the given ID."""
-    # We create a local ether for this single node. 
+    # We create a local ether for this single node.
     # In a real scenario with multiple processes, we'd use a different transport.
     ether = MockEther(sound_speed=1500.0)
-    
+
     transport = MockTransport(node_id, ether)
-    
-    def get_sim_pos(t=transport): return t.position
-    def set_sim_pos(coord, t=transport): t.position = coord
+
+    def get_sim_pos(t: MockTransport = transport) -> Optional[Coord]:
+        return t.position
+
+    def set_sim_pos(coord: Coord, t: MockTransport = transport) -> None:
+        t.position = coord
 
     controller = ControllerWindow(
         root=root,
@@ -40,14 +44,14 @@ def launch_single(root: tk.Tk, node_id: str) -> ControllerWindow:
         get_sim_pos_callback=get_sim_pos,
         set_sim_pos_callback=set_sim_pos,
     )
-    
+
     # Link mock transport to pull depth from the node
     transport.get_depth_callback = controller.node.get_depth
-    
+
     return controller
 
 
-def main():
+def main() -> None:
     if len(sys.argv) < 2:
         print("\nError: Missing node ID.")
         print("Usage: PYTHONPATH=. python -m gui.launcher_single <node_id>")
@@ -55,7 +59,7 @@ def main():
         sys.exit(1)
 
     node_id = sys.argv[1]
-    
+
     # Simple validation
     if not (len(node_id) == 3 and node_id.isdigit()):
         print(f"\nError: Invalid node ID '{node_id}'. Must be a 3-digit numeric string (001-255).\n")
@@ -65,7 +69,7 @@ def main():
     root.withdraw()  # Hide the main root window
 
     _controller = launch_single(root, node_id)
-    
+
     root.mainloop()
 
 

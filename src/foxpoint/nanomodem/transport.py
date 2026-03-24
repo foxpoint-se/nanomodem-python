@@ -98,9 +98,9 @@ class MockEther:
         lat_m = (b.position.lat - a.position.lat) * 111320.0
         avg_lat = math.radians((a.position.lat + b.position.lat) / 2.0)
         lon_m = (b.position.lon - a.position.lon) * 111320.0 * math.cos(avg_lat)
-        
+
         depth_m = b.depth - a.depth
-        
+
         return math.sqrt(lat_m**2 + lon_m**2 + depth_m**2)
 
 

@@ -41,7 +41,7 @@ def test_should_forward_range_response_via_callback() -> None:
 
 def test_should_write_P_command_format() -> None:
     """Verify the format of a ping command string."""
-    cmd = f"$P002".encode("ascii")
+    cmd = "$P002".encode("ascii")
     assert cmd == b"$P002"
 
 

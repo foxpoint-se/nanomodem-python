@@ -44,7 +44,7 @@ class Codec:
         lat_str = f"{coord.lat:+010.6f}"  # e.g. "+63.000000"
         lon_str = f"{coord.lon:+011.6f}"  # e.g. "+010.000000"
         depth_str = f"{depth:07.3f}"  # e.g. "005.000"
-        
+
         body = f"P{node_id[:3]:>03s}{lat_str}{lon_str}{depth_str}"
         return body.encode("ascii")
 

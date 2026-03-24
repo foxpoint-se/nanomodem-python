@@ -1,13 +1,11 @@
 """Tests for AcousticNode."""
 
-import logging
-
 import pytest
 
 from foxpoint.nanomodem.calculation import Calculation
 from foxpoint.nanomodem.node import AcousticNode
 from foxpoint.nanomodem.transport import MockEther, MockTransport
-from foxpoint.nanomodem.types import Coord, PositionMessage, RangeResponseMessage, UnknownMessage
+from foxpoint.nanomodem.types import Coord, PositionMessage, UnknownMessage
 
 
 def _make_node(
@@ -313,7 +311,7 @@ def test_should_calculate_position_when_is_inferring_own_position_enabled_and_ha
     host.request_range("003")
 
     # After third range, auto-calc should trigger
-    original_pos = host.get_position()
+    _ = host.get_position()
     host.request_range("004")
 
     result = host.get_position()
@@ -409,7 +407,7 @@ def test_should_call_on_state_changed_when_message_received() -> None:
     ether = MockEther()
     transport = MockTransport("001", ether)
     calls: list[bool] = []
-    node = AcousticNode(
+    _node = AcousticNode(
         node_id="001",
         transport=transport,
         on_state_changed=lambda: calls.append(True),
@@ -422,7 +420,7 @@ def test_should_call_on_message_received_with_message() -> None:
     ether = MockEther()
     transport = MockTransport("001", ether)
     received: list[object] = []
-    node = AcousticNode(
+    _node = AcousticNode(
         node_id="001",
         transport=transport,
         on_message_received=lambda msg: received.append(msg),

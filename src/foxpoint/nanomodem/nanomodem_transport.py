@@ -158,7 +158,7 @@ class NanomodemTransport:
         # Broadcast data — decode body via codec
         m = BROADCAST_DATA_RE.match(line)
         if m:
-            sender_id = m.group(1)
+            _sender_id = m.group(1)
             _nn = m.group(2)
             body = m.group(3)
             return self._codec.decode(body.encode("ascii"))

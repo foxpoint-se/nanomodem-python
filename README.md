@@ -100,13 +100,32 @@ python3 -m foxpoint.nanomodem --port /dev/ttyUSB0 --baud 9600 --node-id 001
 
 ## Development
 
-### Running Tests
+### Setup
+
+For development, it is recommended to install the library in editable mode with development dependencies:
 
 ```bash
-pytest
+pip install -e ".[dev]"
 ```
 
-(The `pyproject.toml` is configured to look in `src/` and find the tests automatically.)
+### Quality Control (Makefile)
+
+A `Makefile` is provided to simplify common development tasks. Run `make help` to see all available commands.
+
+```bash
+make test      # Run all tests
+make lint      # Check for style and logical errors (Ruff)
+make format    # Automatically format code (Ruff)
+make typecheck # Run strict type checking (Mypy)
+make check     # Run lint, typecheck, and test
+```
+
+### IDE Integration
+
+To ensure your IDE matches the project's quality standards:
+1. **Ruff Extension**: Install the [Ruff extension](https://marketplace.visualstudio.com/items?itemName=charliermarsh.ruff) for Cursor/VS Code.
+2. **Format on Save**: Enable "Format on Save" in your editor settings and set Ruff as the default formatter. This will ensure your code is always formatted according to the project's rules (Black-compatible).
+3. **Mypy**: The `pyproject.toml` is configured for strict type checking. Most IDEs will pick this up automatically if you have a Python type-checking extension installed.
 
 ### Node Capabilities
 

@@ -49,26 +49,30 @@ def run_mock_demo() -> None:
     # --- Create beacons with known surface positions ---
 
     beacon_positions = {
-        "002": Coord(lat=63.0, lon=10.0, depth=0.0),
-        "003": Coord(lat=63.001, lon=10.0, depth=0.0),
-        "004": Coord(lat=63.0005, lon=10.001, depth=0.0),
+        "002": Coord(lat=63.0, lon=10.0),
+        "003": Coord(lat=63.001, lon=10.0),
+        "004": Coord(lat=63.0005, lon=10.001),
     }
 
     beacons: dict[str, AcousticNode] = {}
     for nid, pos in beacon_positions.items():
         node = _create_mock_node(nid, pos, ether, calc)
+        node.set_depth(0.0)
         node.capabilities.is_broadcasting_own_position = True
         beacons[nid] = node
-        logger.info("Beacon %s at (%.4f, %.4f, %.1f)", nid, pos.lat, pos.lon, pos.depth)
+        logger.info("Beacon %s at (%.4f, %.4f, %.1f)", nid, pos.lat, pos.lon, node.get_depth())
 
     # --- Create submerged host ---
 
-    actual_pos = Coord(lat=63.0004, lon=10.0003, depth=5.0)
+    actual_pos = Coord(lat=63.0004, lon=10.0003)
     host = _create_mock_node("001", actual_pos, ether, calc)
+    host.set_depth(5.0)
     host.capabilities.is_inferring_own_position = True
     logger.info(
         "Host 001 at (%.4f, %.4f, %.1f) — actual position",
-        actual_pos.lat, actual_pos.lon, actual_pos.depth,
+        actual_pos.lat,
+        actual_pos.lon,
+        host.get_depth(),
     )
 
     # --- Step 1: Beacons broadcast their positions ---
@@ -85,9 +89,9 @@ def run_mock_demo() -> None:
     logger.info("--- Host ranging to beacons ---")
     for nid in beacon_positions:
         host.request_range(nid)
-        kn = host.get_known_nodes().get(nid)
-        if kn and kn.last_range is not None:
-            logger.info("  Range to %s: %.2fm", nid, kn.last_range)
+        kn_opt = host.get_known_nodes().get(nid)
+        if kn_opt and kn_opt.last_range is not None:
+            logger.info("  Range to %s: %.2fm", nid, kn_opt.last_range)
 
     # --- Step 3: Position should have been auto-calculated ---
 
@@ -95,11 +99,16 @@ def run_mock_demo() -> None:
     result = host.get_position()
     if result is not None:
         logger.info(
-            "  Estimated: (%.6f, %.6f, %.1f)", result.lat, result.lon, result.depth,
+            "  Estimated: (%.6f, %.6f, %.1f)",
+            result.lat,
+            result.lon,
+            host.get_depth(),
         )
         logger.info(
             "  Actual:    (%.6f, %.6f, %.1f)",
-            actual_pos.lat, actual_pos.lon, actual_pos.depth,
+            actual_pos.lat,
+            actual_pos.lon,
+            5.0,
         )
     else:
         logger.warning("  Could not calculate position")

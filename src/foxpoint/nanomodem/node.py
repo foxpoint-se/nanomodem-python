@@ -30,14 +30,10 @@ def _validate_node_id(node_id: str) -> None:
     if not isinstance(node_id, str):
         raise TypeError(f"node_id must be a str, got {type(node_id).__name__}")
     if len(node_id) != 3 or not node_id.isdigit():
-        raise ValueError(
-            f"node_id must be a 3-digit numeric string (e.g. '001'), got '{node_id}'"
-        )
+        raise ValueError(f"node_id must be a 3-digit numeric string (e.g. '001'), got '{node_id}'")
     numeric = int(node_id)
     if numeric < 1 or numeric > 255:
-        raise ValueError(
-            f"node_id must represent 1-255, got {numeric}"
-        )
+        raise ValueError(f"node_id must represent 1-255, got {numeric}")
 
 
 class AcousticNode:
@@ -139,11 +135,6 @@ class AcousticNode:
     def broadcast_position(self) -> None:
         """Broadcast own position to all other nodes."""
         if self._position is not None:
-            msg = PositionMessage(
-                node_id=self._node_id,
-                coord=self._position,
-                depth=self._depth
-            )
             # The transport interface needs to be updated to accept PositionMessage
             # OR we update the transport interface to accept (Coord, depth)
             self._transport.broadcast_position(self._position, self._depth)
@@ -155,11 +146,7 @@ class AcousticNode:
         If own depth is set, projects 3D ranges to 2D before trilateration.
         Returns the estimated position, or None if not enough data.
         """
-        usable = [
-            kn
-            for kn in self._known_nodes.values()
-            if kn.position is not None and kn.last_range is not None
-        ]
+        usable = [kn for kn in self._known_nodes.values() if kn.position is not None and kn.last_range is not None]
 
         if len(usable) < 3:
             return None
@@ -172,15 +159,13 @@ class AcousticNode:
             assert kn.last_range is not None
 
             distance = kn.last_range
-            
+
             # Use depth if available on either side
             own_depth = self._depth
             kn_depth = kn.depth
 
             if own_depth != 0.0 or kn_depth != 0.0:
-                distance = self._calculation.project_3d_to_2d(
-                    distance, own_depth, kn_depth
-                )
+                distance = self._calculation.project_3d_to_2d(distance, own_depth, kn_depth)
 
             positions.append(kn.position)
             distances.append(distance)
@@ -203,9 +188,7 @@ class AcousticNode:
                 self._known_nodes[nid].last_seen = time.time()
             case RangeResponseMessage(node_id=nid, timestamp=ts):
                 self._ensure_known_node(nid)
-                distance = self._calculation.timestamp_to_distance(
-                    ts, self._sound_speed
-                )
+                distance = self._calculation.timestamp_to_distance(ts, self._sound_speed)
                 self._known_nodes[nid].last_range = distance
                 self._known_nodes[nid].last_seen = time.time()
                 self._maybe_infer_position()

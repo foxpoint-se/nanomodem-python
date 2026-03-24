@@ -8,6 +8,7 @@ Usage:
 from __future__ import annotations
 
 import tkinter as tk
+from typing import Optional
 
 from foxpoint.nanomodem.transport import MockEther, MockTransport
 from foxpoint.nanomodem.types import Coord
@@ -20,7 +21,7 @@ MAP_ZOOM = 17
 
 def launch_mock(root: tk.Tk) -> list[ControllerWindow]:
     """Create a mock scenario with 4 nodes, each in its own ControllerWindow.
-    
+
     The 'Host' node is the primary unit we are testing, so it receives
     simulation callbacks to control its 'physical' position in the mock ether.
     The 'Beacons' are static units that do not receive simulation controls.
@@ -60,66 +61,73 @@ def launch_mock(root: tk.Tk) -> list[ControllerWindow]:
     controllers: list[ControllerWindow] = []
 
     # 3. Instantiate the Host (The node we pretend we are using)
-    # This one gets the callbacks so we can move its "Physical" location 
+    # This one gets the callbacks so we can move its "Physical" location
     # while its "Logical" location remains unknown.
-    host_transport = MockTransport(host_config["id"], ether)
-    host_transport.position = host_config["sim_pos"]
+    host_id: str = str(host_config["id"])
+    host_sim_pos: Coord = host_config["sim_pos"]  # type: ignore
+    host_transport = MockTransport(host_id, ether)
+    host_transport.position = host_sim_pos
 
-    def get_sim_pos(t=host_transport): return t.position
-    def set_sim_pos(coord, t=host_transport): t.position = coord
+    def get_sim_pos(t: MockTransport = host_transport) -> Optional[Coord]:
+        return t.position
+
+    def set_sim_pos(coord: Coord, t: MockTransport = host_transport) -> None:
+        t.position = coord
 
     host_controller = ControllerWindow(
         root=root,
-        node_id=host_config["id"],
-        pretty_name=host_config["name"],
+        node_id=host_id,
+        pretty_name=str(host_config["name"]),
         transport=host_transport,
-        peer_ids=[b["id"] for b in beacons_config],
+        peer_ids=[str(b["id"]) for b in beacons_config],
         map_center=MAP_CENTER,
         map_zoom=MAP_ZOOM,
         window_geometry=get_geometry(0),
         get_sim_pos_callback=get_sim_pos,
         set_sim_pos_callback=set_sim_pos,
     )
-    
+
     # Set the initial logical depth for the host
-    host_controller.node.set_depth(host_config["initial_depth"])
-    
+    host_controller.node.set_depth(float(host_config["initial_depth"]))  # type: ignore
+
     # Link the mock transport to pull depth from the node
     host_transport.get_depth_callback = host_controller.node.get_depth
-    
+
     # Pre-populate host registry with beacon positions (simulating a known environment)
     for b in beacons_config:
-        host_controller.node.set_known_node_position(b["id"], b["sim_pos"])
-        host_controller.node.set_known_node_depth(b["id"], 0.0)
-    
+        host_controller.node.set_known_node_position(str(b["id"]), b["sim_pos"])  # type: ignore
+        host_controller.node.set_known_node_depth(str(b["id"]), 0.0)
+
     controllers.append(host_controller)
 
     # 4. Instantiate Beacons (Physical units that just "exist" at a spot)
     # These do NOT get simulation callbacks because they are static in this scenario.
-    for i, b in enumerate(beacons_config, start=1):
-        b_transport = MockTransport(b["id"], ether)
-        b_transport.position = b["sim_pos"]
+    for i, b_conf in enumerate(beacons_config, start=1):
+        b_id: str = str(b_conf["id"])
+        b_sim_pos: Coord = b_conf["sim_pos"]  # type: ignore
+        b_transport = MockTransport(b_id, ether)
+        b_transport.position = b_sim_pos
 
         b_controller = ControllerWindow(
             root=root,
-            node_id=b["id"],
-            pretty_name=b["name"],
+            node_id=b_id,
+            pretty_name=str(b_conf["name"]),
             transport=b_transport,
-            peer_ids=[nid for nid in all_ids if nid != b["id"]],
+            peer_ids=[str(nid) for nid in all_ids if nid != b_id],
             map_center=MAP_CENTER,
             map_zoom=MAP_ZOOM,
             window_geometry=get_geometry(i),
             get_sim_pos_callback=None,  # Disabled for beacons
             set_sim_pos_callback=None,
         )
-        
+
         # Beacons know their own position in this scenario
-        b_controller.node.set_position(b["sim_pos"])
+        b_controller.node.set_position(b_sim_pos)
         b_controller.node.set_depth(0.0)
-        
+
         # Link the mock transport to pull depth from the node
         b_transport.get_depth_callback = b_controller.node.get_depth
-        
+
         controllers.append(b_controller)
 
     return controllers

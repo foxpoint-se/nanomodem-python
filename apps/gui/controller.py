@@ -48,9 +48,7 @@ MAP_SELECTION_COLOR_OUTSIDE = "grey"
 MAP_SELECTION_COLOR_CIRCLE = "white"
 
 
-def _circle_coords(
-    lat: float, lon: float, radius_m: float, n: int = 48
-) -> list[tuple[float, float]]:
+def _circle_coords(lat: float, lon: float, radius_m: float, n: int = 48) -> list[tuple[float, float]]:
     """Generate lat/lon points forming a circle of given radius."""
     meters_per_deg = 111320.0
     cos_lat = math.cos(math.radians(lat))
@@ -87,13 +85,13 @@ class ControllerWindow:
         self._root = root
         self._peer_ids = peer_ids
         self._markers: dict[str, object] = {}  # node_id -> marker
-        self._paths: dict[str, object] = {}    # node_id -> path (range circle)
+        self._paths: dict[str, object] = {}  # node_id -> path (range circle)
         self._registry_rows: dict[str, dict[str, ttk.Frame | ttk.Label]] = {}
         self._icon_cache: dict[str, ImageTk.PhotoImage] = {}
 
         # Edit state
         self._editing_target: Optional[str] = None  # "me_pos", "me_depth", "sim_pos", or node_id
-        self._editing_type: Optional[str] = None    # "pos" or "depth"
+        self._editing_type: Optional[str] = None  # "pos" or "depth"
         self._selection_marker_pos: Optional[tuple[float, float]] = None
         self._edit_var = tk.StringVar()
         self._edit_var.trace_add("write", self._on_edit_var_changed)
@@ -124,8 +122,8 @@ class ControllerWindow:
             node_id=node_id,
             transport=transport,
             position=position,
-            on_state_changed=lambda: root.after(0, self._refresh_ui),
-            on_message_received=lambda msg: root.after(0, self._log_message, msg),
+            on_state_changed=lambda: (root.after(0, self._refresh_ui), None)[1],
+            on_message_received=lambda msg: (root.after(0, self._log_message, msg), None)[1],
         )
 
         self._refresh_ui()
@@ -148,10 +146,14 @@ class ControllerWindow:
         self._map.set_zoom(zoom)
         self._map.add_left_click_map_command(self._on_map_click)
 
-        self._map_hint_label = ttk.Label(
-            frame, text="Editing position → click map to fill input", foreground="orange"
-        )
+        self._map_hint_label = ttk.Label(frame, text="Editing position → click map to fill input", foreground="orange")
         # Hidden by default, shown during position edit
+
+    def _on_map_click(self, coords: tuple[float, float]) -> None:
+        if self._editing_target and self._editing_type == "pos":
+            self._selection_marker_pos = coords
+            self._edit_var.set(f"{coords[0]:.6f}, {coords[1]:.6f}")
+            self._refresh_map()
 
     def _build_my_node_panel(self) -> None:
         frame = ttk.LabelFrame(self._window, text="My node")
@@ -163,13 +165,15 @@ class ControllerWindow:
         self._me_pos_row = ttk.Frame(self._my_node_frame)
         self._me_pos_row.pack(fill=tk.X, pady=2)
         ttk.Label(self._me_pos_row, text="Position:", foreground="gray", width=10).pack(side=tk.LEFT)
-        
+
         # Display sub-frame
         self._me_pos_display_f = ttk.Frame(self._me_pos_row)
         self._me_pos_val_label = ttk.Label(self._me_pos_display_f, text="—", font="monospace")
         self._me_pos_val_label.pack(side=tk.LEFT)
-        ttk.Button(self._me_pos_display_f, text="Edit pos", command=lambda: self._start_edit("me_pos", "pos")).pack(side=tk.RIGHT)
-        
+        ttk.Button(self._me_pos_display_f, text="Edit pos", command=lambda: self._start_edit("me_pos", "pos")).pack(
+            side=tk.RIGHT
+        )
+
         # Edit sub-frame
         self._me_pos_edit_f = ttk.Frame(self._me_pos_row)
         ttk.Entry(self._me_pos_edit_f, textvariable=self._edit_var, width=25).pack(side=tk.LEFT, padx=2)
@@ -180,13 +184,15 @@ class ControllerWindow:
         self._me_depth_row = ttk.Frame(self._my_node_frame)
         self._me_depth_row.pack(fill=tk.X, pady=2)
         ttk.Label(self._me_depth_row, text="Depth:", foreground="gray", width=10).pack(side=tk.LEFT)
-        
+
         # Display sub-frame
         self._me_depth_display_f = ttk.Frame(self._me_depth_row)
         self._me_depth_val_label = ttk.Label(self._me_depth_display_f, text="—", font="monospace")
         self._me_depth_val_label.pack(side=tk.LEFT)
-        ttk.Button(self._me_depth_display_f, text="Edit depth", command=lambda: self._start_edit("me_depth", "depth")).pack(side=tk.RIGHT)
-        
+        ttk.Button(
+            self._me_depth_display_f, text="Edit depth", command=lambda: self._start_edit("me_depth", "depth")
+        ).pack(side=tk.RIGHT)
+
         # Edit sub-frame
         self._me_depth_edit_f = ttk.Frame(self._me_depth_row)
         ttk.Entry(self._me_depth_edit_f, textvariable=self._edit_var, width=10).pack(side=tk.LEFT, padx=2)
@@ -211,7 +217,9 @@ class ControllerWindow:
         self._sim_pos_display_f = ttk.Frame(self._sim_pos_row)
         self._sim_pos_val_label = ttk.Label(self._sim_pos_display_f, text="—", font="monospace")
         self._sim_pos_val_label.pack(side=tk.LEFT)
-        ttk.Button(self._sim_pos_display_f, text="Edit mock pos", command=lambda: self._start_edit("sim_pos", "pos")).pack(side=tk.RIGHT)
+        ttk.Button(
+            self._sim_pos_display_f, text="Edit mock pos", command=lambda: self._start_edit("sim_pos", "pos")
+        ).pack(side=tk.RIGHT)
 
         # Edit sub-frame
         self._sim_pos_edit_f = ttk.Frame(self._sim_pos_row)
@@ -220,8 +228,10 @@ class ControllerWindow:
         ttk.Button(self._sim_pos_edit_f, text="X", command=self._cancel_edit).pack(side=tk.LEFT)
 
         ttk.Checkbutton(
-            self._sim_pos_frame, text="Show simulated position on map", 
-            variable=self._show_sim_pos_var, command=self._refresh_map
+            self._sim_pos_frame,
+            text="Show simulated position on map",
+            variable=self._show_sim_pos_var,
+            command=self._refresh_map,
         ).pack(anchor=tk.W, pady=(4, 0))
 
     def _build_registry_panel(self) -> None:
@@ -254,20 +264,14 @@ class ControllerWindow:
         ttk.Label(range_row, text="Range to:").pack(side=tk.LEFT)
         self._range_target = ttk.Combobox(range_row, width=6)
         self._range_target.pack(side=tk.LEFT, padx=4)
-        ttk.Button(range_row, text="Request range", command=self._on_request_range).pack(
-            side=tk.LEFT
-        )
+        ttk.Button(range_row, text="Request range", command=self._on_request_range).pack(side=tk.LEFT)
 
         # Button row
         btn_row = ttk.Frame(frame)
         btn_row.pack(fill=tk.X, padx=4, pady=(2, 4))
 
-        ttk.Button(btn_row, text="Broadcast position", command=self._on_broadcast).pack(
-            side=tk.LEFT, padx=(0, 4)
-        )
-        ttk.Button(btn_row, text="Calculate position", command=self._on_calculate).pack(
-            side=tk.LEFT
-        )
+        ttk.Button(btn_row, text="Broadcast position", command=self._on_broadcast).pack(side=tk.LEFT, padx=(0, 4))
+        ttk.Button(btn_row, text="Calculate position", command=self._on_calculate).pack(side=tk.LEFT)
 
     def _build_console(self) -> None:
         frame = ttk.LabelFrame(self._window, text="Console")
@@ -291,17 +295,11 @@ class ControllerWindow:
     #  Event handlers                                                      #
     # ------------------------------------------------------------------ #
 
-    def _on_map_click(self, coords: tuple[float, float]) -> None:
-        if self._editing_target and self._editing_type == "pos":
-            self._selection_marker_pos = coords
-            self._edit_var.set(f"{coords[0]:.6f}, {coords[1]:.6f}")
-            self._refresh_map()
-
-    def _on_edit_var_changed(self, *args) -> None:
+    def _on_edit_var_changed(self, *args: object) -> None:
         """Handle changes to the single edit input field."""
         if not self._editing_target or self._editing_type != "pos":
             return
-        
+
         # If the field is empty, clear the selection marker immediately
         if not self._edit_var.get().strip():
             self._selection_marker_pos = None
@@ -314,14 +312,14 @@ class ControllerWindow:
         # Debounce the map update
         if self._debounce_timer:
             self._root.after_cancel(self._debounce_timer)
-        
+
         self._debounce_timer = self._root.after(500, self._sync_selection_from_input)
 
     def _sync_selection_from_input(self) -> None:
         """Parse input and update selection marker if valid."""
         self._debounce_timer = None
         val = self._edit_var.get()
-        
+
         # Strict pattern: Number.X, Number.Y
         # Allows optional spaces, requires at least one decimal digit for both
         match = re.match(r"^\s*(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)\s*$", val)
@@ -338,13 +336,13 @@ class ControllerWindow:
         self._editing_target = target
         self._editing_type = edit_type
         self._selection_marker_pos = None
-        
+
         # Always start with an empty field as requested
         self._edit_var.set("")
 
         if edit_type == "pos":
             self._map_hint_label.pack(pady=2)
-        
+
         self._refresh_ui()
 
     def _cancel_edit(self) -> None:
@@ -358,7 +356,7 @@ class ControllerWindow:
         target = self._editing_target
         etype = self._editing_type
         val = self._edit_var.get()
-        
+
         try:
             if etype == "pos":
                 # Use the same strict parsing as the debounced sync
@@ -366,23 +364,23 @@ class ControllerWindow:
                 if not match:
                     self._log("Invalid format. Use 'lat.x, lon.y'")
                     return
-                
+
                 lat = float(match.group(1))
                 lon = float(match.group(2))
                 coord = Coord(lat=lat, lon=lon)
-                
+
                 if target == "me_pos":
                     self._node.set_position(coord)
                 elif target == "sim_pos":
                     if self._set_sim_pos:
                         self._set_sim_pos(coord)
-                else:
+                elif target is not None:
                     self._node.set_known_node_position(target, coord)
             else:
                 depth = float(val)
                 if target == "me_depth":
                     self._node.set_depth(depth)
-                else:
+                elif target is not None:
                     self._node.set_known_node_depth(target, depth)
         except ValueError:
             self._log("Invalid numeric values.")
@@ -397,7 +395,8 @@ class ControllerWindow:
         ttk.Label(dialog, text="Node ID (3 digits):").pack(pady=5)
         entry = ttk.Entry(dialog)
         entry.pack(pady=5)
-        def confirm():
+
+        def confirm() -> None:
             nid = entry.get()
             if len(nid) == 3 and nid.isdigit():
                 self._node.set_known_node_position(nid, None)
@@ -405,10 +404,12 @@ class ControllerWindow:
                 self._start_edit(nid, "pos")
             else:
                 self._log("Invalid ID.")
+
         ttk.Button(dialog, text="Add", command=confirm).pack()
 
     def _on_delete_node(self, node_id: str) -> None:
         self._node.delete_known_node(node_id)
+        self._refresh_ui()
 
     def _on_request_range(self) -> None:
         target = self._range_target.get()
@@ -433,11 +434,7 @@ class ControllerWindow:
 
     def _on_close(self) -> None:
         self._window.destroy()
-        remaining = [
-            w
-            for w in self._root.winfo_children()
-            if isinstance(w, tk.Toplevel) and w.winfo_exists()
-        ]
+        remaining = [w for w in self._root.winfo_children() if isinstance(w, tk.Toplevel) and w.winfo_exists()]
         if not remaining:
             self._root.quit()
 
@@ -454,7 +451,7 @@ class ControllerWindow:
 
     def _refresh_my_node_panel(self) -> None:
         pos = self._node.get_position()
-        
+
         # Update Position Row
         if self._editing_target == "me_pos":
             self._me_pos_display_f.pack_forget()
@@ -492,7 +489,7 @@ class ControllerWindow:
 
     def _refresh_registry_panel(self) -> None:
         known = self._node.get_known_nodes()
-        
+
         # Remove widgets for nodes that are no longer in the registry
         current_ids = set(known.keys())
         stored_ids = set(self._registry_rows.keys())
@@ -506,10 +503,10 @@ class ControllerWindow:
                 # Create row frame
                 row_frame = ttk.Frame(self._registry_rows_container)
                 row_frame.pack(fill=tk.X, pady=1)
-                
+
                 # ID label
                 ttk.Label(row_frame, text=nid, width=5, font="monospace").pack(side=tk.LEFT)
-                
+
                 # Display sub-frame
                 display_f = ttk.Frame(row_frame)
                 pos_label = ttk.Label(display_f, text="—", width=20, font="monospace", foreground="gray")
@@ -518,14 +515,22 @@ class ControllerWindow:
                 depth_label.pack(side=tk.LEFT)
                 range_label = ttk.Label(display_f, text="—", width=8, font="monospace")
                 range_label.pack(side=tk.LEFT)
-                
-                ttk.Button(display_f, text="🗑", width=3, command=lambda n=nid: self._on_delete_node(n)).pack(side=tk.RIGHT)
-                ttk.Button(display_f, text="Edit depth", width=9, command=lambda n=nid: self._start_edit(n, "depth")).pack(side=tk.RIGHT, padx=1)
-                ttk.Button(display_f, text="Edit pos", width=8, command=lambda n=nid: self._start_edit(n, "pos")).pack(side=tk.RIGHT)
-                
+
+                def _make_delete(n: str) -> Callable[[], None]:
+                    return lambda: self._on_delete_node(n)
+
+                def _make_edit(n: str, t: str) -> Callable[[], None]:
+                    return lambda: self._start_edit(n, t)
+
+                ttk.Button(display_f, text="🗑", width=3, command=_make_delete(nid)).pack(side=tk.RIGHT)
+                ttk.Button(display_f, text="Edit depth", width=9, command=_make_edit(nid, "depth")).pack(
+                    side=tk.RIGHT, padx=1
+                )
+                ttk.Button(display_f, text="Edit pos", width=8, command=_make_edit(nid, "pos")).pack(side=tk.RIGHT)
+
                 # Edit sub-frame
                 edit_f = ttk.Frame(row_frame)
-                
+
                 self._registry_rows[nid] = {
                     "row_frame": row_frame,
                     "display_f": display_f,
@@ -536,36 +541,40 @@ class ControllerWindow:
                 }
 
             row_info = self._registry_rows[nid]
-            
+
             # Deterministic color based on ID
-            try: color_idx = int(nid) % len(NODE_COLORS)
-            except: color_idx = hash(nid) % len(NODE_COLORS)
+            color_idx: int
+            try:
+                color_idx = int(nid) % len(NODE_COLORS)
+            except ValueError:
+                color_idx = hash(nid) % len(NODE_COLORS)
             color = NODE_COLORS[color_idx]
 
             if self._editing_target == nid:
                 row_info["display_f"].pack_forget()
                 row_info["edit_f"].pack(side=tk.LEFT, fill=tk.X, expand=True)
-                
+
                 # Re-create edit widgets to ensure correct type (pos vs depth)
-                for w in row_info["edit_f"].winfo_children(): w.destroy()
-                
+                for w in row_info["edit_f"].winfo_children():
+                    w.destroy()
+
                 if self._editing_type == "pos":
                     ttk.Entry(row_info["edit_f"], textvariable=self._edit_var, width=22).pack(side=tk.LEFT, padx=1)
                 else:
                     ttk.Entry(row_info["edit_f"], textvariable=self._edit_var, width=10).pack(side=tk.LEFT, padx=1)
-                
+
                 ttk.Button(row_info["edit_f"], text="Save", command=self._save_edit).pack(side=tk.LEFT, padx=1)
                 ttk.Button(row_info["edit_f"], text="X", command=self._cancel_edit).pack(side=tk.LEFT)
             else:
                 row_info["edit_f"].pack_forget()
                 row_info["display_f"].pack(side=tk.LEFT, fill=tk.X, expand=True)
-                
+
                 pos_val = f"{kn.position.lat:.4f}, {kn.position.lon:.4f}" if kn.position else "—"
-                row_info["pos_label"].configure(text=pos_val)
+                row_info["pos_label"].configure({"text": pos_val})
                 depth_val = f"{kn.depth:.1f}m"
-                row_info["depth_label"].configure(text=depth_val)
+                row_info["depth_label"].configure({"text": depth_val})
                 range_val = f"{kn.last_range:.1f}m" if kn.last_range is not None else "—"
-                row_info["range_label"].configure(text=range_val, foreground=color)
+                row_info["range_label"].configure({"text": range_val, "foreground": color})
 
     def _refresh_actions_dropdown(self) -> None:
         ids = sorted(self._node.get_known_nodes().keys())
@@ -575,7 +584,7 @@ class ControllerWindow:
         known = self._node.get_known_nodes()
         current_ids = set(known.keys()) | {"me", "simulated", "selection"}
         stored_ids = set(self._markers.keys())
-        
+
         # Remove markers for nodes no longer present
         for nid in stored_ids - current_ids:
             self._delete_marker(nid)
@@ -585,11 +594,13 @@ class ControllerWindow:
         pos = self._node.get_position()
         if pos:
             self._update_or_create_marker(
-                "me", pos.lat, pos.lon, 
+                "me",
+                pos.lat,
+                pos.lon,
                 text=f"{self._node.node_id} (me)",
                 icon=None,  # Use default pin
                 color_circle=OWN_COLOR_CIRCLE,
-                color_outside=OWN_COLOR_OUTSIDE
+                color_outside=OWN_COLOR_OUTSIDE,
             )
         else:
             self._delete_marker("me")
@@ -598,16 +609,12 @@ class ControllerWindow:
         sim_pos = self._get_sim_pos() if self._get_sim_pos else None
         if self._show_sim_pos_var.get() and sim_pos:
             icon = self._get_circle_icon("black", transparent=True)
-            self._update_or_create_marker(
-                "simulated", sim_pos.lat, sim_pos.lon,
-                text="Physical (Mock)",
-                icon=icon
-            )
+            self._update_or_create_marker("simulated", sim_pos.lat, sim_pos.lon, text="Physical (Mock)", icon=icon)
         else:
             self._delete_marker("simulated")
 
         # 3. Known nodes (Colored ring, transparent center)
-        for i, (nid, kn) in enumerate(sorted(known.items())):
+        for nid, kn in sorted(known.items()):
             # Deterministic color based on ID
             try:
                 color_idx = int(nid) % len(NODE_COLORS)
@@ -617,12 +624,8 @@ class ControllerWindow:
 
             if kn.position:
                 icon = self._get_circle_icon(color, transparent=True)
-                self._update_or_create_marker(
-                    nid, kn.position.lat, kn.position.lon,
-                    text=nid,
-                    icon=icon
-                )
-                
+                self._update_or_create_marker(nid, kn.position.lat, kn.position.lon, text=nid, icon=icon)
+
                 # Range circle
                 if kn.last_range is not None and kn.last_range > 0:
                     pts = _circle_coords(kn.position.lat, kn.position.lon, kn.last_range)
@@ -637,14 +640,14 @@ class ControllerWindow:
         if self._selection_marker_pos:
             icon = self._get_circle_icon("grey", transparent=True)
             self._update_or_create_marker(
-                "selection", self._selection_marker_pos[0], self._selection_marker_pos[1],
-                text="Selection",
-                icon=icon
+                "selection", self._selection_marker_pos[0], self._selection_marker_pos[1], text="Selection", icon=icon
             )
         else:
             self._delete_marker("selection")
 
-    def _get_circle_icon(self, color: str, size: int = 16, thickness: int = 2, transparent: bool = True) -> ImageTk.PhotoImage:
+    def _get_circle_icon(
+        self, color: str, size: int = 16, thickness: int = 2, transparent: bool = True
+    ) -> ImageTk.PhotoImage:
         """Create or retrieve a circular icon from cache."""
         cache_key = f"{color}_{size}_{thickness}_{transparent}"
         if cache_key in self._icon_cache:
@@ -653,44 +656,47 @@ class ControllerWindow:
         # Create RGBA image with transparent background
         img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
         draw = ImageDraw.Draw(img)
-        
+
         if transparent:
             # Draw only the outline
-            draw.ellipse((0, 0, size-1, size-1), outline=color, width=thickness)
+            draw.ellipse((0, 0, size - 1, size - 1), outline=color, width=thickness)
         else:
             # Draw solid circle
-            draw.ellipse((0, 0, size-1, size-1), fill=color)
-            
+            draw.ellipse((0, 0, size - 1, size - 1), fill=color)
+
         icon = ImageTk.PhotoImage(img)
         self._icon_cache[cache_key] = icon
         return icon
 
-    def _update_or_create_marker(self, key: str, lat: float, lon: float, text: str, 
-                                 icon: Optional[ImageTk.PhotoImage] = None,
-                                 color_circle: Optional[str] = None,
-                                 color_outside: Optional[str] = None) -> None:
+    def _update_or_create_marker(
+        self,
+        key: str,
+        lat: float,
+        lon: float,
+        text: str,
+        icon: Optional[ImageTk.PhotoImage] = None,
+        color_circle: Optional[str] = None,
+        color_outside: Optional[str] = None,
+    ) -> None:
         if key in self._markers:
             marker = self._markers[key]
             try:
-                marker.set_position(lat, lon) # type: ignore
-                marker.set_text(text) # type: ignore
+                marker.set_position(lat, lon)  # type: ignore
+                marker.set_text(text)  # type: ignore
                 return
-            except:
+            except Exception:
                 self._delete_marker(key)
 
         if icon:
-            m = self._map.set_marker(
-                lat, lon, text=text,
-                icon=icon,
-                icon_anchor="center",
-                text_color="black"
-            )
+            m = self._map.set_marker(lat, lon, text=text, icon=icon, icon_anchor="center", text_color="black")
         else:
             m = self._map.set_marker(
-                lat, lon, text=text,
+                lat,
+                lon,
+                text=text,
                 marker_color_circle=color_circle,
                 marker_color_outside=color_outside,
-                text_color="black"
+                text_color="black",
             )
         self._markers[key] = m
 
@@ -705,16 +711,16 @@ class ControllerWindow:
         if key in self._markers:
             marker = self._markers.pop(key)
             try:
-                marker.delete() # type: ignore
-            except:
+                marker.delete()  # type: ignore
+            except Exception:
                 pass
 
     def _delete_path(self, key: str) -> None:
         if key in self._paths:
             path_obj = self._paths.pop(key)
             try:
-                path_obj.delete() # type: ignore
-            except:
+                path_obj.delete()  # type: ignore
+            except Exception:
                 pass
 
     # ------------------------------------------------------------------ #
