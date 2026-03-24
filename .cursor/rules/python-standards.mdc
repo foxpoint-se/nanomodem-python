@@ -1,0 +1,117 @@
+---
+description: Python code style, type safety, and error handling
+globs: **/*.py
+alwaysApply: false
+---
+
+# Python Code Standards
+
+## Type Safety
+
+- All functions must have type hints for parameters and return values
+- Use `dataclass` for structured data types
+- Use `Protocol` from `typing` for interfaces
+- Avoid `Any` - use `TypeVar` or `Generic` for flexible but typed code
+
+```python
+# ❌ BAD
+def fetch_data(key):
+    data = get_data(key)
+    return data
+
+# ✅ GOOD
+from dataclasses import dataclass
+
+@dataclass
+class Data:
+    key: str
+    value: str
+
+def fetch_data(key: str) -> Data:
+    data = get_data(key)
+    return Data(key=key, value=data)
+```
+
+## Error Handling
+
+- Never silently catch exceptions with empty `except` blocks
+- Use specific exception types
+- Log errors with context before re-raising
+- Create custom exceptions for domain-specific errors
+
+```python
+# ❌ BAD
+try:
+    send_message(msg)
+except:
+    pass
+
+# ✅ GOOD
+try:
+    send_message(msg)
+except ConnectionError as e:
+    logger.error("Failed to send message", extra={"error": str(e)})
+    raise TransportError("Unable to deliver message") from e
+```
+
+## Import Organization
+
+1. Standard library imports
+2. Third-party imports  
+3. Local imports
+
+```python
+# ✅ GOOD
+import logging
+from pathlib import Path
+from dataclasses import dataclass
+from typing import Protocol
+
+import numpy as np
+
+from nanomodem.types import NodeState
+from nanomodem.protocols import TransportProtocol
+```
+
+## Naming Conventions
+
+- Use `snake_case` for variables, functions, and modules
+- Use `PascalCase` for classes and protocols
+- Use `SCREAMING_SNAKE_CASE` for constants
+- Prefix private methods/attributes with `_`
+- Use descriptive names that reveal intent
+
+```python
+# ❌ BAD
+def proc(d):
+    r = []
+    for i in d:
+        r.append(i * 2)
+    return r
+
+# ✅ GOOD
+def double_values(values: list[int]) -> list[int]:
+    return [value * 2 for value in values]
+```
+
+## Class Structure
+
+- Keep constructors simple - defer complex initialization
+- Use properties for computed values
+- Group related methods together
+
+```python
+@dataclass
+class Node:
+    """High-level interface for acoustic communication."""
+    transport: TransportProtocol
+    driver: DriverProtocol
+    
+    @property
+    def is_connected(self) -> bool:
+        return self.transport.is_open
+    
+    def send_message(self, msg: str) -> None:
+        """Send a message through the transport."""
+        pass
+```

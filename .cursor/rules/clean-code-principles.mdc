@@ -1,0 +1,96 @@
+---
+description: Clean code principles, architecture, and project organization
+alwaysApply: true
+---
+
+# Clean Code & Architecture
+
+## Core Principles
+
+- **Explicit Types**: Use type hints everywhere. Never use `Any` or `Unknown`. All types must be explicit and well-defined. If unclear, investigate and define before implementation.
+- **Self-Explanatory Code**: Code should be readable from top to bottom without comments. Comments are a sign of unclear code.
+- **Single Responsibility**: Extract logic into functions, classes, or modules with descriptive names. Each should do one thing well.
+- **Function Length**: Keep functions under 15-20 lines. If longer, extract sub-steps into descriptive functions.
+- **Dead Simple**: Code should be immediately obvious what it does at a glance.
+
+### Type Hints Examples
+
+```python
+# ❌ BAD
+def process_data(data):
+    return data
+
+# ✅ GOOD
+def process_data(data: list[str]) -> dict[str, int]:
+    return {item: len(item) for item in data}
+```
+
+### Function Extraction
+
+```python
+# ❌ BAD
+def send_message(msg, host, port, timeout, retries):
+    for i in range(retries):
+        try:
+            socket = connect(host, port, timeout)
+            socket.send(msg)
+            socket.close()
+            break
+        except Exception as e:
+            if i == retries - 1:
+                raise
+
+# ✅ GOOD
+def send_message(msg: str, host: str, port: int, config: SendConfig) -> None:
+    socket = create_socket(host, port, config.timeout)
+    send_with_retries(socket, msg, config.retries)
+
+def send_with_retries(socket, msg: str, retries: int) -> None:
+    for attempt in range(retries):
+        try:
+            socket.send(msg)
+            return
+        except Exception as e:
+            if attempt == retries - 1:
+                raise
+```
+
+## Organization & Reuse
+
+- **Domain over Type**: Organize files by domain (what they belong to) rather than type (models, utils, etc).
+- **Hierarchy**: Move shared logic up the folder hierarchy only when it becomes truly general.
+- **DRY with Caution**: Reuse existing code if it solves the *exact* same problem.
+- **Generalization**: Avoid "quirky" parameters for edge cases. Prefer creating a specific variant or using inheritance/protocols.
+- **Continuous Refactoring**: Always look for opportunities to refactor and generalize. When new requirements emerge, prefer generalizing well-tested solutions over creating duplicates.
+
+### Good Organization
+
+```
+src/nanomodem/
+  codecs/           # Codec-specific logic
+    __init__.py
+  drivers/          # Driver-specific logic
+    __init__.py
+  transports/       # Transport-specific logic
+    __init__.py
+  types.py          # Shared domain types
+  protocols.py      # Shared protocols/interfaces
+  node.py           # Main public API
+  __init__.py       # Exports
+```
+
+## Technical Debt
+
+- **Explicit Debt**: Encode trade-offs directly into names. Use prefixes like `TODO:`, `FIXME:`, `HACK:`, or `temporary_` to make debt visible and encourage refactoring.
+
+```python
+# ✅ GOOD - Explicit about technical debt
+def temporary_parse_legacy_format(data: str) -> dict:
+    # TODO: Replace with new parser once migration complete
+    pass
+
+# ❌ BAD - Hidden debt
+def parse_thing(data: str) -> dict:
+    # This is a workaround because X
+    pass
+```

@@ -1,0 +1,105 @@
+---
+description: Testing standards and practices
+globs: **/tests/**/*.py
+alwaysApply: false
+---
+
+# Testing Standards
+
+## Test Organization
+
+- One test file per module being tested (e.g., `test_transport.py` for `transport.py`)
+- Test names should clearly describe **what** is being tested and **under what circumstances**
+- Use the `test__` prefix (double underscore) to separate the required pytest prefix from the descriptive name
+- Format: `test__should_[expected_behavior]_when_[circumstances]`
+- Use `pytest` conventions
+- Group tests into classes by functionality
+
+```python
+# ❌ BAD - Unclear what's being tested or what the conditions are
+class TestTransport:
+    def test_send_message(self):
+        pass
+    
+    def test_encode(self):
+        pass
+
+# ✅ GOOD - Crystal clear about behavior and conditions
+class TestTransport:
+    def test__should_send_message_when_connection_is_open(self):
+        pass
+    
+    def test__should_raise_connection_error_when_transport_is_closed(self):
+        pass
+
+class TestCodec:
+    def test__should_encode_valid_data_correctly(self):
+        pass
+    
+    def test__should_raise_value_error_when_data_is_invalid(self):
+        pass
+```
+
+## Test Quality
+
+- Each test should test one behavior under specific circumstances
+- Use descriptive assertion messages
+- Use fixtures for common setup
+- Avoid testing implementation details - test behavior instead
+- Mock external dependencies (network, filesystem)
+- For complex multi-parameter tests, use `@pytest.mark.parametrize` to keep names clear
+
+```python
+# ❌ BAD - Unclear what's being tested
+def test_node():
+    n = Node(MockTransport(), MockDriver())
+    assert n is not None
+    assert n.transport is not None
+
+# ✅ GOOD - Clear circumstances and expectations
+def test__should_initialize_with_provided_transport_and_driver():
+    """Initialize with transport and driver passed to constructor."""
+    transport = MockTransport()
+    driver = MockDriver()
+    
+    node = Node(transport=transport, driver=driver)
+    
+    assert node.transport is transport
+    assert node.driver is driver
+
+# ✅ GOOD - Parametrized for multiple scenarios with clear intent
+@pytest.mark.parametrize("input_value,expected_output", [
+    (0, 0),
+    (1, 2),
+    (5, 10),
+])
+def test__should_double_the_input_value(input_value, expected_output):
+    """Verify doubling function returns correct result for given inputs."""
+    result = double_value(input_value)
+    assert result == expected_output
+```
+
+## Fixtures & Mocks
+
+- Create reusable fixtures in `conftest.py`
+- Use clear mock objects with minimal setup
+- Prefer `unittest.mock` for Python standard library
+
+```python
+# conftest.py
+import pytest
+from unittest.mock import Mock
+
+@pytest.fixture
+def mock_transport():
+    """Provides a mock transport for testing."""
+    transport = Mock()
+    transport.is_open = True
+    return transport
+
+# test_node.py
+def test_send_message(mock_transport):
+    node = Node(transport=mock_transport, driver=Mock())
+    node.send_message("test")
+    mock_transport.send.assert_called_once_with("test")
+```
