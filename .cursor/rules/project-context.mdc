@@ -31,3 +31,10 @@ A Python library for acoustic communication. Core purpose: enable pluggable tran
 - Tests use `test__should_[behavior]_when_[circumstances]` naming
 - Run `make test` frequently—it's the verification standard
 - Focus on making transport/driver/codec implementations swappable without core API changes
+
+## Packaging & Installation
+
+- **Dependency management**: `pyproject.toml` (setuptools-based, no Poetry)
+- **Virtual environment**: `.venv` (dot-prefix, as per README)
+- **Installation command**: `pip install -e ".[dev]"` (editable mode + dev dependencies)
+- **Setup targets**: Use `make install` to create/update `.venv` and install deps; `make clean-env` to delete it
