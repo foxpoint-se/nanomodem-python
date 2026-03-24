@@ -25,7 +25,7 @@ This plan outlines the steps to transform this "hacking" repo into a Python libr
 - [x] Skip the namespacing completely
 - [x] Remove foxpoint from readme. Are there more occurrences of this?
 - [x] Remove words like "professional" and other silly stuff like that.
-- [ ] Rename gui to gui_controller or something similar?
+- [x] Rename gui to gui_controller or something similar?
 
 ### Intermediate phase
 - [x] Fix proper type checking and/or linting.
