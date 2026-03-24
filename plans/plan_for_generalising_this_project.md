@@ -22,6 +22,13 @@ This plan outlines the steps to transform this "hacking" repo into a professiona
 - [x] Create `src/foxpoint/__init__.py` (leave empty, this enables the namespace).
 - [x] Create `src/foxpoint/nanomodem/__init__.py` (this will be your public API).
 - [x] Create sub-folders for organization: `mkdir -p src/foxpoint/nanomodem/{transports,codecs,drivers}`.
+- [ ] Skip the namespacing completely
+- [ ] Remove foxpoint from readme. Are there more occurrences of this?
+- [ ] Remove words like "professional" and other silly stuff like that.
+- [ ] Rename gui to gui_controller or something similar?
+
+### Intermediate phase
+- [x] Fix proper type checking and/or linting.
 
 ### Phase 3: Core Logic Refactor
 *Goal: Implement the "Pluggable" architecture we discussed.*
@@ -53,7 +60,8 @@ This plan outlines the steps to transform this "hacking" repo into a professiona
 - [ ] (Future) Add Discord notification on releases.
 - [ ] (Future) Always run tests in PRs and similar.
 - [ ] (Future) Make the git repo public.
-- [ ] (Future) Cursor rules and Claude rules.
+- [x] (Future) Cursor rules and Claude rules.
+- [ ] (Future) Easier way of running various things. PYTHONPATH and ugly stuff like that should be avoided. Should either be easy-to-use make targets, or other simple instructions in readme.
 
 ---
 **Note on Decisions:**
