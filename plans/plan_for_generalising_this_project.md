@@ -61,7 +61,7 @@ This plan outlines the steps to transform this "hacking" repo into a professiona
 - [ ] (Future) Always run tests in PRs and similar.
 - [ ] (Future) Make the git repo public.
 - [x] (Future) Cursor rules and Claude rules.
-- [ ] (Future) Easier way of running various things. PYTHONPATH and ugly stuff like that should be avoided. Should either be easy-to-use make targets, or other simple instructions in readme.
+- [x] (Future) Easier way of running various things. PYTHONPATH and ugly stuff like that should be avoided. Should either be easy-to-use make targets, or other simple instructions in readme.
 
 ---
 **Note on Decisions:**
