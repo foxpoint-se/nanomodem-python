@@ -1,6 +1,6 @@
-# Modernization Plan: Foxpoint Nanomodem Library
+# Modernization Plan: Nanomodem Library
 
-This plan outlines the steps to transform this "hacking" repo into a Python library (`foxpoint.nanomodem`) that is easy to consume in ROS2, GUI apps, and other projects.
+This plan outlines the steps to transform this "hacking" repo into a Python library (`nanomodem`) that is easy to consume in ROS2, GUI apps, and other projects.
 
 ### Phase 0: Cleanup & Branching
 *Goal: Start fresh and remove legacy clutter.*
@@ -17,11 +17,11 @@ This plan outlines the steps to transform this "hacking" repo into a Python libr
 - [x] Create a `.gitignore` if missing (ensure `__pycache__`, `.venv`, and `dist/` are ignored).
 
 ### Phase 2: Package Structure (The "Namespace")
-*Goal: Organize files so they can be imported as `foxpoint.nanomodem`.*
-- [x] Create the nested directory structure: `mkdir -p src/foxpoint/nanomodem`.
-- [x] Create `src/foxpoint/__init__.py` (leave empty, this enables the namespace).
-- [x] Create `src/foxpoint/nanomodem/__init__.py` (this will be your public API).
-- [x] Create sub-folders for organization: `mkdir -p src/foxpoint/nanomodem/{transports,codecs,drivers}`.
+*Goal: Organize files so they can be imported as `nanomodem`.*
+- [x] Create the nested directory structure: `mkdir -p src/nanomodem`.
+- [x] Create `src/__init__.py` (leave empty, this enables the namespace).
+- [x] Create `src/nanomodem/__init__.py` (this will be your public API).
+- [x] Create sub-folders for organization: `mkdir -p src/nanomodem/{transports,codecs,drivers}`.
 - [x] Skip the namespacing completely
 - [x] Remove foxpoint from readme. Are there more occurrences of this?
 - [x] Remove words like "professional" and other silly stuff like that.
@@ -32,24 +32,24 @@ This plan outlines the steps to transform this "hacking" repo into a Python libr
 
 ### Phase 3: Core Logic Refactor
 *Goal: Implement the "Pluggable" architecture we discussed.*
-- [ ] **Protocols**: Define `TransportProtocol` and `DriverProtocol` in `src/foxpoint/nanomodem/protocols.py`.
-- [ ] **Drivers**: Move the `$Pxxx` command logic into `src/foxpoint/nanomodem/drivers/v3.py`.
-- [ ] **Node**: Implement the high-level `AcousticNode` in `src/foxpoint/nanomodem/node.py` (using Dependency Injection for Driver/Transport).
-- [ ] **Types**: Define `Coord` and `NodeState` as `dataclasses` in `src/foxpoint/nanomodem/types.py`.
-- [ ] **Exports**: Update `src/foxpoint/nanomodem/__init__.py` to export the main classes for easy import.
+- [ ] **Protocols**: Define `TransportProtocol` and `DriverProtocol` in `src/nanomodem/protocols.py`.
+- [ ] **Drivers**: Move the `$Pxxx` command logic into `src/nanomodem/drivers/v3.py`.
+- [ ] **Node**: Implement the high-level `AcousticNode` in `src/nanomodem/node.py` (using Dependency Injection for Driver/Transport).
+- [ ] **Types**: Define `Coord` and `NodeState` as `dataclasses` in `src/nanomodem/types.py`.
+- [ ] **Exports**: Update `src/nanomodem/__init__.py` to export the main classes for easy import.
 
 ### Phase 4: Dependency Management (Poetry)
 *Goal: Make the project "installable" and manageable.*
-- [ ] Initialize Poetry: `poetry init` (follow prompts, use `foxpoint-nanomodem` as name).
+- [ ] Initialize Poetry: `poetry init` (follow prompts, use `nanomodem` as name).
 - [ ] Configure `pyproject.toml` to use the `src` layout.
 - [ ] Add dependencies: `poetry add pyserial` (and any others needed).
 - [ ] **Check**: Ensure `build-backend = "poetry.core.masonry.api"` is in `pyproject.toml` for ROS2 compatibility.
 
 ### Phase 5: Legacy & Examples
 *Goal: Move existing "hacking" code out of the library path.*
-- [ ] Move `take2/gui` to `apps/gui`.
-- [ ] Move `take2/nanomodem` (old version) to a `legacy/` folder or delete if no longer needed.
-- [ ] Update GUI imports to use the new `foxpoint.nanomodem` package.
+- [x] Move `take2/gui` to `apps/gui`.
+- [x] Move `take2/nanomodem` (old version) to a `legacy/` folder or delete if no longer needed.
+- [x] Update GUI imports to use the new `nanomodem` package.
 
 ### Phase 6: Versioning & Publishing (Optional/Future)
 *Goal: Move from "commit hashes" to "tags".*
