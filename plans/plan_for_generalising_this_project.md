@@ -38,12 +38,16 @@ This plan outlines the steps to transform this "hacking" repo into a Python libr
 - [x] **Types**: Define `Coord` and `NodeState` as `dataclasses` in `src/nanomodem/types.py`.
 - [x] **Exports**: Update `src/nanomodem/__init__.py` to export the main classes for easy import.
 
-### Phase 4: Dependency Management (Poetry)
-*Goal: Make the project "installable" and manageable.*
-- [ ] Initialize Poetry: `poetry init` (follow prompts, use `nanomodem` as name).
-- [ ] Configure `pyproject.toml` to use the `src` layout.
-- [ ] Add dependencies: `poetry add pyserial` (and any others needed).
-- [ ] **Check**: Ensure `build-backend = "poetry.core.masonry.api"` is in `pyproject.toml` for ROS2 compatibility.
+### Phase 4: Dependency Management (uv)
+*Goal: Make the project "installable," ROS2-compatible, and keep the GUI separate.*
+
+- [ ] Initialize `uv` project: `uv init --lib` (creates `pyproject.toml` with `src` layout).
+- [ ] Configure `hatchling` as the build-backend for standard ROS2/pip compatibility.
+- [ ] Add core dependencies: `uv add scipy pyserial`.
+- [ ] Add optional GUI dependencies as an "extra": `uv add --extra gui tkintermapview customtkinter`.
+- [ ] Map the `nanomodem-demo` script to the `apps` entry point in `pyproject.toml`.
+- [ ] Configure build settings to **include** `src/nanomodem` but **exclude** the `apps` folder from the library distribution.
+- [ ] **Check**: Verify `pip install .` installs only the core library, while `pip install ".[gui]"` installs the demo and its GUI tools.
 
 ### Phase 5: Legacy & Examples
 *Goal: Move existing "hacking" code out of the library path.*
@@ -66,5 +70,5 @@ This plan outlines the steps to transform this "hacking" repo into a Python libr
 ---
 **Note on Decisions:**
 - We chose **`dataclasses`** over `TypedDict` for better Intellisense and methods.
-- We chose **Poetry** for the modern "NPM-like" experience.
+- We chose **uv** for the modern "NPM-like" experience and speed.
 - We are **skipping** automatic tagging for now to stay fast.
