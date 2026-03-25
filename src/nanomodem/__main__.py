@@ -12,7 +12,7 @@ import logging
 
 from .calculation import Calculation
 from .node import AcousticNode
-from .transport import MockEther, MockTransport
+from .transports.mock import MockEther, MockTransport
 from .types import Coord
 
 logging.basicConfig(

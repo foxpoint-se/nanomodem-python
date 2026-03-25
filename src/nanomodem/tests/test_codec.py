@@ -1,6 +1,6 @@
 """Tests for Codec."""
 
-from nanomodem.codec import Codec
+from nanomodem.codecs.v3 import Codec
 from nanomodem.types import Coord, PositionMessage, UnknownMessage
 
 

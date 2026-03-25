@@ -1,34 +1,18 @@
-"""Transport interface and mock implementations."""
+"""Mock transport and shared in-memory bus for testing."""
 
 from __future__ import annotations
 
 import math
-from typing import Callable, Optional, Protocol
+from typing import Callable, Optional
 
-from .types import (
+from ..protocols import OnMessageCallback
+from ..types import (
     Coord,
     Message,
     PositionMessage,
     RangeResponseMessage,
     UnknownMessage,
 )
-
-OnMessageCallback = Callable[[Message], None]
-
-
-class TransportInterface(Protocol):
-    """Interface for sending/receiving messages. Inject into AcousticNode.
-
-    Works at the message level, not bytes. Each implementation handles
-    encoding/decoding internally (NanomodemTransport uses Codec,
-    MockTransport routes typed messages directly).
-    """
-
-    def broadcast_position(self, coord: Coord, depth: float) -> None: ...
-
-    def request_range(self, target_id: str) -> None: ...
-
-    def on_message(self, callback: OnMessageCallback) -> None: ...
 
 
 class MockEther:
@@ -68,18 +52,16 @@ class MockEther:
             return
 
         if target is None:
-            # Target not in network — simulate timeout
             sender.deliver(UnknownMessage(raw="#TO"))
             return
 
         if target.position is None or sender.position is None:
-            # Position missing — we can't compute distance, so simulate timeout
             sender.deliver(UnknownMessage(raw="#TO"))
             return
 
         distance = self._calculate_distance(sender, target)
 
-        # Convert to timestamp in 100µs units (per modem spec):
+        # Convert to timestamp in 100us units (per modem spec):
         # timestamp = round(travel_time / 3.125e-5)
         travel_time = distance / self._sound_speed
         timestamp = round(travel_time / 3.125e-5)
@@ -89,8 +71,8 @@ class MockEther:
     def _calculate_distance(self, a: MockTransport, b: MockTransport) -> float:
         """Euclidean distance in meters using flat-earth approximation.
 
-        - 1 degree lat ≈ 111320 m
-        - 1 degree lon ≈ 111320 * cos(lat) m
+        - 1 degree lat ~ 111320 m
+        - 1 degree lon ~ 111320 * cos(lat) m
         """
         assert a.position is not None
         assert b.position is not None
@@ -107,7 +89,7 @@ class MockEther:
 class MockTransport:
     """In-memory transport using MockEther as the communication medium.
 
-    Routes typed Message objects directly — no codec needed.
+    Routes typed Message objects directly -- no codec needed.
     """
 
     def __init__(self, node_id: str, ether: MockEther) -> None:

@@ -1,6 +1,6 @@
 """Codec for encoding/decoding message bodies. Stateless, pure, no I/O.
 
-Injected into NanomodemTransport, NOT into AcousticNode.
+Injected into a driver, NOT into AcousticNode.
 The node never knows this exists.
 
 Body format (for position messages):
@@ -17,18 +17,7 @@ Position payload:
 
 from __future__ import annotations
 
-from typing import Protocol
-
-from .types import Coord, Message, PositionMessage, UnknownMessage
-
-
-class CodecInterface(Protocol):
-    """Interface for body encoding/decoding."""
-
-    def encode_position(self, node_id: str, coord: Coord, depth: float) -> bytes: ...
-
-    def decode(self, payload: bytes) -> Message: ...
-
+from ..types import Coord, Message, PositionMessage, UnknownMessage
 
 MSG_TYPE_POSITION = ord("P")
 

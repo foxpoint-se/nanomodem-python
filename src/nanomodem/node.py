@@ -10,8 +10,8 @@ import logging
 import time
 from typing import Callable, Optional
 
-from .calculation import Calculation, CalculationInterface
-from .transport import TransportInterface
+from .calculation import Calculation
+from .protocols import CalculationProtocol, TransportProtocol
 from .types import (
     Coord,
     KnownNode,
@@ -42,8 +42,8 @@ class AcousticNode:
     def __init__(
         self,
         node_id: str,
-        transport: TransportInterface,
-        calculation: Optional[CalculationInterface] = None,
+        transport: TransportProtocol,
+        calculation: Optional[CalculationProtocol] = None,
         position: Optional[Coord] = None,
         sound_speed: float = 1500.0,
         on_state_changed: Optional[Callable[[], None]] = None,
@@ -53,7 +53,7 @@ class AcousticNode:
 
         self._node_id = node_id
         self._transport = transport
-        self._calculation: CalculationInterface = calculation or Calculation()
+        self._calculation: CalculationProtocol = calculation or Calculation()
         self._position = position
         self._depth = 0.0
         if position is not None:
@@ -76,11 +76,11 @@ class AcousticNode:
         return self._node_id
 
     @property
-    def transport(self) -> TransportInterface:
+    def transport(self) -> TransportProtocol:
         return self._transport
 
     @property
-    def calculation(self) -> CalculationInterface:
+    def calculation(self) -> CalculationProtocol:
         return self._calculation
 
     @property

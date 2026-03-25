@@ -7,15 +7,20 @@ Python library for underwater localization using acoustic modems (Nanomodem v3).
 ```text
 .
 ├── src/
-│   └── nanomodem/              # Core library (nanomodem)
+│   └── nanomodem/              # Core library
 │       ├── node.py             # AcousticNode — the only stateful class
-│       ├── transport.py        # TransportInterface, MockTransport, MockEther
-│       ├── nanomodem_transport.py  # Real serial transport
-│       ├── codec.py            # Encode/decode message bodies
-│       ├── calculation.py       # Trilateration, projection, timestamp conversion
+│       ├── protocols.py        # TransportProtocol, DriverProtocol, etc.
 │       ├── types.py            # Coord, KnownNode, Message union, etc.
+│       ├── calculation.py      # Trilateration, projection, timestamp conversion
+│       ├── transports/
+│       │   ├── mock.py         # MockTransport + MockEther (in-memory)
+│       │   └── serial.py       # SerialTransport (real hardware)
+│       ├── drivers/
+│       │   └── v3.py           # NanomodemV3Driver (modem command protocol)
+│       ├── codecs/
+│       │   └── v3.py           # Codec (message body encoding)
 │       ├── __main__.py         # CLI entry point (mock demo)
-│       └── tests/              # 71 unit + integration tests
+│       └── tests/              # Unit + integration tests
 ├── apps/
 │   └── gui_controller/         # Tkinter GUI application
 │       ├── controller.py       # Per-node ControllerWindow
@@ -33,38 +38,38 @@ Python library for underwater localization using acoustic modems (Nanomodem v3).
 graph TD
     Client["Client (ROS, CLI, GUI, test)"]
     Node["AcousticNode"]
-    Caps["NodeCapabilities"]
-    Registry["KnownNodes registry"]
-    Transport["TransportInterface"]
+    TP["TransportProtocol"]
     Calc["Calculation"]
-    NanoTransport["NanomodemTransport"]
-    Codec["Codec (encode/decode bodies)"]
-    MockTransport["MockTransport"]
-    MockEther["MockEther (shared bus)"]
-    Serial["Serial Port"]
+    MockT["MockTransport"]
+    MockE["MockEther"]
+    SerialT["SerialTransport"]
+    Driver["NanomodemV3Driver"]
+    CodecV3["Codec"]
+    Serial["serial.Serial"]
 
     Client --> Node
-    Node --> Caps
-    Node --> Registry
-    Node --> Transport
+    Node --> TP
     Node --> Calc
-    Transport -.-> NanoTransport
-    Transport -.-> MockTransport
-    NanoTransport --> Codec
-    NanoTransport --> Serial
-    MockTransport --> MockEther
+    TP -.->|"impl"| MockT
+    TP -.->|"impl"| SerialT
+    MockT --> MockE
+    SerialT --> Driver
+    SerialT --> Serial
+    Driver --> CodecV3
 ```
 
-**AcousticNode** is the only stateful class. It holds its own position, depth, known nodes, and distances. Orchestrates communication and calculation via injected dependencies.
+**Pluggable design**: all core interfaces live in `protocols.py`. Swap implementations without changing core logic.
+
+**AcousticNode** is the only stateful class. It holds its own position, depth, known nodes, and distances. Orchestrates communication and calculation via injected dependencies (transport, calculation).
+
+**TransportProtocol** defines `broadcast_position(coord, depth)`, `request_range(target_id)`, and `on_message(callback)`. Two implementations:
+
+- **MockTransport** routes typed `Message` objects through a shared **MockEther** bus. No codec or driver needed.
+- **SerialTransport** wraps a serial port. Delegates command formatting and response parsing to a **DriverProtocol** implementation.
+
+**NanomodemV3Driver** handles the nanomodem v3 modem protocol: formats `$P`, `$B` commands and parses `#R`, `#B`, `#U` responses. Uses a **Codec** for message body encoding/decoding.
 
 **Calculation** is stateless and pure. Trilateration (scipy least_squares), 3D-to-2D projection, timestamp-to-distance conversion.
-
-**TransportInterface** defines two operations: `broadcast_position(coord)` and `request_range(target_id)`, plus `on_message(callback)` for receiving. Two implementations:
-
-- **MockTransport** routes typed `Message` objects through a shared **MockEther** bus. No codec needed.
-- **NanomodemTransport** wraps a serial port. Uses **Codec** internally to encode/decode message bodies. Formats `$P`, `$B`, `$M` commands. Parses `#` responses. Nothing received on serial is ever silently dropped -- everything becomes a typed `Message` (or `UnknownMessage` as catch-all).
-
-**Codec** encodes/decodes message bodies (position data). Stateless, pure, injected into NanomodemTransport. The node never knows it exists.
 
 ## Installation
 
@@ -102,10 +107,59 @@ nanomodem-node 001
 python3 -m nanomodem
 ```
 
-### Real Hardware
+### Real Hardware (Single Modem on Serial)
+
+Connect a nanomodem v3 to your serial port and run:
+
+```python
+from nanomodem import AcousticNode, SerialTransport, NanomodemV3Driver, Codec, Coord
+
+# Wire up: codec -> driver -> transport -> node
+driver = NanomodemV3Driver(codec=Codec())
+transport = SerialTransport(node_id="001", port="/dev/ttyUSB0", driver=driver)
+node = AcousticNode(node_id="001", transport=transport)
+
+transport.start()
+
+node.set_position(Coord(lat=63.0, lon=10.0))
+node.broadcast_position()    # Announce to other nodes
+node.request_range("002")    # Ping another node
+# ... incoming messages are delivered via on_message callback ...
+
+transport.stop()
+```
+
+### Two Mock Nodes (No Hardware)
+
+Simulate two nodes communicating through an in-memory bus:
+
+```python
+from nanomodem import AcousticNode, MockEther, MockTransport, Coord
+
+ether = MockEther()
+
+node_a = AcousticNode(
+    node_id="001",
+    transport=MockTransport("001", ether),
+    position=Coord(lat=63.0, lon=10.0),
+)
+node_b = AcousticNode(
+    node_id="002",
+    transport=MockTransport("002", ether),
+)
+
+# Node A broadcasts its position, Node B receives it
+node_a.broadcast_position()
+print(node_b.get_known_nodes())  # Node B now knows about Node A
+```
+
+For complete scenarios with GUI, trilateration, and multi-node setups, see `apps/gui_controller/scenarios/`.
+
+### CLI
 
 ```bash
-python3 -m nanomodem --port /dev/ttyUSB0 --baud 9600 --node-id 001
+python3 -m nanomodem                  # Mock demo (no hardware)
+python3 -m nanomodem --port /dev/ttyUSB0 --node-id 001  # Real hardware
 ```
 
 ## Development

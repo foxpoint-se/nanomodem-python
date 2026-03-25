@@ -2,7 +2,7 @@
 
 from nanomodem.calculation import Calculation
 from nanomodem.node import AcousticNode
-from nanomodem.transport import MockEther, MockTransport
+from nanomodem.transports.mock import MockEther, MockTransport
 from nanomodem.types import Coord
 
 

@@ -18,7 +18,7 @@ from PIL import Image, ImageDraw, ImageTk
 from tkintermapview import TkinterMapView
 
 from nanomodem.node import AcousticNode
-from nanomodem.transport import TransportInterface
+from nanomodem.protocols import TransportProtocol
 from nanomodem.types import (
     Coord,
     Message,
@@ -73,7 +73,7 @@ class ControllerWindow:
         root: tk.Tk,
         node_id: str,
         pretty_name: str,
-        transport: TransportInterface,
+        transport: TransportProtocol,
         peer_ids: list[str],
         map_center: tuple[float, float] = (59.310153, 17.975189),
         map_zoom: int = 17,

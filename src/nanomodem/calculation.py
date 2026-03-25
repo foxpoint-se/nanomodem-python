@@ -3,22 +3,11 @@
 from __future__ import annotations
 
 import math
-from typing import Protocol
 
 import numpy as np
 from scipy.optimize import least_squares
 
 from .types import Coord
-
-
-class CalculationInterface(Protocol):
-    """Interface for calculation functions. Inject into AcousticNode."""
-
-    def trilaterate(self, positions: list[Coord], distances: list[float]) -> Coord: ...
-
-    def project_3d_to_2d(self, distance_3d: float, host_depth: float, beacon_depth: float) -> float: ...
-
-    def timestamp_to_distance(self, timestamp: int, sound_speed: float) -> float: ...
 
 
 class Calculation:

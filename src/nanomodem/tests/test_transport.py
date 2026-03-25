@@ -1,6 +1,6 @@
 """Tests for MockTransport + MockEther."""
 
-from nanomodem.transport import MockEther, MockTransport
+from nanomodem.transports.mock import MockEther, MockTransport
 from nanomodem.types import (
     Coord,
     Message,

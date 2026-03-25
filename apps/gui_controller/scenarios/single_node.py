@@ -6,7 +6,7 @@ import sys
 import tkinter as tk
 from typing import Optional
 
-from nanomodem.transport import MockEther, MockTransport
+from nanomodem.transports.mock import MockEther, MockTransport
 from nanomodem.types import Coord
 
 from ..controller import ControllerWindow
