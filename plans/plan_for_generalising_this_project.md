@@ -32,11 +32,11 @@ This plan outlines the steps to transform this "hacking" repo into a Python libr
 
 ### Phase 3: Core Logic Refactor
 *Goal: Implement the "Pluggable" architecture we discussed.*
-- [ ] **Protocols**: Define `TransportProtocol` and `DriverProtocol` in `src/nanomodem/protocols.py`.
-- [ ] **Drivers**: Move the `$Pxxx` command logic into `src/nanomodem/drivers/v3.py`.
-- [ ] **Node**: Implement the high-level `AcousticNode` in `src/nanomodem/node.py` (using Dependency Injection for Driver/Transport).
-- [ ] **Types**: Define `Coord` and `NodeState` as `dataclasses` in `src/nanomodem/types.py`.
-- [ ] **Exports**: Update `src/nanomodem/__init__.py` to export the main classes for easy import.
+- [x] **Protocols**: Define `TransportProtocol` and `DriverProtocol` in `src/nanomodem/protocols.py`.
+- [x] **Drivers**: Move the `$Pxxx` command logic into `src/nanomodem/drivers/v3.py`.
+- [x] **Node**: Implement the high-level `AcousticNode` in `src/nanomodem/node.py` (using Dependency Injection for Driver/Transport).
+- [x] **Types**: Define `Coord` and `NodeState` as `dataclasses` in `src/nanomodem/types.py`.
+- [x] **Exports**: Update `src/nanomodem/__init__.py` to export the main classes for easy import.
 
 ### Phase 4: Dependency Management (Poetry)
 *Goal: Make the project "installable" and manageable.*
