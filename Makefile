@@ -1,24 +1,19 @@
-.PHONY: help install clean-env lint format typecheck test
+.PHONY: help install clean-env lint format typecheck test verify-dist
 
 help:
 	@echo "Available commands:"
-	@echo "  make install   - Create/update virtual environment and install dependencies"
-	@echo "  make clean-env - Delete virtual environment"
-	@echo "  make lint      - Check code style and quality using ruff"
-	@echo "  make format    - Format code using ruff"
-	@echo "  make typecheck - Check types using mypy"
-	@echo "  make test      - Run all code checks and tests using pytest"
+	@echo "  make install      - Install dependencies using uv"
+	@echo "  make clean-env    - Delete virtual environment"
+	@echo "  make lint         - Check code style and quality using ruff"
+	@echo "  make format       - Format code using ruff"
+	@echo "  make typecheck    - Check types using mypy"
+	@echo "  make test         - Run all code checks and tests using pytest"
+	@echo "  make verify-dist  - Verify the library is installable and importable"
 
 install:
-	@if [ ! -d ".venv" ]; then \
-		echo "Creating virtual environment..."; \
-		python3 -m venv .venv; \
-	fi
-	@echo "Installing dependencies..."
-	@. .venv/bin/activate && pip install -q -e ".[dev]"
-	@echo ""
-	@echo "✓ Dependencies installed. To activate the virtual environment, run:"
-	@echo "  source .venv/bin/activate"
+	@echo "Installing dependencies with uv..."
+	uv sync --all-extras
+	@echo "✓ Dependencies installed."
 
 clean-env:
 	@if [ -d ".venv" ]; then \
@@ -30,13 +25,17 @@ clean-env:
 	fi
 
 lint:
-	ruff check src apps
+	uv run ruff check src apps
 
 format:
-	ruff format src apps
+	uv run ruff format src apps
 
 typecheck:
-	mypy src apps
+	uv run mypy src apps
 
 test: lint typecheck
-	pytest
+	uv run pytest
+
+verify-dist:
+	@echo "Verifying distribution (isolated install)..."
+	uv run --no-project --with "." python -c "from nanomodem.node import AcousticNode; print('✅ Distribution verified')"

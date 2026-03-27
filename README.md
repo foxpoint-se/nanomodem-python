@@ -2,6 +2,46 @@
 
 Python library for underwater localization using acoustic modems (Nanomodem v3).
 
+## Installation
+
+### For Users (Library)
+
+Install the core library (includes `scipy` and `pyserial`):
+
+```bash
+pip install git+https://github.com/foxpoint-se/nanomodem-python.git
+```
+
+To include the GUI demo and its dependencies:
+
+```bash
+pip install "nanomodem[gui] @ git+https://github.com/foxpoint-se/nanomodem-python.git"
+```
+
+### For Developers (Local)
+
+Clone and set up the full environment (requires uv):
+
+```bash
+git clone https://github.com/foxpoint-se/nanomodem-python.git
+cd nanomodem-python
+make install
+```
+
+## Usage
+
+Run the 4-node mock simulation:
+
+```bash
+uv run nanomodem-demo
+```
+
+Run a single node UI (requires node ID):
+
+```bash
+uv run nanomodem-node 001
+```
+
 ## Project Structure
 
 ```text
@@ -64,12 +104,12 @@ graph TD
 
 **TransportProtocol** defines `broadcast_position(coord, depth)`, `request_range(target_id)`, and `on_message(callback)`. Two implementations:
 
-- **MockTransport** routes typed `Message` objects through a shared **MockEther** bus. No codec or driver needed.
-- **SerialTransport** wraps a serial port. Delegates command formatting and response parsing to a **DriverProtocol** implementation.
+* **MockTransport** routes typed `Message` objects through a shared **MockEther** bus. No codec or driver needed.
+* **SerialTransport** wraps a serial port. Delegates command formatting and response parsing to a **DriverProtocol** implementation.
 
 **NanomodemV3Driver** handles the nanomodem v3 modem protocol: formats `$P`, `$B` commands and parses `#R`, `#B`, `#U` responses. Uses a **Codec** for message body encoding/decoding.
 
-**Calculation** is stateless and pure. Trilateration (scipy least_squares), 3D-to-2D projection, timestamp-to-distance conversion.
+**Calculation** is stateless and pure. Trilateration (scipy least\_squares), 3D-to-2D projection, timestamp-to-distance conversion.
 
 ## Installation
 
@@ -184,11 +224,12 @@ make typecheck # Run strict type checking (Mypy)
 ### IDE Integration
 
 To ensure your IDE matches the project's quality standards:
+
 1. **Ruff Extension**: Install the [Ruff extension](https://marketplace.visualstudio.com/items?itemName=charliermarsh.ruff) for Cursor/VS Code.
 2. **Format on Save**: Enable "Format on Save" in your editor settings and set Ruff as the default formatter. This will ensure your code is always formatted according to the project's rules (Black-compatible).
 3. **Mypy**: The `pyproject.toml` is configured for strict type checking. Most IDEs will pick this up automatically if you have a Python type-checking extension installed.
 
----
+***
 
 ## API Reference
 
@@ -196,8 +237,8 @@ To ensure your IDE matches the project's quality standards:
 
 Nodes have two boolean capabilities that gate automatic behavior:
 
-- `is_broadcasting_own_position` -- auto-broadcast when `set_position()` is called
-- `is_inferring_own_position` -- auto-trilaterate when a new range response arrives and 3+ beacon positions/ranges are available
+* `is_broadcasting_own_position` -- auto-broadcast when `set_position()` is called
+* `is_inferring_own_position` -- auto-trilaterate when a new range response arrives and 3+ beacon positions/ranges are available
 
 A "beacon" node sets `is_broadcasting_own_position = True`. A "submerged host" sets `is_inferring_own_position = True`. Both can be toggled independently on any node.
 
@@ -205,7 +246,7 @@ A "beacon" node sets `is_broadcasting_own_position = True`. A "submerged host" s
 
 AcousticNode accepts two optional callbacks:
 
-- `on_state_changed: Callable[[], None]` -- called whenever node state changes (position set, depth changed, message received)
-- `on_message_received: Callable[[Message], None]` -- called with each incoming message for logging/display
+* `on_state_changed: Callable[[], None]` -- called whenever node state changes (position set, depth changed, message received)
+* `on_message_received: Callable[[Message], None]` -- called with each incoming message for logging/display
 
 GUI controllers use these with `root.after(0, ...)` for thread-safe reactive UI updates.
