@@ -1,4 +1,4 @@
-.PHONY: help install clean-env lint format typecheck test verify-dist
+.PHONY: help install clean-env lint format typecheck test verify-dist verify-dist-gui
 
 help:
 	@echo "Available commands:"
@@ -39,3 +39,7 @@ test: lint typecheck
 verify-dist:
 	@echo "Verifying distribution (isolated install)..."
 	uv run --no-project --with "." python -c "from nanomodem.node import AcousticNode; print('✅ Distribution verified')"
+
+verify-dist-gui:
+	@echo "Verifying GUI distribution (isolated install)..."
+	uv run --no-project --with ".[gui]" python -c "from nanomodem.gui.scenarios.mock_4_nodes import main; print('✅ GUI distribution verified')"
