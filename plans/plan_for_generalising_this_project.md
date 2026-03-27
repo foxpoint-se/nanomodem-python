@@ -41,13 +41,16 @@ This plan outlines the steps to transform this "hacking" repo into a Python libr
 ### Phase 4: Dependency Management (uv)
 *Goal: Make the project "installable," ROS2-compatible, and keep the GUI separate.*
 
-- [ ] Initialize `uv` project: `uv init --lib` (creates `pyproject.toml` with `src` layout).
-- [ ] Configure `hatchling` as the build-backend for standard ROS2/pip compatibility.
-- [ ] Add core dependencies: `uv add scipy pyserial`.
-- [ ] Add optional GUI dependencies as an "extra": `uv add --extra gui tkintermapview customtkinter`.
-- [ ] Map the `nanomodem-demo` script to the `apps` entry point in `pyproject.toml`.
-- [ ] Configure build settings to **include** `src/nanomodem` but **exclude** the `apps` folder from the library distribution.
-- [ ] **Check**: Verify `pip install .` installs only the core library, while `pip install ".[gui]"` installs the demo and its GUI tools.
+- [x] Initialize `uv` project: `uv init --lib` (creates `pyproject.toml` with `src` layout).
+- [x] Configure `hatchling` as the build-backend for standard ROS2/pip compatibility.
+- [x] Add core dependencies: `uv add scipy pyserial`.
+- [x] Add optional GUI dependencies as an "extra": `uv add --extra gui tkintermapview customtkinter`.
+- [x] Map the `nanomodem-demo` script to the `apps` entry point in `pyproject.toml`.
+- [x] Configure build settings to **include** `src/nanomodem` but **exclude** the `apps` folder from the library distribution.
+- [x] **Check**: Verify `pip install .` installs only the core library, while `pip install ".[gui]"` installs the demo and its GUI tools.
+
+### Intermediate phase
+- [x] Clean up readme
 
 ### Phase 5: Legacy & Examples
 *Goal: Move existing "hacking" code out of the library path.*
@@ -58,14 +61,15 @@ This plan outlines the steps to transform this "hacking" repo into a Python libr
 ### Phase 6: Versioning & Publishing (Optional/Future)
 *Goal: Move from "commit hashes" to "tags".*
 - [ ] **Decision**: Start with `version = "0.1.0-dev"` in `pyproject.toml`.
-- [ ] Use `pip install git+https://...` for consumption.
+- [x] Use `pip install git+https://...` for consumption.
 - [ ] (Future) Set up `commitizen` for local tagging.
 - [ ] (Future) Add GitHub Action for auto-tagging on merge to main.
 - [ ] (Future) Add Discord notification on releases.
-- [ ] (Future) Always run tests in PRs and similar.
-- [ ] (Future) Make the git repo public.
+- [x] (Future) Always run tests in PRs and similar.
+- [x] (Future) Make the git repo public.
 - [x] (Future) Cursor rules and Claude rules.
 - [x] (Future) Easier way of running various things. PYTHONPATH and ugly stuff like that should be avoided. Should either be easy-to-use make targets, or other simple instructions in readme.
+- [x] (Future) Use anaconda (?) in CI to test for multiple python versions
 
 ---
 **Note on Decisions:**
