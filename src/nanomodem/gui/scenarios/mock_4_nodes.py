@@ -8,10 +8,9 @@ from __future__ import annotations
 import tkinter as tk
 from typing import Optional
 
+from nanomodem.gui.controller import ControllerWindow
 from nanomodem.transports.mock import MockEther, MockTransport
 from nanomodem.types import Coord
-
-from ..controller import ControllerWindow
 
 MAP_CENTER = (59.310153, 17.975189)
 MAP_ZOOM = 17

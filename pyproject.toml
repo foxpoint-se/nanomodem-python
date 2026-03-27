@@ -22,8 +22,8 @@ dev = [
 ]
 
 [project.scripts]
-nanomodem-demo = "apps.gui_controller.scenarios.mock_4_nodes:main"
-nanomodem-node = "apps.gui_controller.scenarios.single_node:main"
+nanomodem-demo = "nanomodem.gui.scenarios.mock_4_nodes:main"
+nanomodem-node = "nanomodem.gui.scenarios.single_node:main"
 
 [build-system]
 requires = ["hatchling"]
@@ -33,14 +33,14 @@ build-backend = "hatchling.build"
 packages = ["src/nanomodem"]
 
 [tool.hatch.build.targets.sdist]
-include = ["src", "apps"]
+include = ["src"]
 
 [tool.hatch.build.targets.wheel.sources]
 "src" = ""
 
 [tool.pytest.ini_options]
 testpaths = ["src/nanomodem/tests"]
-pythonpath = ["src", "."]
+pythonpath = ["src"]
 
 [tool.mypy]
 python_version = "3.12"

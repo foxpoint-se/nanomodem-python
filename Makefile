@@ -25,13 +25,13 @@ clean-env:
 	fi
 
 lint:
-	uv run ruff check src apps
+	uv run ruff check src
 
 format:
-	uv run ruff format src apps
+	uv run ruff format src
 
 typecheck:
-	uv run mypy src apps
+	uv run mypy src
 
 test: lint typecheck
 	uv run pytest
