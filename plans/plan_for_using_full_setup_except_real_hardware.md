@@ -44,3 +44,9 @@
 - [ ] Find out if there are unit tests that should be added at this point
 
 **Outcome:** Everything behaves exactly as it will in water, verified visually.
+
+---
+
+### Phase 4: Complementary things
+- [ ] Maybe (probably?) move the serial broker from scripts to gui so it is available when installing with [gui] option
+- [ ] Maybe rename the [gui] profile to something more descriptive? Dev? Demo?
