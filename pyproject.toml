@@ -66,3 +66,7 @@ line-ending = "auto"
 version_toml = ["pyproject.toml:project.version"]
 tag_format = "v{version}"
 commit_parser = "conventional"
+build_command = """
+uv lock --upgrade-package "$PACKAGE_NAME"
+git add uv.lock
+"""
