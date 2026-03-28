@@ -60,11 +60,10 @@ This plan outlines the steps to transform this "hacking" repo into a Python libr
 
 ### Phase 6: Versioning & Publishing (Optional/Future)
 *Goal: Move from "commit hashes" to "tags".*
-- [ ] **Decision**: Start with `version = "0.1.0-dev"` in `pyproject.toml`.
+- [x] **Decision**: Start with `version = "0.1.0-dev"` in `pyproject.toml`.
 - [x] Use `pip install git+https://...` for consumption.
-- [ ] (Future) Set up `commitizen` for local tagging.
-- [ ] (Future) Add GitHub Action for auto-tagging on merge to main.
-- [ ] (Future) Add Discord notification on releases.
+- [x] (Future) Set up `commitizen` for local tagging.
+- [x] (Future) Add GitHub Action for auto-tagging on merge to main.
 - [x] (Future) Always run tests in PRs and similar.
 - [x] (Future) Make the git repo public.
 - [x] (Future) Cursor rules and Claude rules.
