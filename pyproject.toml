@@ -24,6 +24,7 @@ dev = [
 [project.scripts]
 nanomodem-demo = "nanomodem.gui.scenarios.mock_4_nodes:main"
 nanomodem-node = "nanomodem.gui.scenarios.single_node:main"
+nanomodem-bridge = "nanomodem.gui.scenarios.serial_bridge_2_nodes:main"
 
 [build-system]
 requires = ["hatchling"]

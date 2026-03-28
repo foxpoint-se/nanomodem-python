@@ -1,4 +1,4 @@
-.PHONY: help install clean-env lint format typecheck test verify-dist verify-dist-gui
+.PHONY: help install clean-env lint format typecheck test verify-dist verify-dist-gui run-bridge run-broker
 
 help:
 	@echo "Available commands:"
@@ -9,6 +9,8 @@ help:
 	@echo "  make typecheck    - Check types using mypy"
 	@echo "  make test         - Run all code checks and tests using pytest"
 	@echo "  make verify-dist  - Verify the library is installable and importable"
+	@echo "  make run-bridge   - Run the serial bridge scenario (requires socat)"
+	@echo "  make run-broker   - Show instructions for running the standalone broker"
 
 install:
 	@echo "Installing dependencies with uv..."
@@ -43,6 +45,9 @@ verify-dist:
 verify-dist-gui:
 	@echo "Verifying GUI distribution (isolated install)..."
 	uv run --no-project --with ".[gui]" python -c "from nanomodem.gui.scenarios.mock_4_nodes import main; print('✅ GUI distribution verified')"
+
+run-bridge:
+	uv run nanomodem-bridge
 
 run-broker:
 	@echo ""
