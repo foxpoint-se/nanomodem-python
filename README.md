@@ -194,9 +194,11 @@ A "beacon" node sets `is_broadcasting_own_position = True`. A "submerged host" s
 
 ### Callbacks
 
-AcousticNode accepts two optional callbacks:
+AcousticNode accepts optional typed callbacks:
 
-- `on_state_changed: Callable[[], None]` -- called whenever node state changes (position set, depth changed, message received)
+- `on_position_changed: Callable[[Optional[Coord]], None]` -- called when own position is set or cleared
+- `on_depth_changed: Callable[[float], None]` -- called when own depth changes
+- `on_known_nodes_changed: Callable[[dict[str, KnownNode]], None]` -- called when the peer registry changes (new node seen, range updated, etc.)
 - `on_message_received: Callable[[Message], None]` -- called with each incoming message for logging/display
 
 GUI controllers use these with `root.after(0, ...)` for thread-safe reactive UI updates.
