@@ -41,10 +41,10 @@ BAUD = 9600
 TIMEOUT = 0.1
 
 # Physical positions used by broker for range simulation (lat, lon, depth_m).
-# Node A's position is updated at runtime via its sim_pos panel.
-POSITIONS: dict[str, tuple[float, float, float]] = {
-    "001": (59.310153, 17.975189, 0.0),
-    "002": (59.310500, 17.974500, 0.0),
+# Nodes start with no position; set via GUI or explicitly before ranging.
+POSITIONS: dict[str, tuple[float, float, float] | None] = {
+    "001": None,
+    "002": None,
 }
 
 _SOCAT_PTY_RE = re.compile(r"PTY is (/dev/[^\s]+)")
@@ -98,7 +98,7 @@ def _relay_loop(
     src_id: str,
     dst_id: str,
     label: str,
-    positions: dict[str, tuple[float, float, float]],
+    positions: dict[str, tuple[float, float, float] | None],
     dst_lock: threading.Lock,
 ) -> None:
     while True:
@@ -146,7 +146,7 @@ def _start_broker_threads(
     port_b: serial.Serial,
     node_a_id: str,
     node_b_id: str,
-    positions: dict[str, tuple[float, float, float]],
+    positions: dict[str, tuple[float, float, float] | None],
 ) -> None:
     lock_a = threading.Lock()
     lock_b = threading.Lock()
@@ -171,7 +171,10 @@ def _start_broker_threads(
 
 def _make_get_sim_pos(node_id: str) -> Callable[[], Optional[Coord]]:
     def get_sim_pos() -> Optional[Coord]:
-        lat, lon, _ = POSITIONS[node_id]
+        pos = POSITIONS[node_id]
+        if pos is None:
+            return None
+        lat, lon, _ = pos
         return Coord(lat=lat, lon=lon)
 
     return get_sim_pos
@@ -179,7 +182,8 @@ def _make_get_sim_pos(node_id: str) -> Callable[[], Optional[Coord]]:
 
 def _make_set_sim_pos(node_id: str) -> Callable[[Coord], None]:
     def set_sim_pos(coord: Coord) -> None:
-        _, _, depth = POSITIONS[node_id]
+        existing = POSITIONS[node_id]
+        depth = existing[2] if existing is not None else 0.0
         POSITIONS[node_id] = (coord.lat, coord.lon, depth)
 
     return set_sim_pos
@@ -233,6 +237,7 @@ def launch_bridge(root: tk.Tk) -> list[ControllerWindow]:
         pretty_name="Node A (Host)",
         transport=transport_a,
         peer_ids=["002"],
+        position=None,
         map_center=MAP_CENTER,
         map_zoom=MAP_ZOOM,
         window_geometry=f"{win_w}x{win_h}+0+0",
@@ -248,6 +253,7 @@ def launch_bridge(root: tk.Tk) -> list[ControllerWindow]:
         pretty_name="Node B (Beacon)",
         transport=transport_b,
         peer_ids=["001"],
+        position=None,
         map_center=MAP_CENTER,
         map_zoom=MAP_ZOOM,
         window_geometry=f"{win_w}x{win_h}+{win_w}+0",
