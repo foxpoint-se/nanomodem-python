@@ -54,3 +54,4 @@
 - [ ] Consolidate the broker. Should be one thing, used across all scripts or launch files that need it.
 - [ ] Go through everything and see if anything smells.
 - [ ] Should the "simulated position" field even be in the gui for this scenario? How is it used?
+- [x] Maybe (probably?) the mock position should be updated when you set the actual position? Kind of makes sense, doesn't it?
