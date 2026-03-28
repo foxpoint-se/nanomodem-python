@@ -1,6 +1,6 @@
 # Nanomodem Library
 
-Python library for underwater localization using acoustic modems (Nanomodem v3).
+Python library for underwater acoustic positioning — trilaterate a submerged node's position using a network of surface beacons and acoustic range measurements.
 
 ## Installation
 
@@ -46,12 +46,20 @@ make verify-dist-gui  # Verify the GUI extra is installable in a clean environme
 **4-node mock simulation (1 host + 3 beacons):**
 
 ```bash
+uv run nanomodem-demo
+
+# OR
+source .venv/bin/activate
 nanomodem-demo
 ```
 
 **Single node UI (requires node ID):**
 
 ```bash
+uv run nanomodem-node 001
+
+# OR
+source .venv/bin/activate
 nanomodem-node 001
 ```
 
