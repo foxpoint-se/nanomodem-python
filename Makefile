@@ -1,4 +1,4 @@
-.PHONY: help install clean-env lint format typecheck test verify-dist verify-dist-gui
+.PHONY: help install clean-env lint format typecheck test verify-dist verify-dist-demo run-bridge
 
 help:
 	@echo "Available commands:"
@@ -9,6 +9,8 @@ help:
 	@echo "  make typecheck    - Check types using mypy"
 	@echo "  make test         - Run all code checks and tests using pytest"
 	@echo "  make verify-dist  - Verify the library is installable and importable"
+	@echo "  make verify-dist-demo - Verify the demo scenarios are installable"
+	@echo "  make run-bridge   - Run the serial bridge scenario (requires socat)"
 
 install:
 	@echo "Installing dependencies with uv..."
@@ -28,7 +30,7 @@ lint:
 	uv run ruff check src
 
 format:
-	uv run ruff format src
+	uv run ruff format src & uv run ruff check src --fix
 
 typecheck:
 	uv run mypy src
@@ -40,6 +42,9 @@ verify-dist:
 	@echo "Verifying distribution (isolated install)..."
 	uv run --no-project --with "." python -c "from nanomodem.node import AcousticNode; print('✅ Distribution verified')"
 
-verify-dist-gui:
-	@echo "Verifying GUI distribution (isolated install)..."
-	uv run --no-project --with ".[gui]" python -c "from nanomodem.gui.scenarios.mock_4_nodes import main; print('✅ GUI distribution verified')"
+verify-dist-demo:
+	@echo "Verifying demo distribution (isolated install)..."
+	uv run --no-project --with ".[demo]" python -c "from nanomodem.demo.scenarios.mock_4_nodes import main; print('✅ Demo distribution verified')"
+
+run-bridge:
+	uv run nanomodem-bridge

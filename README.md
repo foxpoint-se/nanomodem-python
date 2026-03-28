@@ -1,6 +1,6 @@
 # Nanomodem Library
 
-Python library for underwater localization using acoustic modems (Nanomodem v3).
+Python library for underwater acoustic positioning — trilaterate a submerged node's position using a network of surface beacons and acoustic range measurements.
 
 ## Installation
 
@@ -12,10 +12,10 @@ Install the core library (includes `scipy` and `pyserial`):
 pip install git+https://github.com/foxpoint-se/nanomodem-python.git
 ```
 
-To include the GUI demo and its dependencies:
+To include the demo scenarios and their dependencies:
 
 ```bash
-pip install "nanomodem[gui] @ git+https://github.com/foxpoint-se/nanomodem-python.git"
+pip install "nanomodem[demo] @ git+https://github.com/foxpoint-se/nanomodem-python.git"
 ```
 
 ### For Developers (Local)
@@ -36,22 +36,30 @@ make lint           # Check for style and logical errors (Ruff)
 make format         # Automatically format code (Ruff)
 make typecheck      # Run strict type checking (Mypy)
 make verify-dist    # Verify the core library is installable in a clean environment
-make verify-dist-gui  # Verify the GUI extra is installable in a clean environment
+make verify-dist-demo  # Verify the demo extra is installable in a clean environment
 ```
 
 ## Usage
 
-### GUI Demo (requires `[gui]` extra)
+### Demo Scenarios (requires `[demo]` extra)
 
 **4-node mock simulation (1 host + 3 beacons):**
 
 ```bash
+uv run nanomodem-demo
+
+# OR
+source .venv/bin/activate
 nanomodem-demo
 ```
 
 **Single node UI (requires node ID):**
 
 ```bash
+uv run nanomodem-node 001
+
+# OR
+source .venv/bin/activate
 nanomodem-node 001
 ```
 
@@ -104,7 +112,7 @@ python3 -m nanomodem                                    # Mock demo (no hardware
 python3 -m nanomodem --port /dev/ttyUSB0 --node-id 001  # Real hardware
 ```
 
-For complete scenarios with GUI, trilateration, and multi-node setups, see `src/nanomodem/gui/scenarios/`.
+For complete scenarios with GUI, trilateration, and multi-node setups, see `src/nanomodem/demo/scenarios/`.
 
 ## Architecture
 
@@ -162,7 +170,7 @@ graph TD
 │       │   └── v3.py           # NanomodemV3Driver (modem command protocol)
 │       ├── codecs/
 │       │   └── v3.py           # Codec (message body encoding)
-│       ├── gui/                # GUI demo (installed with [gui] extra)
+│       ├── demo/               # Demo scenarios (installed with [demo] extra)
 │       │   ├── controller.py   # Per-node ControllerWindow
 │       │   └── scenarios/
 │       │       ├── mock_4_nodes.py  # 4-node simulation
@@ -186,9 +194,11 @@ A "beacon" node sets `is_broadcasting_own_position = True`. A "submerged host" s
 
 ### Callbacks
 
-AcousticNode accepts two optional callbacks:
+AcousticNode accepts optional typed callbacks:
 
-- `on_state_changed: Callable[[], None]` -- called whenever node state changes (position set, depth changed, message received)
+- `on_position_changed: Callable[[Optional[Coord]], None]` -- called when own position is set or cleared
+- `on_depth_changed: Callable[[float], None]` -- called when own depth changes
+- `on_known_nodes_changed: Callable[[dict[str, KnownNode]], None]` -- called when the peer registry changes (new node seen, range updated, etc.)
 - `on_message_received: Callable[[Message], None]` -- called with each incoming message for logging/display
 
 GUI controllers use these with `root.after(0, ...)` for thread-safe reactive UI updates.

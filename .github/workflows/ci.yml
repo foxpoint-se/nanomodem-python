@@ -30,8 +30,8 @@ jobs:
       - name: Verify Distribution (Isolated Install)
         run: make verify-dist
 
-      - name: Verify GUI Distribution (Isolated Install)
-        run: make verify-dist-gui
+      - name: Verify Demo Distribution (Isolated Install)
+        run: make verify-dist-demo
 
       - name: Run Tests
         run: make test

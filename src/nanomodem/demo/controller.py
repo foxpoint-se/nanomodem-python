@@ -16,11 +16,14 @@ from typing import Callable, Optional
 
 from PIL import Image, ImageDraw, ImageTk
 from tkintermapview import TkinterMapView
+from tkintermapview.canvas_position_marker import CanvasPositionMarker
+from tkintermapview.map_widget import CanvasPath
 
 from nanomodem.node import AcousticNode
 from nanomodem.protocols import TransportProtocol
 from nanomodem.types import (
     Coord,
+    KnownNode,
     Message,
     PositionMessage,
     RangeResponseMessage,
@@ -84,8 +87,8 @@ class ControllerWindow:
     ) -> None:
         self._root = root
         self._peer_ids = peer_ids
-        self._markers: dict[str, object] = {}  # node_id -> marker
-        self._paths: dict[str, object] = {}  # node_id -> path (range circle)
+        self._markers: dict[str, CanvasPositionMarker] = {}  # node_id -> marker
+        self._paths: dict[str, CanvasPath] = {}  # node_id -> path (range circle)
         self._registry_rows: dict[str, dict[str, ttk.Frame | ttk.Label]] = {}
         self._icon_cache: dict[str, ImageTk.PhotoImage] = {}
 
@@ -118,12 +121,23 @@ class ControllerWindow:
         self._build_console()
 
         # --- Create AcousticNode ---
+        def _on_depth_changed(_depth: float) -> None:
+            root.after(0, self._refresh_ui)
+
+        def _on_known_nodes_changed(_known: dict[str, KnownNode]) -> None:
+            root.after(0, self._refresh_ui)
+
+        def _on_message_received(msg: Message) -> None:
+            root.after(0, self._log_message, msg)
+
         self._node = AcousticNode(
             node_id=node_id,
             transport=transport,
             position=position,
-            on_state_changed=lambda: (root.after(0, self._refresh_ui), None)[1],
-            on_message_received=lambda msg: (root.after(0, self._log_message, msg), None)[1],
+            on_position_changed=self._handle_position_changed,
+            on_depth_changed=_on_depth_changed,
+            on_known_nodes_changed=_on_known_nodes_changed,
+            on_message_received=_on_message_received,
         )
 
         self._refresh_ui()
@@ -432,6 +446,17 @@ class ControllerWindow:
         else:
             self._log("Cannot calculate: need 3+ nodes with position and range.")
 
+    def _handle_position_changed(self, pos: Optional[Coord]) -> None:
+        """Sync actual node position to sim position, then refresh UI.
+
+        When the node gains an actual position (manual set or trilateration),
+        the sim position is updated to match so that MockEther / broker use
+        the correct physical location for range calculation.
+        """
+        if pos is not None and self._set_sim_pos is not None:
+            self._set_sim_pos(pos)
+        self._root.after(0, self._refresh_ui)
+
     def _on_close(self) -> None:
         self._window.destroy()
         remaining = [w for w in self._root.winfo_children() if isinstance(w, tk.Toplevel) and w.winfo_exists()]
@@ -681,8 +706,8 @@ class ControllerWindow:
         if key in self._markers:
             marker = self._markers[key]
             try:
-                marker.set_position(lat, lon)  # type: ignore
-                marker.set_text(text)  # type: ignore
+                marker.set_position(lat, lon)
+                marker.set_text(text)
                 return
             except Exception:
                 self._delete_marker(key)
@@ -711,7 +736,7 @@ class ControllerWindow:
         if key in self._markers:
             marker = self._markers.pop(key)
             try:
-                marker.delete()  # type: ignore
+                marker.delete()
             except Exception:
                 pass
 
@@ -719,7 +744,7 @@ class ControllerWindow:
         if key in self._paths:
             path_obj = self._paths.pop(key)
             try:
-                path_obj.delete()  # type: ignore
+                path_obj.delete()
             except Exception:
                 pass
 

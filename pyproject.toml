@@ -10,7 +10,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-gui = [
+demo = [
     "tkintermapview>=1.29",
     "customtkinter",
     "pillow",
@@ -22,8 +22,9 @@ dev = [
 ]
 
 [project.scripts]
-nanomodem-demo = "nanomodem.gui.scenarios.mock_4_nodes:main"
-nanomodem-node = "nanomodem.gui.scenarios.single_node:main"
+nanomodem-demo = "nanomodem.demo.scenarios.mock_4_nodes:main"
+nanomodem-node = "nanomodem.demo.scenarios.single_node:main"
+nanomodem-bridge = "nanomodem.demo.scenarios.serial_bridge_2_nodes:main"
 
 [build-system]
 requires = ["hatchling"]
@@ -66,3 +67,7 @@ line-ending = "auto"
 version_toml = ["pyproject.toml:project.version"]
 tag_format = "v{version}"
 commit_parser = "conventional"
+build_command = """
+uv lock --upgrade-package "$PACKAGE_NAME"
+git add uv.lock
+"""

@@ -6,14 +6,16 @@ Creates a mock scenario with 1 host + 3 beacons.
 from __future__ import annotations
 
 import tkinter as tk
-from typing import Optional
+from typing import Optional, TypedDict
 
-from nanomodem.gui.controller import ControllerWindow
+from nanomodem.demo.controller import ControllerWindow
 from nanomodem.transports.mock import MockEther, MockTransport
 from nanomodem.types import Coord
 
 MAP_CENTER = (59.310153, 17.975189)
 MAP_ZOOM = 17
+
+Config = TypedDict("Config", {"id": str, "name": str, "sim_pos": Coord, "initial_depth": float})
 
 
 def launch_mock(root: tk.Tk) -> list[ControllerWindow]:
@@ -27,17 +29,17 @@ def launch_mock(root: tk.Tk) -> list[ControllerWindow]:
     ether = MockEther(sound_speed=1500.0)
 
     # 1. Scenario Configuration
-    host_config = {
+    host_config: Config = {
         "id": "001",
         "name": "Host (Tracker)",
         "sim_pos": Coord(lat=59.310153, lon=17.975189),
         "initial_depth": 5.0,
     }
 
-    beacons_config = [
-        {"id": "002", "name": "Beacon 1", "sim_pos": Coord(lat=59.310500, lon=17.974500)},
-        {"id": "003", "name": "Beacon 2", "sim_pos": Coord(lat=59.310800, lon=17.976000)},
-        {"id": "004", "name": "Beacon 3", "sim_pos": Coord(lat=59.309500, lon=17.975500)},
+    beacons_config: list[Config] = [
+        {"id": "002", "name": "Beacon 1", "sim_pos": Coord(lat=59.310500, lon=17.974500), "initial_depth": 0.0},
+        {"id": "003", "name": "Beacon 2", "sim_pos": Coord(lat=59.310800, lon=17.976000), "initial_depth": 0.0},
+        {"id": "004", "name": "Beacon 3", "sim_pos": Coord(lat=59.309500, lon=17.975500), "initial_depth": 0.0},
     ]
 
     all_ids = [host_config["id"]] + [b["id"] for b in beacons_config]
@@ -61,7 +63,7 @@ def launch_mock(root: tk.Tk) -> list[ControllerWindow]:
     # This one gets the callbacks so we can move its "Physical" location
     # while its "Logical" location remains unknown.
     host_id: str = str(host_config["id"])
-    host_sim_pos: Coord = host_config["sim_pos"]  # type: ignore
+    host_sim_pos: Coord = host_config["sim_pos"]
     host_transport = MockTransport(host_id, ether)
     host_transport.position = host_sim_pos
 
@@ -85,14 +87,14 @@ def launch_mock(root: tk.Tk) -> list[ControllerWindow]:
     )
 
     # Set the initial logical depth for the host
-    host_controller.node.set_depth(float(host_config["initial_depth"]))  # type: ignore
+    host_controller.node.set_depth(float(host_config["initial_depth"]))
 
     # Link the mock transport to pull depth from the node
     host_transport.get_depth_callback = host_controller.node.get_depth
 
     # Pre-populate host registry with beacon positions (simulating a known environment)
     for b in beacons_config:
-        host_controller.node.set_known_node_position(str(b["id"]), b["sim_pos"])  # type: ignore
+        host_controller.node.set_known_node_position(str(b["id"]), b["sim_pos"])
         host_controller.node.set_known_node_depth(str(b["id"]), 0.0)
 
     controllers.append(host_controller)
@@ -101,7 +103,7 @@ def launch_mock(root: tk.Tk) -> list[ControllerWindow]:
     # These do NOT get simulation callbacks because they are static in this scenario.
     for i, b_conf in enumerate(beacons_config, start=1):
         b_id: str = str(b_conf["id"])
-        b_sim_pos: Coord = b_conf["sim_pos"]  # type: ignore
+        b_sim_pos: Coord = b_conf["sim_pos"]
         b_transport = MockTransport(b_id, ether)
         b_transport.position = b_sim_pos
 

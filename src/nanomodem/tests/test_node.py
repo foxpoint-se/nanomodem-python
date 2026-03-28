@@ -5,7 +5,7 @@ import pytest
 from nanomodem.calculation import Calculation
 from nanomodem.node import AcousticNode
 from nanomodem.transports.mock import MockEther, MockTransport
-from nanomodem.types import Coord, PositionMessage, UnknownMessage
+from nanomodem.types import Coord, KnownNode, PositionMessage, UnknownMessage
 
 
 def _make_node(
@@ -390,30 +390,78 @@ def test_should_accept_valid_node_id_boundaries() -> None:
 # --- Callbacks ---
 
 
-def test_should_call_on_state_changed_when_position_set() -> None:
+def test__should_call_on_position_changed_with_new_coord_when_set_position_called() -> None:
     ether = MockEther()
     transport = MockTransport("001", ether)
-    calls: list[bool] = []
+    received: list[Coord | None] = []
     node = AcousticNode(
         node_id="001",
         transport=transport,
-        on_state_changed=lambda: calls.append(True),
+        on_position_changed=lambda pos: received.append(pos),
     )
-    node.set_position(Coord(lat=63.0, lon=10.0))
-    assert len(calls) == 1
+    new_pos = Coord(lat=63.0, lon=10.0)
+    node.set_position(new_pos)
+    assert len(received) == 1
+    assert received[0] == new_pos
 
 
-def test_should_call_on_state_changed_when_message_received() -> None:
+def test__should_call_on_position_changed_with_none_when_position_cleared() -> None:
     ether = MockEther()
     transport = MockTransport("001", ether)
-    calls: list[bool] = []
+    received: list[Coord | None] = []
+    node = AcousticNode(
+        node_id="001",
+        transport=transport,
+        position=Coord(lat=63.0, lon=10.0),
+        on_position_changed=lambda pos: received.append(pos),
+    )
+    node.set_position(None)
+    assert len(received) == 1
+    assert received[0] is None
+
+
+def test__should_call_on_depth_changed_with_new_depth_when_set_depth_called() -> None:
+    ether = MockEther()
+    transport = MockTransport("001", ether)
+    received: list[float] = []
+    node = AcousticNode(
+        node_id="001",
+        transport=transport,
+        on_depth_changed=lambda d: received.append(d),
+    )
+    node.set_depth(7.5)
+    assert len(received) == 1
+    assert received[0] == 7.5
+
+
+def test__should_call_on_known_nodes_changed_when_position_message_received() -> None:
+    ether = MockEther()
+    transport = MockTransport("001", ether)
+    snapshots: list[dict[str, KnownNode]] = []
     _node = AcousticNode(
         node_id="001",
         transport=transport,
-        on_state_changed=lambda: calls.append(True),
+        on_known_nodes_changed=lambda known: snapshots.append(known),
     )
     transport.deliver(PositionMessage(node_id="002", coord=Coord(lat=63.0, lon=10.0)))
-    assert len(calls) >= 1
+    assert len(snapshots) == 1
+    assert "002" in snapshots[0]
+    assert snapshots[0]["002"].position == Coord(lat=63.0, lon=10.0)
+
+
+def test__should_call_on_known_nodes_changed_when_range_response_received() -> None:
+    ether = MockEther(sound_speed=1500.0)
+    host = _make_node("001", position=Coord(lat=63.0, lon=10.0), ether=ether)
+    _beacon = _make_node("002", position=Coord(lat=63.0, lon=10.0), ether=ether)
+
+    snapshots: list[dict[str, KnownNode]] = []
+    host._cb_known_nodes_changed = lambda known: snapshots.append(known)
+
+    host.request_range("002")
+
+    assert len(snapshots) >= 1
+    assert "002" in snapshots[-1]
+    assert snapshots[-1]["002"].last_range is not None
 
 
 def test_should_call_on_message_received_with_message() -> None:

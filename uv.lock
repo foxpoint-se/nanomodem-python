@@ -283,7 +283,7 @@ wheels = [
 
 [[package]]
 name = "nanomodem"
-version = "0.1.0"
+version = "1.0.0"
 source = { editable = "." }
 dependencies = [
     { name = "pyserial" },
@@ -291,29 +291,29 @@ dependencies = [
 ]
 
 [package.optional-dependencies]
+demo = [
+    { name = "customtkinter" },
+    { name = "pillow" },
+    { name = "tkintermapview" },
+]
 dev = [
     { name = "mypy" },
     { name = "pytest" },
     { name = "ruff" },
 ]
-gui = [
-    { name = "customtkinter" },
-    { name = "pillow" },
-    { name = "tkintermapview" },
-]
 
 [package.metadata]
 requires-dist = [
-    { name = "customtkinter", marker = "extra == 'gui'" },
+    { name = "customtkinter", marker = "extra == 'demo'" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.0.0" },
-    { name = "pillow", marker = "extra == 'gui'" },
+    { name = "pillow", marker = "extra == 'demo'" },
     { name = "pyserial", specifier = ">=3.5" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.3.0" },
     { name = "scipy", specifier = ">=1.10.0" },
-    { name = "tkintermapview", marker = "extra == 'gui'", specifier = ">=1.29" },
+    { name = "tkintermapview", marker = "extra == 'demo'", specifier = ">=1.29" },
 ]
-provides-extras = ["gui", "dev"]
+provides-extras = ["demo", "dev"]
 
 [[package]]
 name = "numpy"
