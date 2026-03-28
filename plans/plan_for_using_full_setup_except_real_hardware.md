@@ -7,14 +7,14 @@
 ### Phase 1: Serial Broker (the "fake water")
 *Goal: A running broker that links two virtual serial port pairs and prints every raw byte it sees.*
 
-- [ ] Create `scripts/serial_broker.py` — a standalone script
-- [ ] Use `socat` to create two virtual serial pairs (documented in the script's usage comment)
-- [ ] Broker reads from both ports, relays bytes in both directions
-- [ ] Broker logs every raw line to stdout with direction and timestamp (e.g. `[A→B] $B32P001...`)
-- [ ] When broker sees `$Pxxx`, synthesize a `#RxxxTyyyyy` response back to sender using hardcoded positions
-- [ ] Hardcoded node positions are defined at top of script (easy to change)
-- [ ] Figure out if we should add any of this to the "convenient scripts" defined in toml or Makefile or similar
-- [ ] Find out if there are unit tests that should be added at this point
+- [x] Create `scripts/serial_broker.py` — a standalone script
+- [x] Use `socat` to create two virtual serial pairs (documented in the script's usage comment)
+- [x] Broker reads from both ports, relays bytes in both directions
+- [x] Broker logs every raw line to stdout with direction and timestamp (e.g. `[A→B] $B32P001...`)
+- [x] When broker sees `$Pxxx`, synthesize a `#RxxxTyyyyy` response back to sender using hardcoded positions
+- [x] Hardcoded node positions are defined at top of script (easy to change)
+- [x] Figure out if we should add any of this to the "convenient scripts" defined in toml or Makefile or similar
+- [x] Find out if there are unit tests that should be added at this point
 
 **Outcome:** Run `python scripts/serial_broker.py` and see a live bus monitor in the terminal.
 
