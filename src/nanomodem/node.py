@@ -46,7 +46,9 @@ class AcousticNode:
         calculation: Optional[CalculationProtocol] = None,
         position: Optional[Coord] = None,
         sound_speed: float = 1500.0,
-        on_state_changed: Optional[Callable[[], None]] = None,
+        on_position_changed: Optional[Callable[[Optional[Coord]], None]] = None,
+        on_depth_changed: Optional[Callable[[float], None]] = None,
+        on_known_nodes_changed: Optional[Callable[[dict[str, KnownNode]], None]] = None,
         on_message_received: Optional[Callable[[Message], None]] = None,
     ) -> None:
         _validate_node_id(node_id)
@@ -56,15 +58,13 @@ class AcousticNode:
         self._calculation: CalculationProtocol = calculation or Calculation()
         self._position = position
         self._depth = 0.0
-        if position is not None:
-            # If position was provided, we don't have a separate depth yet
-            # unless we want to extract it, but Coord no longer has depth.
-            pass
         self._sound_speed = sound_speed
         self._capabilities = NodeCapabilities()
         self._known_nodes: dict[str, KnownNode] = {}
 
-        self._on_state_changed = on_state_changed
+        self._cb_position_changed = on_position_changed
+        self._cb_depth_changed = on_depth_changed
+        self._cb_known_nodes_changed = on_known_nodes_changed
         self._on_message_received = on_message_received
 
         self._transport.on_message(self._handle_message)
@@ -100,30 +100,35 @@ class AcousticNode:
 
     def set_position(self, position: Optional[Coord]) -> None:
         self._position = position
-        self._on_position_changed()
-        self._notify_state_changed()
+        self._maybe_broadcast_position()
+        if self._cb_position_changed is not None:
+            self._cb_position_changed(position)
 
     def set_depth(self, depth: float) -> None:
         self._depth = depth
-        self._notify_state_changed()
+        if self._cb_depth_changed is not None:
+            self._cb_depth_changed(depth)
 
     def set_known_node_position(self, node_id: str, position: Optional[Coord]) -> None:
         """Manually set or update the position of a node in the registry."""
         self._ensure_known_node(node_id)
         self._known_nodes[node_id].position = position
-        self._notify_state_changed()
+        if self._cb_known_nodes_changed is not None:
+            self._cb_known_nodes_changed(dict(self._known_nodes))
 
     def set_known_node_depth(self, node_id: str, depth: float) -> None:
         """Manually update the depth of a node in the registry."""
         self._ensure_known_node(node_id)
         self._known_nodes[node_id].depth = depth
-        self._notify_state_changed()
+        if self._cb_known_nodes_changed is not None:
+            self._cb_known_nodes_changed(dict(self._known_nodes))
 
     def delete_known_node(self, node_id: str) -> None:
         """Remove a node from the registry."""
         if node_id in self._known_nodes:
             del self._known_nodes[node_id]
-            self._notify_state_changed()
+            if self._cb_known_nodes_changed is not None:
+                self._cb_known_nodes_changed(dict(self._known_nodes))
 
     # --- Actions ---
 
@@ -174,7 +179,8 @@ class AcousticNode:
 
         self._position = Coord(lat=result.lat, lon=result.lon)
 
-        self._notify_state_changed()
+        if self._cb_position_changed is not None:
+            self._cb_position_changed(self._position)
         return self._position
 
     # --- Message handling ---
@@ -186,28 +192,26 @@ class AcousticNode:
                 self._known_nodes[nid].position = c
                 self._known_nodes[nid].depth = d
                 self._known_nodes[nid].last_seen = time.time()
+                if self._cb_known_nodes_changed is not None:
+                    self._cb_known_nodes_changed(dict(self._known_nodes))
             case RangeResponseMessage(node_id=nid, timestamp=ts):
                 self._ensure_known_node(nid)
                 distance = self._calculation.timestamp_to_distance(ts, self._sound_speed)
                 self._known_nodes[nid].last_range = distance
                 self._known_nodes[nid].last_seen = time.time()
+                if self._cb_known_nodes_changed is not None:
+                    self._cb_known_nodes_changed(dict(self._known_nodes))
                 self._maybe_infer_position()
             case UnknownMessage(raw=raw):
                 logger.info("Unhandled message: %s", raw)
 
-        self._notify_state_changed()
         if self._on_message_received is not None:
             self._on_message_received(msg)
 
     # --- Internal helpers ---
 
-    def _notify_state_changed(self) -> None:
-        """Notify the GUI (or any listener) that node state has changed."""
-        if self._on_state_changed is not None:
-            self._on_state_changed()
-
-    def _on_position_changed(self) -> None:
-        """Called whenever own position changes. Triggers auto-broadcast if enabled."""
+    def _maybe_broadcast_position(self) -> None:
+        """Triggers auto-broadcast when own position changes, if enabled."""
         if self._capabilities.is_broadcasting_own_position:
             self.broadcast_position()
 

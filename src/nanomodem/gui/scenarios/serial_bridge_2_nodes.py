@@ -240,7 +240,8 @@ def launch_bridge(root: tk.Tk) -> list[ControllerWindow]:
         set_sim_pos_callback=_make_set_sim_pos("001"),
     )
 
-    # Node B: static beacon, no sim_pos panel
+    # Node B: sim_pos callbacks wired so that setting Node B's actual position
+    # automatically updates POSITIONS["002"] used by the broker for ranging.
     controller_b = ControllerWindow(
         root=root,
         node_id="002",
@@ -250,8 +251,8 @@ def launch_bridge(root: tk.Tk) -> list[ControllerWindow]:
         map_center=MAP_CENTER,
         map_zoom=MAP_ZOOM,
         window_geometry=f"{win_w}x{win_h}+{win_w}+0",
-        get_sim_pos_callback=None,
-        set_sim_pos_callback=None,
+        get_sim_pos_callback=_make_get_sim_pos("002"),
+        set_sim_pos_callback=_make_set_sim_pos("002"),
     )
 
     # 7. Start serial readers

@@ -21,6 +21,7 @@ from nanomodem.node import AcousticNode
 from nanomodem.protocols import TransportProtocol
 from nanomodem.types import (
     Coord,
+    KnownNode,
     Message,
     PositionMessage,
     RangeResponseMessage,
@@ -118,12 +119,23 @@ class ControllerWindow:
         self._build_console()
 
         # --- Create AcousticNode ---
+        def _on_depth_changed(_depth: float) -> None:
+            root.after(0, self._refresh_ui)
+
+        def _on_known_nodes_changed(_known: dict[str, KnownNode]) -> None:
+            root.after(0, self._refresh_ui)
+
+        def _on_message_received(msg: Message) -> None:
+            root.after(0, self._log_message, msg)
+
         self._node = AcousticNode(
             node_id=node_id,
             transport=transport,
             position=position,
-            on_state_changed=lambda: (root.after(0, self._refresh_ui), None)[1],
-            on_message_received=lambda msg: (root.after(0, self._log_message, msg), None)[1],
+            on_position_changed=self._handle_position_changed,
+            on_depth_changed=_on_depth_changed,
+            on_known_nodes_changed=_on_known_nodes_changed,
+            on_message_received=_on_message_received,
         )
 
         self._refresh_ui()
@@ -431,6 +443,17 @@ class ControllerWindow:
             self._log(f"Calculated position: ({result.lat:.6f}, {result.lon:.6f})")
         else:
             self._log("Cannot calculate: need 3+ nodes with position and range.")
+
+    def _handle_position_changed(self, pos: Optional[Coord]) -> None:
+        """Sync actual node position to sim position, then refresh UI.
+
+        When the node gains an actual position (manual set or trilateration),
+        the sim position is updated to match so that MockEther / broker use
+        the correct physical location for range calculation.
+        """
+        if pos is not None and self._set_sim_pos is not None:
+            self._set_sim_pos(pos)
+        self._root.after(0, self._refresh_ui)
 
     def _on_close(self) -> None:
         self._window.destroy()
