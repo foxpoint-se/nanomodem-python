@@ -16,6 +16,8 @@ from typing import Callable, Optional
 
 from PIL import Image, ImageDraw, ImageTk
 from tkintermapview import TkinterMapView
+from tkintermapview.canvas_position_marker import CanvasPositionMarker
+from tkintermapview.map_widget import CanvasPath
 
 from nanomodem.node import AcousticNode
 from nanomodem.protocols import TransportProtocol
@@ -85,8 +87,8 @@ class ControllerWindow:
     ) -> None:
         self._root = root
         self._peer_ids = peer_ids
-        self._markers: dict[str, object] = {}  # node_id -> marker
-        self._paths: dict[str, object] = {}  # node_id -> path (range circle)
+        self._markers: dict[str, CanvasPositionMarker] = {}  # node_id -> marker
+        self._paths: dict[str, CanvasPath] = {}  # node_id -> path (range circle)
         self._registry_rows: dict[str, dict[str, ttk.Frame | ttk.Label]] = {}
         self._icon_cache: dict[str, ImageTk.PhotoImage] = {}
 
@@ -704,8 +706,8 @@ class ControllerWindow:
         if key in self._markers:
             marker = self._markers[key]
             try:
-                marker.set_position(lat, lon)  # type: ignore
-                marker.set_text(text)  # type: ignore
+                marker.set_position(lat, lon)
+                marker.set_text(text)
                 return
             except Exception:
                 self._delete_marker(key)
@@ -734,7 +736,7 @@ class ControllerWindow:
         if key in self._markers:
             marker = self._markers.pop(key)
             try:
-                marker.delete()  # type: ignore
+                marker.delete()
             except Exception:
                 pass
 
@@ -742,7 +744,7 @@ class ControllerWindow:
         if key in self._paths:
             path_obj = self._paths.pop(key)
             try:
-                path_obj.delete()  # type: ignore
+                path_obj.delete()
             except Exception:
                 pass
 
