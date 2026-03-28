@@ -36,7 +36,7 @@ make lint           # Check for style and logical errors (Ruff)
 make format         # Automatically format code (Ruff)
 make typecheck      # Run strict type checking (Mypy)
 make verify-dist    # Verify the core library is installable in a clean environment
-make verify-dist-gui  # Verify the GUI extra is installable in a clean environment
+make verify-dist-demo  # Verify the demo extra is installable in a clean environment
 ```
 
 ## Usage
