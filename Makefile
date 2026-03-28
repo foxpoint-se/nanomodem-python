@@ -1,4 +1,4 @@
-.PHONY: help install clean-env lint format typecheck test verify-dist verify-dist-gui run-bridge run-broker
+.PHONY: help install clean-env lint format typecheck test verify-dist verify-dist-demo run-bridge
 
 help:
 	@echo "Available commands:"
@@ -9,8 +9,8 @@ help:
 	@echo "  make typecheck    - Check types using mypy"
 	@echo "  make test         - Run all code checks and tests using pytest"
 	@echo "  make verify-dist  - Verify the library is installable and importable"
+	@echo "  make verify-dist-demo - Verify the demo scenarios are installable"
 	@echo "  make run-bridge   - Run the serial bridge scenario (requires socat)"
-	@echo "  make run-broker   - Show instructions for running the standalone broker"
 
 install:
 	@echo "Installing dependencies with uv..."
@@ -42,28 +42,9 @@ verify-dist:
 	@echo "Verifying distribution (isolated install)..."
 	uv run --no-project --with "." python -c "from nanomodem.node import AcousticNode; print('✅ Distribution verified')"
 
-verify-dist-gui:
-	@echo "Verifying GUI distribution (isolated install)..."
-	uv run --no-project --with ".[gui]" python -c "from nanomodem.gui.scenarios.mock_4_nodes import main; print('✅ GUI distribution verified')"
+verify-dist-demo:
+	@echo "Verifying demo distribution (isolated install)..."
+	uv run --no-project --with ".[demo]" python -c "from nanomodem.demo.scenarios.mock_4_nodes import main; print('✅ Demo distribution verified')"
 
 run-bridge:
 	uv run nanomodem-bridge
-
-run-broker:
-	@echo ""
-	@echo "Step 1: Create two virtual serial pairs."
-	@echo "  Run each command in its own terminal and note the two PTY paths printed:"
-	@echo ""
-	@echo "    socat -d -d pty,raw,echo=0 pty,raw,echo=0"
-	@echo "    socat -d -d pty,raw,echo=0 pty,raw,echo=0"
-	@echo ""
-	@echo "Step 2: Run the broker (replace PTY paths with the ones from step 1):"
-	@echo ""
-	@echo "    uv run python scripts/serial_broker.py <A_broker> <A_node> <B_broker> <B_node>"
-	@echo ""
-	@echo "  Example:"
-	@echo "    uv run python scripts/serial_broker.py /dev/pts/2 /dev/pts/3 /dev/pts/4 /dev/pts/5"
-	@echo ""
-	@echo "Step 3: Connect nodes to their PTYs (A_node and B_node paths from step 1)."
-	@echo "  Edit NODE_POSITIONS in scripts/serial_broker.py to set simulated positions."
-	@echo ""

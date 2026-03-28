@@ -8,7 +8,7 @@ from __future__ import annotations
 import tkinter as tk
 from typing import Optional
 
-from nanomodem.gui.controller import ControllerWindow
+from nanomodem.demo.controller import ControllerWindow
 from nanomodem.transports.mock import MockEther, MockTransport
 from nanomodem.types import Coord
 

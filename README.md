@@ -12,10 +12,10 @@ Install the core library (includes `scipy` and `pyserial`):
 pip install git+https://github.com/foxpoint-se/nanomodem-python.git
 ```
 
-To include the GUI demo and its dependencies:
+To include the demo scenarios and their dependencies:
 
 ```bash
-pip install "nanomodem[gui] @ git+https://github.com/foxpoint-se/nanomodem-python.git"
+pip install "nanomodem[demo] @ git+https://github.com/foxpoint-se/nanomodem-python.git"
 ```
 
 ### For Developers (Local)
@@ -41,7 +41,7 @@ make verify-dist-gui  # Verify the GUI extra is installable in a clean environme
 
 ## Usage
 
-### GUI Demo (requires `[gui]` extra)
+### Demo Scenarios (requires `[demo]` extra)
 
 **4-node mock simulation (1 host + 3 beacons):**
 
@@ -112,7 +112,7 @@ python3 -m nanomodem                                    # Mock demo (no hardware
 python3 -m nanomodem --port /dev/ttyUSB0 --node-id 001  # Real hardware
 ```
 
-For complete scenarios with GUI, trilateration, and multi-node setups, see `src/nanomodem/gui/scenarios/`.
+For complete scenarios with GUI, trilateration, and multi-node setups, see `src/nanomodem/demo/scenarios/`.
 
 ## Architecture
 
@@ -170,7 +170,7 @@ graph TD
 │       │   └── v3.py           # NanomodemV3Driver (modem command protocol)
 │       ├── codecs/
 │       │   └── v3.py           # Codec (message body encoding)
-│       ├── gui/                # GUI demo (installed with [gui] extra)
+│       ├── demo/               # Demo scenarios (installed with [demo] extra)
 │       │   ├── controller.py   # Per-node ControllerWindow
 │       │   └── scenarios/
 │       │       ├── mock_4_nodes.py  # 4-node simulation

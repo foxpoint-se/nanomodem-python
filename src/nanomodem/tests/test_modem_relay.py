@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import pytest
 
-from nanomodem.gui.scenarios.modem_relay import (
+from nanomodem.demo.scenarios.modem_relay import (
     broadcast_ack,
     broadcast_relay,
     distance_metres,

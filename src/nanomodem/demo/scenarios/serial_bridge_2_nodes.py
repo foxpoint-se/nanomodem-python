@@ -20,9 +20,8 @@ from typing import Callable, Optional
 import serial
 
 from nanomodem.codecs.v3 import Codec
-from nanomodem.drivers.v3 import NanomodemV3Driver
-from nanomodem.gui.controller import ControllerWindow
-from nanomodem.gui.scenarios.modem_relay import (
+from nanomodem.demo.controller import ControllerWindow
+from nanomodem.demo.scenarios.modem_relay import (
     broadcast_ack,
     broadcast_relay,
     distance_metres,
@@ -31,6 +30,7 @@ from nanomodem.gui.scenarios.modem_relay import (
     ping_ack,
     range_response,
 )
+from nanomodem.drivers.v3 import NanomodemV3Driver
 from nanomodem.transports.serial import SerialTransport
 from nanomodem.types import Coord
 
