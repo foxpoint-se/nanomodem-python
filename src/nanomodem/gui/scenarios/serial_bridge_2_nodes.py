@@ -10,7 +10,6 @@ Prerequisite: socat must be installed.
 from __future__ import annotations
 
 import atexit
-import math
 import re
 import subprocess
 import threading
@@ -23,6 +22,15 @@ import serial
 from nanomodem.codecs.v3 import Codec
 from nanomodem.drivers.v3 import NanomodemV3Driver
 from nanomodem.gui.controller import ControllerWindow
+from nanomodem.gui.scenarios.modem_relay import (
+    broadcast_ack,
+    broadcast_relay,
+    distance_metres,
+    parse_broadcast,
+    parse_ping,
+    ping_ack,
+    range_response,
+)
 from nanomodem.transports.serial import SerialTransport
 from nanomodem.types import Coord
 
@@ -39,7 +47,6 @@ POSITIONS: dict[str, tuple[float, float, float]] = {
     "002": (59.310500, 17.974500, 0.0),
 }
 
-_PING_RE = re.compile(rb"^\$P(\d{3})$")
 _SOCAT_PTY_RE = re.compile(r"PTY is (/dev/[^\s]+)")
 
 
@@ -85,34 +92,6 @@ def _log_bus(label: str, raw: bytes) -> None:
     print(f"[{ts}] [{label}] {raw.decode('ascii', errors='replace').strip()}")
 
 
-def _distance_metres(
-    a: tuple[float, float, float],
-    b: tuple[float, float, float],
-) -> float:
-    lat_a, lon_a, depth_a = a
-    lat_b, lon_b, depth_b = b
-    lat_m = (lat_b - lat_a) * 111320.0
-    avg_lat = math.radians((lat_a + lat_b) / 2.0)
-    lon_m = (lon_b - lon_a) * 111320.0 * math.cos(avg_lat)
-    depth_m = depth_b - depth_a
-    return math.sqrt(lat_m**2 + lon_m**2 + depth_m**2)
-
-
-def _build_range_response(
-    sender_id: str,
-    target_id: str,
-    positions: dict[str, tuple[float, float, float]],
-) -> Optional[bytes]:
-    sender_pos = positions.get(sender_id)
-    target_pos = positions.get(target_id)
-    if sender_pos is None or target_pos is None:
-        print(f"[BROKER] Unknown node in range request: {sender_id!r} → {target_id!r}")
-        return None
-    distance = _distance_metres(sender_pos, target_pos)
-    timestamp = round((distance / SOUND_SPEED) / 3.125e-5)
-    return f"#R{target_id}T{timestamp:05d}\r\n".encode("ascii")
-
-
 def _relay_loop(
     src: serial.Serial,
     dst: serial.Serial,
@@ -130,16 +109,30 @@ def _relay_loop(
 
             _log_bus(label, raw)
 
-            m = _PING_RE.match(raw.strip())
-            if m:
-                target_id = m.group(1).decode("ascii")
-                response = _build_range_response(src_id, target_id, positions)
-                if response is not None:
-                    _log_bus(f"BROKER→{src_id}", response)
-                    src.write(response)
-            else:
+            broadcast = parse_broadcast(raw)
+            if broadcast is not None:
+                nn, body = broadcast
+                src.write(broadcast_ack(nn))
                 with dst_lock:
-                    dst.write(raw)
+                    dst.write(broadcast_relay(src_id, nn, body))
+                continue
+
+            target_id = parse_ping(raw)
+            if target_id is not None:
+                src.write(ping_ack(target_id))
+                sender_pos = positions.get(src_id)
+                target_pos = positions.get(target_id)
+                if sender_pos is not None and target_pos is not None:
+                    dist = distance_metres(sender_pos, target_pos)
+                    resp = range_response(target_id, dist, SOUND_SPEED)
+                    _log_bus(f"BROKER→{src_id}", resp)
+                    src.write(resp)
+                else:
+                    print(f"[BROKER] Unknown node in range request: {src_id!r} → {target_id!r}")
+                continue
+
+            with dst_lock:
+                dst.write(raw)
 
         except serial.SerialException as e:
             print(f"[BROKER] Serial error on {label}: {e}")
