@@ -13,6 +13,7 @@
 - [ ] Broker logs every raw line to stdout with direction and timestamp (e.g. `[A→B] $B32P001...`)
 - [ ] When broker sees `$Pxxx`, synthesize a `#RxxxTyyyyy` response back to sender using hardcoded positions
 - [ ] Hardcoded node positions are defined at top of script (easy to change)
+- [ ] Figure out if we should add any of this to the "convenient scripts" defined in toml or Makefile or similar
 - [ ] Find out if there are unit tests that should be added at this point
 
 **Outcome:** Run `python scripts/serial_broker.py` and see a live bus monitor in the terminal.
