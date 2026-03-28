@@ -1,0 +1,40 @@
+---
+description: Project architecture and context for the codebase
+alwaysApply: true
+---
+
+# Project Context
+
+## What This Is
+
+A Python library for acoustic communication. Core purpose: enable pluggable transport and driver layers for flexible acoustic modem integration.
+
+## Architecture
+
+**Pluggable Design Pattern**: The codebase uses Protocol-based interfaces to allow swappable implementations:
+- **Transports** (e.g., serial, UDP) - handle communication channels
+- **Drivers** (e.g., device command protocols) - handle device-specific logic
+- **Codecs** (e.g., data encoding/decoding) - handle message formatting
+- **Node** - high-level orchestrator that uses DI to combine the above
+
+## Key Files & Patterns
+
+- `protocols.py` - Defines Protocol interfaces (TransportProtocol, DriverProtocol, CodecProtocol)
+- `types.py` - Domain types (dataclasses for shared data structures)
+- `node.py` - Main public API; uses DI to accept transport/driver/codec
+- `tests/` - Full test coverage with clear behavioral test names
+
+## Important Notes
+
+- All public APIs use explicit type hints; avoid `Any`
+- Use `dataclass` for domain data, `Protocol` for interfaces
+- Tests use `test__should_[behavior]_when_[circumstances]` naming
+- Run `make test` frequently—it's the verification standard
+- Focus on making transport/driver/codec implementations swappable without core API changes
+
+## Packaging & Installation
+
+- **Dependency management**: `pyproject.toml` (setuptools-based, no Poetry)
+- **Virtual environment**: `.venv` (dot-prefix, as per README)
+- **Installation command**: `pip install -e ".[dev]"` (editable mode + dev dependencies)
+- **Setup targets**: Use `make install` to create/update `.venv` and install deps; `make clean-env` to delete it

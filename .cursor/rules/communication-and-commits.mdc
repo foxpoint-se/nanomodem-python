@@ -1,0 +1,74 @@
+---
+description: Communication style, handover procedures, and commit conventions
+alwaysApply: true
+---
+
+# Communication & Development Workflow
+
+## Communication Style
+
+- Be very concise in responses while staying clear and to the point.
+- If there is any risk of unclarity or ambiguity, explicitly confirm intent before proceeding.
+- If the prompt is clearly a question (e.g. "how do I...?", "can I...?"), answer it; do not implement anything until confirmation.
+
+## Handover & Verification
+
+**Always run `make test` and confirm everything compiles/type-checks before indicating completion.**
+
+After making changes, always provide a concise verification recipe:
+- Max 5 commands to verify the implementation
+- Use the same commands from development to ensure a "sanity check"
+- If verification requires more than 5 commands, suggest improvements to DevX (e.g., new Makefile targets or scripts)
+
+Example:
+
+```bash
+make test          # Run all tests
+make lint          # Check code quality
+make build         # Verify package builds
+```
+
+Aim for "popular repository README" clarity—getting started and verifying changes should be immediate and obvious.
+
+## Commit Conventions
+
+### Message Format
+
+- Use **Conventional Commits** for summary lines: `feat:`, `fix:`, `refactor:`, `docs:`, `test:`, `chore:`
+- Focus summary on the **why** rather than the **what**
+- Add detailed explanation in commit body if needed
+
+```
+feat: simplify transport initialization with dependency injection
+
+Previously, transports required complex setup steps. Now DI 
+handles it cleanly and makes testing easier.
+```
+
+### Authorship & Metadata
+
+- Do not include Cursor or AI agents as co-authors
+- Do not add trailers like "Made-with: Cursor" to commit messages
+- Keep commits clean and focused on the code change
+
+### Examples
+
+```
+# ✅ GOOD - Explains the why
+fix: handle empty codec data gracefully
+
+Clients were seeing crashes when codec returned empty data.
+Added validation to gracefully skip empty buffers.
+
+# ❌ BAD - Just describes the what
+fix: add empty data check in codec handler
+
+# ✅ GOOD - Concise and purposeful
+refactor: consolidate transport logic into protocol
+
+Removes duplication across serial and UDP transports
+by extracting common patterns into TransportProtocol.
+
+# ❌ BAD - Unclear purpose
+refactor: move stuff around in transport
+```
