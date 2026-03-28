@@ -23,12 +23,12 @@
 ### Phase 2: New Launch Scenario
 *Goal: Two nodes running with `SerialTransport`, pointed at the virtual ports, using the real driver and codec.*
 
-- [ ] Create `src/nanomodem/gui/scenarios/serial_bridge_2_nodes.py`
-- [ ] Wire up two `ControllerWindow`s, each using `SerialTransport` on their respective virtual TTY
-- [ ] Pass `get_sim_pos_callback` / `set_sim_pos_callback` that read/write into the broker's position table
-- [ ] Node A gets the sim pos panel (movable); Node B is static (no sim callbacks)
-- [ ] Add a `make run-bridge` Makefile target to launch this scenario
-- [ ] Find out if there are unit tests that should be added at this point
+- [x] Create `src/nanomodem/gui/scenarios/serial_bridge_2_nodes.py`
+- [x] Wire up two `ControllerWindow`s, each using `SerialTransport` on their respective virtual TTY
+- [x] Pass `get_sim_pos_callback` / `set_sim_pos_callback` that read/write into the broker's position table
+- [x] Node A gets the sim pos panel (movable); Node B is static (no sim callbacks)
+- [x] Add a `make run-bridge` Makefile target to launch this scenario
+- [x] Find out if there are unit tests that should be added at this point
 
 **Outcome:** Two GUI windows open. Broker is running. Everything wired.
 
@@ -37,11 +37,11 @@
 ### Phase 3: Verify End-to-End Behaviour
 *Goal: Manually walk through the real scenario and confirm everything behaves as expected.*
 
-- [ ] Node A broadcasts position → broker relays raw bytes → Node B receives and updates registry
-- [ ] Node A requests range to Node B → broker synthesizes `#R` response → Node A computes distance
-- [ ] Move Node A's sim pos in GUI → broker uses new position → range value changes accordingly
-- [ ] Inspect broker terminal to confirm codec output looks correct (32-byte position body, etc.)
-- [ ] Find out if there are unit tests that should be added at this point
+- [x] Node A broadcasts position → broker relays raw bytes → Node B receives and updates registry
+- [x] Node A requests range to Node B → broker synthesizes `#R` response → Node A computes distance
+- [x] Move Node A's sim pos in GUI → broker uses new position → range value changes accordingly
+- [x] Inspect broker terminal to confirm codec output looks correct (32-byte position body, etc.)
+- [x] Find out if there are unit tests that should be added at this point
 
 **Outcome:** Everything behaves exactly as it will in water, verified visually.
 
@@ -53,5 +53,5 @@
 - [ ] Maybe rename the gui folder to something better? app? runners?
 - [ ] Consolidate the broker. Should be one thing, used across all scripts or launch files that need it.
 - [ ] Go through everything and see if anything smells.
-- [ ] Should the "simulated position" field even be in the gui for this scenario? How is it used?
+- [x] Should the "simulated position" field even be in the gui for this scenario? How is it used?
 - [x] Maybe (probably?) the mock position should be updated when you set the actual position? Kind of makes sense, doesn't it?
