@@ -73,15 +73,21 @@ class NetworkMockTransport:
             name=f"network-{node_id}-reader",
         )
         self._reader_started = False
+        self._stopped = False
 
     def start(self) -> None:
         """Start the background reader thread."""
+        if self._reader_started:
+            return
         self._running = True
         self._reader_thread.start()
         self._reader_started = True
 
     def stop(self) -> None:
         """Stop the background reader and close the socket."""
+        if self._stopped:
+            return
+        self._stopped = True
         self._running = False
         with self._lock:
             try:

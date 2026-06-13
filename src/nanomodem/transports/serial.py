@@ -57,17 +57,27 @@ class SerialTransport:
             daemon=True,
             name=f"serial-{node_id}-reader",
         )
+        self._reader_started = False
+        self._stopped = False
 
     def start(self) -> None:
         """Start the background serial reader thread."""
+        if self._reader_started:
+            return
         self._running = True
         self._reader_thread.start()
+        self._reader_started = True
 
     def stop(self) -> None:
         """Stop the background reader and close the serial port."""
+        if self._stopped:
+            return
+        self._stopped = True
         self._running = False
-        self._reader_thread.join(timeout=2.0)
-        self._serial.close()
+        if self._reader_started:
+            self._reader_thread.join(timeout=2.0)
+        if self._serial.is_open:
+            self._serial.close()
 
     def broadcast_position(self, coord: Coord, depth: float) -> None:
         cmd = self._driver.format_broadcast(self.node_id, coord, depth)

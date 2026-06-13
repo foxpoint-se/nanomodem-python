@@ -95,7 +95,8 @@ def launch_single(
 
     # Serial mode: metadata (GPS, etc.) on a separate simulator TCP connection
     if world_host and world_port and acoustic_config:
-        _start_metadata_client(root, controller, world_host, world_port, acoustic_config)
+        metadata_client = _start_metadata_client(root, controller, world_host, world_port, acoustic_config)
+        controller.register_shutdown_callback(metadata_client.stop)
 
     verify_modem_id_at_startup(controller.node)
 

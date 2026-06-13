@@ -142,13 +142,19 @@ class SimulatorMetadataClient:
         self._timeout = timeout
         self._running = False
         self._thread: Optional[threading.Thread] = None
+        self._stopped = False
 
     def start(self) -> None:
+        if self._thread is not None:
+            return
         self._running = True
         self._thread = threading.Thread(target=self._run, daemon=True, name=f"sim-meta-{self._node_id}")
         self._thread.start()
 
     def stop(self) -> None:
+        if self._stopped:
+            return
+        self._stopped = True
         self._running = False
         if self._thread is not None:
             self._thread.join(timeout=2.0)

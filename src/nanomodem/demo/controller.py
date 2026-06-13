@@ -104,6 +104,8 @@ class ControllerWindow:
         self._edit_var = tk.StringVar()
         self._edit_var.trace_add("write", self._on_edit_var_changed)
         self._debounce_timer: Optional[str] = None
+        self._shutdown_callbacks: list[Callable[[], None]] = []
+        self._shutdown_done = False
 
         # --- Create the window ---
         self._window = tk.Toplevel(root)
@@ -145,6 +147,20 @@ class ControllerWindow:
     @property
     def node(self) -> AcousticNode:
         return self._node
+
+    def register_shutdown_callback(self, callback: Callable[[], None]) -> None:
+        """Run callback once when this window closes (e.g. stop metadata client)."""
+        self._shutdown_callbacks.append(callback)
+
+    def _shutdown(self) -> None:
+        if self._shutdown_done:
+            return
+        self._shutdown_done = True
+        for callback in self._shutdown_callbacks:
+            callback()
+        stop = getattr(self._node.transport, "stop", None)
+        if callable(stop):
+            stop()
 
     # ------------------------------------------------------------------ #
     #  UI construction                                                     #
@@ -434,6 +450,7 @@ class ControllerWindow:
         self._root.after(0, self._refresh_ui)
 
     def _on_close(self) -> None:
+        self._shutdown()
         self._window.destroy()
         remaining = [w for w in self._root.winfo_children() if isinstance(w, tk.Toplevel) and w.winfo_exists()]
         if not remaining:
