@@ -58,6 +58,8 @@ POSITIONS: dict[str, tuple[float, float, float] | None] = {
 
 HEARD_DATA_PACKET: dict[str, bool] = {}
 
+PortRegistry = dict[str, tuple[serial.Serial, threading.Lock]]
+
 _SOCAT_PTY_RE = re.compile(r"PTY is (/dev/[^\s]+)")
 
 
@@ -102,63 +104,48 @@ def _log_bus(label: str, raw: bytes) -> None:
     print(format_serial_log(label, "", raw))
 
 
-def _write_to_node(
-    node_id: str,
-    data: bytes,
-    src_id: str,
-    src: serial.Serial,
-    dst: serial.Serial,
-    dst_lock: threading.Lock,
-) -> None:
+def _write_to_node(node_id: str, data: bytes, ports: PortRegistry) -> None:
+    port, lock = ports[node_id]
     _log_bus(f"BROKER→{node_id}", data)
-    if node_id == src_id:
-        src.write(data)
-    else:
-        with dst_lock:
-            dst.write(data)
+    with lock:
+        port.write(data)
 
 
 def _handle_relay_command(
     command: bytes,
-    src: serial.Serial,
-    dst: serial.Serial,
     src_id: str,
+    peer_id: str,
     label: str,
     positions: dict[str, tuple[float, float, float] | None],
-    dst_lock: threading.Lock,
+    ports: PortRegistry,
     heard_data_packet: dict[str, bool],
 ) -> None:
     _log_bus(label, command)
 
     def send_message(node_id: str, data: bytes) -> None:
-        _write_to_node(node_id, data, src_id, src, dst, dst_lock)
+        _write_to_node(node_id, data, ports)
 
     if parse_status_query(command):
-        response = status_response(src_id, MOCK_STATUS_VOLTAGE_RAW)
-        _log_bus(f"BROKER→{src_id}", response)
-        src.write(response)
+        send_message(src_id, status_response(src_id, MOCK_STATUS_VOLTAGE_RAW))
         return
 
     broadcast = parse_broadcast(command)
     if broadcast is not None:
         nn, body = broadcast
-        src.write(broadcast_ack(nn))
-        with dst_lock:
-            dst.write(broadcast_relay(src_id, nn, body))
+        send_message(src_id, broadcast_ack(nn))
+        send_message(peer_id, broadcast_relay(src_id, nn, body))
         return
 
     target_id = parse_ping(command)
     if target_id is not None:
-        src.write(ping_ack(target_id))
+        send_message(src_id, ping_ack(target_id))
         sender_pos = positions.get(src_id)
         target_pos = positions.get(target_id)
         if sender_pos is not None and target_pos is not None:
             coord_src = Coord(lat=sender_pos[0], lon=sender_pos[1])
             coord_dst = Coord(lat=target_pos[0], lon=target_pos[1])
             dist = calculate_distance_3d(coord_src, sender_pos[2], coord_dst, target_pos[2])
-            resp = range_response(target_id, dist, SOUND_SPEED)
-            _log_bus(f"BROKER→{src_id}", resp)
-            src.write(resp)
+            send_message(src_id, range_response(target_id, dist, SOUND_SPEED))
         else:
             print(f"[BROKER] Unknown node in range request: {src_id!r} → {target_id!r}")
         return
@@ -183,18 +170,16 @@ def _handle_relay_command(
         )
         return
 
-    with dst_lock:
-        dst.write(command)
+    send_message(peer_id, command)
 
 
 def _relay_loop(
     src: serial.Serial,
-    dst: serial.Serial,
     src_id: str,
-    dst_id: str,
+    peer_id: str,
     label: str,
     positions: dict[str, tuple[float, float, float] | None],
-    dst_lock: threading.Lock,
+    ports: PortRegistry,
     heard_data_packet: dict[str, bool],
 ) -> None:
     buffer = b""
@@ -211,7 +196,7 @@ def _relay_loop(
                     break
                 command, buffer = split
                 _handle_relay_command(
-                    command, src, dst, src_id, label, positions, dst_lock, heard_data_packet
+                    command, src_id, peer_id, label, positions, ports, heard_data_packet
                 )
 
         except serial.SerialException as e:
@@ -230,16 +215,19 @@ def _start_broker_threads(
 ) -> None:
     lock_a = threading.Lock()
     lock_b = threading.Lock()
+    ports: PortRegistry = {
+        node_a_id: (port_a, lock_a),
+        node_b_id: (port_b, lock_b),
+    }
     threading.Thread(
         target=_relay_loop,
         args=(
             port_a,
-            port_b,
             node_a_id,
             node_b_id,
             f"{node_a_id}→{node_b_id}",
             positions,
-            lock_b,
+            ports,
             HEARD_DATA_PACKET,
         ),
         daemon=True,
@@ -249,12 +237,11 @@ def _start_broker_threads(
         target=_relay_loop,
         args=(
             port_b,
-            port_a,
             node_b_id,
             node_a_id,
             f"{node_b_id}→{node_a_id}",
             positions,
-            lock_a,
+            ports,
             HEARD_DATA_PACKET,
         ),
         daemon=True,

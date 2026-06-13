@@ -162,7 +162,8 @@ class HybridBackend:
         self.client_threads: list[threading.Thread] = []
 
         # Driver for parsing acoustic messages (reuse like Controllers do)
-        self._driver = NanomodemV3Driver(Codec())
+        self._codec = Codec()
+        self._driver = NanomodemV3Driver(self._codec)
 
         self._heard_data_packet: dict[str, bool] = {}
 
@@ -395,19 +396,22 @@ class HybridBackend:
         logger.error("Serial error for node %s: %s", node_id, error)
         self._cleanup_node(node_id)
 
+    def _apply_belief_update(self, msg: PositionMessage) -> None:
+        self.state.set_belief_position(msg.node_id, msg.coord, msg.depth)
+        if self.on_interpreted:
+            self.on_interpreted(
+                f"Belief update: {msg.node_id} at ({msg.coord.lat:.4f}, {msg.coord.lon:.4f}, {msg.depth:.1f}m)"
+            )
+
     def _broker_message(self, sender_id: str, data: bytes) -> None:
         """Broker acoustic message routing based on physical positions."""
         if self.on_raw_traffic:
             self.on_raw_traffic(sender_id, data)
 
         line = data.decode("ascii", errors="replace").strip()
-        msg = self._driver.parse_line(line)
-        if isinstance(msg, PositionMessage):
-            self.state.set_belief_position(msg.node_id, msg.coord, msg.depth)
-            if self.on_interpreted:
-                self.on_interpreted(
-                    f"Belief update: {msg.node_id} at ({msg.coord.lat:.4f}, {msg.coord.lon:.4f}, {msg.depth:.1f}m)"
-                )
+        parsed = self._driver.parse_line(line)
+        if isinstance(parsed, PositionMessage):
+            self._apply_belief_update(parsed)
 
         if parse_status_query(data):
             self.send_message(
@@ -419,6 +423,9 @@ class HybridBackend:
         broadcast = parse_broadcast(data)
         if broadcast is not None:
             nn, body = broadcast
+            belief_msg = self._codec.decode(body)
+            if isinstance(belief_msg, PositionMessage):
+                self._apply_belief_update(belief_msg)
             self.send_message(sender_id, broadcast_ack(nn))
             sender_pos = self.state.get_physical_position(sender_id)
             if sender_pos is None:
