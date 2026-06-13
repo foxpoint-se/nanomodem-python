@@ -2,6 +2,56 @@
 
 <!-- version list -->
 
+## v1.2.0 (2026-06-13)
+
+### Bug Fixes
+
+- Address Copilot review on mock sync, UI races, and ack parsing
+  ([`ab7f3a3`](https://github.com/foxpoint-se/nanomodem-python/commit/ab7f3a348e12b8a6aa02561a1f8fc8be826b6dbb))
+
+- Address Copilot review on shutdown and relay parsing
+  ([`06ef155`](https://github.com/foxpoint-se/nanomodem-python/commit/06ef155af09d70c87f072773badeb4524f6a50ba))
+
+- Address Copilot review on simulator startup and metadata client
+  ([`b916cd5`](https://github.com/foxpoint-se/nanomodem-python/commit/b916cd58f95fc4ca6d3d836b47f4b53cf851017d))
+
+- Address second Copilot review batch on bridge and tests
+  ([`4b1f230`](https://github.com/foxpoint-se/nanomodem-python/commit/4b1f230af3d656ac4c54c176da34ed2ebb6d1a26))
+
+- Serial god-view scenario startup and simulator UI threading
+  ([`ab920d2`](https://github.com/foxpoint-se/nanomodem-python/commit/ab920d2fbd4bcfc837d0756219db8a2ae1c453d7))
+
+- Stop transports when controller window closes
+  ([`1c9dace`](https://github.com/foxpoint-se/nanomodem-python/commit/1c9dace9a1fc2a1eb74905b0d7c12d72ae8f8cce))
+
+- Track belief on outbound broadcasts and lock broker port writes
+  ([`696b071`](https://github.com/foxpoint-se/nanomodem-python/commit/696b071b88df19cd1d06133c1b57ca9b448b055e))
+
+### Chores
+
+- Tidy plans and document god-view serial scenario
+  ([`36644cb`](https://github.com/foxpoint-se/nanomodem-python/commit/36644cb095d38192b0816abdb5af5ebe24b1722e))
+
+### Features
+
+- God view simulator with unified metadata channel
+  ([`4884983`](https://github.com/foxpoint-se/nanomodem-python/commit/48849836766b340f1417b9ba5071fe68441cd715))
+
+- Relay test/quality simulation and parse v3 test broadcasts
+  ([`1f4f047`](https://github.com/foxpoint-se/nanomodem-python/commit/1f4f04735ab1fcc276eafbf9230f244f0238827d))
+
+- Transport-agnostic controller and serial logging
+  ([`d9395d1`](https://github.com/foxpoint-se/nanomodem-python/commit/d9395d1d05ad10ef571fde8e7131e9a4b0b9753e))
+
+- V3 modem status, test, and quality commands end-to-end
+  ([`2c70882`](https://github.com/foxpoint-se/nanomodem-python/commit/2c70882822c7673f8f1d48a16f1563b5d3b41aa1))
+
+### Testing
+
+- Poll for network transport events instead of fixed sleep
+  ([`670253d`](https://github.com/foxpoint-se/nanomodem-python/commit/670253d55fe702ba4ff2b3ce4632345cb69e9ce0))
+
+
 ## v1.1.0 (2026-03-28)
 
 ### Bug Fixes
