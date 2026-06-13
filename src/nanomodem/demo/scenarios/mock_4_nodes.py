@@ -6,14 +6,14 @@ Creates a mock scenario with 1 host + 3 beacons.
 from __future__ import annotations
 
 import tkinter as tk
-from typing import Optional, TypedDict
+from typing import TypedDict
 
 from nanomodem.demo.controller import ControllerWindow
 from nanomodem.transports.mock import MockEther, MockTransport
 from nanomodem.types import Coord
 
 MAP_CENTER = (59.310153, 17.975189)
-MAP_ZOOM = 17
+MAP_ZOOM = 16
 
 Config = TypedDict("Config", {"id": str, "name": str, "sim_pos": Coord, "initial_depth": float})
 
@@ -60,18 +60,10 @@ def launch_mock(root: tk.Tk) -> list[ControllerWindow]:
     controllers: list[ControllerWindow] = []
 
     # 3. Instantiate the Host (The node we pretend we are using)
-    # This one gets the callbacks so we can move its "Physical" location
-    # while its "Logical" location remains unknown.
     host_id: str = str(host_config["id"])
     host_sim_pos: Coord = host_config["sim_pos"]
     host_transport = MockTransport(host_id, ether)
     host_transport.position = host_sim_pos
-
-    def get_sim_pos(t: MockTransport = host_transport) -> Optional[Coord]:
-        return t.position
-
-    def set_sim_pos(coord: Coord, t: MockTransport = host_transport) -> None:
-        t.position = coord
 
     host_controller = ControllerWindow(
         root=root,
@@ -82,8 +74,6 @@ def launch_mock(root: tk.Tk) -> list[ControllerWindow]:
         map_center=MAP_CENTER,
         map_zoom=MAP_ZOOM,
         window_geometry=get_geometry(0),
-        get_sim_pos_callback=get_sim_pos,
-        set_sim_pos_callback=set_sim_pos,
     )
 
     # Set the initial logical depth for the host
@@ -116,8 +106,6 @@ def launch_mock(root: tk.Tk) -> list[ControllerWindow]:
             map_center=MAP_CENTER,
             map_zoom=MAP_ZOOM,
             window_geometry=get_geometry(i),
-            get_sim_pos_callback=None,  # Disabled for beacons
-            set_sim_pos_callback=None,
         )
 
         # Beacons know their own position in this scenario

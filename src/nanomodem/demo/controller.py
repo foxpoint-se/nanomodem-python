@@ -44,8 +44,6 @@ NODE_COLORS = [
 ]
 OWN_COLOR_OUTSIDE = "black"
 OWN_COLOR_CIRCLE = "white"
-SIM_COLOR_OUTSIDE = "black"
-SIM_COLOR_CIRCLE = "white"
 KNOWN_COLOR_CIRCLE = "white"
 MAP_SELECTION_COLOR_OUTSIDE = "grey"
 MAP_SELECTION_COLOR_CIRCLE = "white"
@@ -79,11 +77,9 @@ class ControllerWindow:
         transport: TransportProtocol,
         peer_ids: list[str],
         map_center: tuple[float, float] = (59.310153, 17.975189),
-        map_zoom: int = 17,
+        map_zoom: int = 16,
         position: Optional[Coord] = None,
         window_geometry: Optional[str] = None,
-        get_sim_pos_callback: Optional[Callable[[], Optional[Coord]]] = None,
-        set_sim_pos_callback: Optional[Callable[[Coord], None]] = None,
     ) -> None:
         self._root = root
         self._peer_ids = peer_ids
@@ -93,17 +89,12 @@ class ControllerWindow:
         self._icon_cache: dict[str, ImageTk.PhotoImage] = {}
 
         # Edit state
-        self._editing_target: Optional[str] = None  # "me_pos", "me_depth", "sim_pos", or node_id
+        self._editing_target: Optional[str] = None  # "me_pos", "me_depth", or node_id
         self._editing_type: Optional[str] = None  # "pos" or "depth"
         self._selection_marker_pos: Optional[tuple[float, float]] = None
         self._edit_var = tk.StringVar()
         self._edit_var.trace_add("write", self._on_edit_var_changed)
         self._debounce_timer: Optional[str] = None
-
-        # Simulated position callbacks
-        self._get_sim_pos = get_sim_pos_callback
-        self._set_sim_pos = set_sim_pos_callback
-        self._show_sim_pos_var = tk.BooleanVar(value=True)
 
         # --- Create the window ---
         self._window = tk.Toplevel(root)
@@ -115,7 +106,6 @@ class ControllerWindow:
         # --- Build all UI panels ---
         self._build_map(map_center, map_zoom)
         self._build_my_node_panel()
-        self._build_simulated_pos_panel()
         self._build_registry_panel()
         self._build_actions_panel()
         self._build_console()
@@ -212,41 +202,6 @@ class ControllerWindow:
         ttk.Entry(self._me_depth_edit_f, textvariable=self._edit_var, width=10).pack(side=tk.LEFT, padx=2)
         ttk.Button(self._me_depth_edit_f, text="Save", command=self._save_edit).pack(side=tk.LEFT, padx=2)
         ttk.Button(self._me_depth_edit_f, text="X", command=self._cancel_edit).pack(side=tk.LEFT)
-
-    def _build_simulated_pos_panel(self) -> None:
-        self._sim_pos_panel = ttk.LabelFrame(self._window, text="Simulated position (for ranging)")
-        self._sim_pos_panel.pack(fill=tk.X, padx=6, pady=3)
-        self._sim_pos_frame = ttk.Frame(self._sim_pos_panel)
-        self._sim_pos_frame.pack(fill=tk.X, padx=4, pady=4)
-
-        if self._get_sim_pos is None:
-            ttk.Label(self._sim_pos_frame, text="N/A (real mode)", foreground="gray").pack()
-            return
-
-        self._sim_pos_row = ttk.Frame(self._sim_pos_frame)
-        self._sim_pos_row.pack(fill=tk.X)
-        ttk.Label(self._sim_pos_row, text="Position:", foreground="gray", width=10).pack(side=tk.LEFT)
-
-        # Display sub-frame
-        self._sim_pos_display_f = ttk.Frame(self._sim_pos_row)
-        self._sim_pos_val_label = ttk.Label(self._sim_pos_display_f, text="—", font="monospace")
-        self._sim_pos_val_label.pack(side=tk.LEFT)
-        ttk.Button(
-            self._sim_pos_display_f, text="Edit mock pos", command=lambda: self._start_edit("sim_pos", "pos")
-        ).pack(side=tk.RIGHT)
-
-        # Edit sub-frame
-        self._sim_pos_edit_f = ttk.Frame(self._sim_pos_row)
-        ttk.Entry(self._sim_pos_edit_f, textvariable=self._edit_var, width=25).pack(side=tk.LEFT, padx=2)
-        ttk.Button(self._sim_pos_edit_f, text="Save", command=self._save_edit).pack(side=tk.LEFT, padx=2)
-        ttk.Button(self._sim_pos_edit_f, text="X", command=self._cancel_edit).pack(side=tk.LEFT)
-
-        ttk.Checkbutton(
-            self._sim_pos_frame,
-            text="Show simulated position on map",
-            variable=self._show_sim_pos_var,
-            command=self._refresh_map,
-        ).pack(anchor=tk.W, pady=(4, 0))
 
     def _build_registry_panel(self) -> None:
         frame = ttk.LabelFrame(self._window, text="Registry (known nodes)")
@@ -385,9 +340,6 @@ class ControllerWindow:
 
                 if target == "me_pos":
                     self._node.set_position(coord)
-                elif target == "sim_pos":
-                    if self._set_sim_pos:
-                        self._set_sim_pos(coord)
                 elif target is not None:
                     self._node.set_known_node_position(target, coord)
             else:
@@ -447,14 +399,7 @@ class ControllerWindow:
             self._log("Cannot calculate: need 3+ nodes with position and range.")
 
     def _handle_position_changed(self, pos: Optional[Coord]) -> None:
-        """Sync actual node position to sim position, then refresh UI.
-
-        When the node gains an actual position (manual set or trilateration),
-        the sim position is updated to match so that MockEther / broker use
-        the correct physical location for range calculation.
-        """
-        if pos is not None and self._set_sim_pos is not None:
-            self._set_sim_pos(pos)
+        """Refresh UI when node position changes."""
         self._root.after(0, self._refresh_ui)
 
     def _on_close(self) -> None:
@@ -469,7 +414,6 @@ class ControllerWindow:
 
     def _refresh_ui(self) -> None:
         self._refresh_my_node_panel()
-        self._refresh_sim_pos_panel()
         self._refresh_registry_panel()
         self._refresh_actions_dropdown()
         self._refresh_map()
@@ -497,20 +441,6 @@ class ControllerWindow:
             depth = self._node._depth
             val = f"{depth:.1f} m"
             self._me_depth_val_label.configure(text=val)
-
-    def _refresh_sim_pos_panel(self) -> None:
-        if self._get_sim_pos is None:
-            return
-
-        pos = self._get_sim_pos()
-        if self._editing_target == "sim_pos":
-            self._sim_pos_display_f.pack_forget()
-            self._sim_pos_edit_f.pack(side=tk.LEFT, fill=tk.X, expand=True)
-        else:
-            self._sim_pos_edit_f.pack_forget()
-            self._sim_pos_display_f.pack(side=tk.LEFT, fill=tk.X, expand=True)
-            val = f"{pos.lat:.6f}, {pos.lon:.6f}" if pos else "—"
-            self._sim_pos_val_label.configure(text=val)
 
     def _refresh_registry_panel(self) -> None:
         known = self._node.get_known_nodes()
@@ -607,7 +537,7 @@ class ControllerWindow:
 
     def _refresh_map(self) -> None:
         known = self._node.get_known_nodes()
-        current_ids = set(known.keys()) | {"me", "simulated", "selection"}
+        current_ids = set(known.keys()) | {"me", "selection"}
         stored_ids = set(self._markers.keys())
 
         # Remove markers for nodes no longer present
@@ -615,30 +545,21 @@ class ControllerWindow:
             self._delete_marker(nid)
             self._delete_path(nid)
 
-        # 1. Own position (Regular Black Pin)
+        # 1. Own position (Circle, transparent center)
         pos = self._node.get_position()
         if pos:
+            icon = self._get_circle_icon("black", transparent=True)
             self._update_or_create_marker(
                 "me",
                 pos.lat,
                 pos.lon,
                 text=f"{self._node.node_id} (me)",
-                icon=None,  # Use default pin
-                color_circle=OWN_COLOR_CIRCLE,
-                color_outside=OWN_COLOR_OUTSIDE,
+                icon=icon,
             )
         else:
             self._delete_marker("me")
 
-        # 2. Simulated position (Black ring, transparent center)
-        sim_pos = self._get_sim_pos() if self._get_sim_pos else None
-        if self._show_sim_pos_var.get() and sim_pos:
-            icon = self._get_circle_icon("black", transparent=True)
-            self._update_or_create_marker("simulated", sim_pos.lat, sim_pos.lon, text="Physical (Mock)", icon=icon)
-        else:
-            self._delete_marker("simulated")
-
-        # 3. Known nodes (Colored ring, transparent center)
+        # 2. Known nodes (Colored ring, transparent center)
         for nid, kn in sorted(known.items()):
             # Deterministic color based on ID
             try:
@@ -661,7 +582,7 @@ class ControllerWindow:
                 self._delete_marker(nid)
                 self._delete_path(nid)
 
-        # 4. Map Selection (Grey ring, transparent center)
+        # Map Selection (Grey ring, transparent center)
         if self._selection_marker_pos:
             icon = self._get_circle_icon("grey", transparent=True)
             self._update_or_create_marker(

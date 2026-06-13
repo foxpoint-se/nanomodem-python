@@ -35,7 +35,7 @@ from nanomodem.transports.serial import SerialTransport
 from nanomodem.types import Coord
 
 MAP_CENTER = (59.310153, 17.975189)
-MAP_ZOOM = 17
+MAP_ZOOM = 16
 SOUND_SPEED = 1500.0
 BAUD = 9600
 TIMEOUT = 0.1
@@ -232,7 +232,6 @@ def launch_bridge(root: tk.Tk) -> list[ControllerWindow]:
     win_h = min(780, screen_h)
 
     # 6. Instantiate ControllerWindows
-    # Node A: sim_pos panel enabled — moving it updates POSITIONS["001"] for the broker
     controller_a = ControllerWindow(
         root=root,
         node_id="001",
@@ -243,12 +242,8 @@ def launch_bridge(root: tk.Tk) -> list[ControllerWindow]:
         map_center=MAP_CENTER,
         map_zoom=MAP_ZOOM,
         window_geometry=f"{win_w}x{win_h}+0+0",
-        get_sim_pos_callback=_make_get_sim_pos("001"),
-        set_sim_pos_callback=_make_set_sim_pos("001"),
     )
 
-    # Node B: sim_pos callbacks wired so that setting Node B's actual position
-    # automatically updates POSITIONS["002"] used by the broker for ranging.
     controller_b = ControllerWindow(
         root=root,
         node_id="002",
@@ -259,8 +254,6 @@ def launch_bridge(root: tk.Tk) -> list[ControllerWindow]:
         map_center=MAP_CENTER,
         map_zoom=MAP_ZOOM,
         window_geometry=f"{win_w}x{win_h}+{win_w}+0",
-        get_sim_pos_callback=_make_get_sim_pos("002"),
-        set_sim_pos_callback=_make_set_sim_pos("002"),
     )
 
     # 7. Start serial readers

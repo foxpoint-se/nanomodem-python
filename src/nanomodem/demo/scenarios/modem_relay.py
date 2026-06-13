@@ -32,6 +32,28 @@ SOUND_SPEED_DEFAULT = 1500.0  # m/s
 # ------------------------------------------------------------------ #
 
 
+def split_modem_command(buffer: bytes) -> tuple[bytes, bytes] | None:
+    """Extract one complete outbound command from a serial buffer.
+
+    Modem commands have no line terminator. Returns (command, remainder) or None
+    if the buffer does not yet contain a full command.
+    """
+    buf = buffer.lstrip()
+    if buf.startswith(b"$B"):
+        if len(buf) < 4:
+            return None
+        body_len = int(buf[2:4])
+        total = 4 + body_len
+        if len(buf) < total:
+            return None
+        return buf[:total], buf[total:]
+    if buf.startswith(b"$P"):
+        if len(buf) < 5:
+            return None
+        return buf[:5], buf[5:]
+    return None
+
+
 def parse_broadcast(raw: bytes) -> tuple[str, bytes] | None:
     """Parse a broadcast command. Returns (nn, body) or None."""
     m = _BROADCAST_CMD_RE.match(raw.strip())

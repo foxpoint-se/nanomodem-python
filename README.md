@@ -61,10 +61,40 @@ uv run nanomodem-controller 001
 
 # Real hardware
 uv run nanomodem-controller 001 --port /dev/ttyUSB0
-
-# Local testing with socat
-uv run nanomodem-controller 001 --port /dev/pts/5
 ```
+
+**God View Simulator (multi-process testing):**
+
+The simulator provides a "God View" of physical truth separate from controller belief, enabling realistic multi-terminal testing without hardware.
+
+**Network mode (fast, multi-terminal logic testing):**
+
+```bash
+# Start simulator in one terminal
+uv run nanomodem-simulator
+
+# Connect controllers in other terminals
+uv run nanomodem-controller 001 --network 127.0.0.1:5555
+uv run nanomodem-controller 002 --network 127.0.0.1:5555
+```
+
+**Serial mode (hardware-accurate stack testing with PTYs):**
+
+```bash
+# Start simulator in one terminal
+uv run nanomodem-simulator
+
+# Create PTY pair for Node 001 in another terminal
+socat -d -d pty,raw,echo=0 pty,raw,echo=0
+# Note the PTY paths (e.g., /dev/pts/4 and /dev/pts/5)
+
+# Connect controller 001 in a third terminal
+uv run nanomodem-controller 001 --port /dev/pts/4 --world 127.0.0.1:5555 --world-port /dev/pts/5
+
+# Repeat for additional nodes
+```
+
+Serial mode tests the full `SerialTransport`, `Driver`, and `Codec` stack — the same code that runs on the boat. Acoustic data flows through the PTY, while metadata (registration, GPS updates) flows through a TCP connection to the simulator.
 
 ### Real Hardware (Single Modem on Serial)
 

@@ -19,11 +19,33 @@ from nanomodem.demo.scenarios.modem_relay import (
     parse_ping,
     ping_ack,
     range_response,
+    split_modem_command,
 )
 
 # ------------------------------------------------------------------ #
 #  Broadcast parsing                                                   #
 # ------------------------------------------------------------------ #
+
+
+def test__should_split_broadcast_command_without_newline() -> None:
+    raw = b"$B32P001+59.310000+017.975000005.000"
+    split = split_modem_command(raw)
+    assert split is not None
+    command, rest = split
+    assert command == raw
+    assert rest == b""
+
+
+def test__should_split_ping_command_without_newline() -> None:
+    split = split_modem_command(b"$P002")
+    assert split is not None
+    command, rest = split
+    assert command == b"$P002"
+    assert rest == b""
+
+
+def test__should_return_none_when_broadcast_is_incomplete() -> None:
+    assert split_modem_command(b"$B32P001") is None
 
 
 def test__should_parse_broadcast_command() -> None:
