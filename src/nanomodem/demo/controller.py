@@ -24,6 +24,7 @@ from nanomodem.constants import SOUND_SPEED_WATER_M_S
 from nanomodem.drivers.v3_spec import TEST_MESSAGE_PAYLOAD
 from nanomodem.node import AcousticNode
 from nanomodem.protocols import TransportProtocol
+from nanomodem.transports.mock import MockTransport
 from nanomodem.types import (
     Coord,
     KnownNode,
@@ -427,6 +428,9 @@ class ControllerWindow:
 
     def _handle_position_changed(self, pos: Optional[Coord]) -> None:
         """Refresh UI when node position changes."""
+        transport = self._node.transport
+        if isinstance(transport, MockTransport):
+            transport.position = pos
         self._root.after(0, self._refresh_ui)
 
     def _on_close(self) -> None:

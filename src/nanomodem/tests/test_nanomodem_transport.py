@@ -92,6 +92,7 @@ def test__should_normalize_leading_noise_before_dollar_response() -> None:
     msg = driver.parse_line("\xff$B32")
     assert isinstance(msg, LocalAckMessage)
     assert msg.command == "broadcast"
+    assert msg.target_id == "32"
 
 
 def test__should_normalize_leading_noise_before_hash_response() -> None:

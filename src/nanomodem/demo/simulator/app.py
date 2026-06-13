@@ -364,9 +364,9 @@ class SimulatorWindow:
         row = self._registry_rows[node_id]
 
         # Update transport info
-        if node_id in self.backend.serial_readers:
-            pty_path = self.backend.serial_readers[node_id].pty_path
-            transport_text = f"Serial: {pty_path}"
+        reader = self.backend.serial_readers.get(node_id)
+        if reader is not None:
+            transport_text = f"Serial: {reader.pty_path}"
         elif node_id in self.backend.network_acoustic_clients:
             transport_text = "Network: TCP"
         else:

@@ -23,9 +23,9 @@ Config = TypedDict("Config", {"id": str, "name": str, "sim_pos": Coord, "initial
 def launch_mock(root: tk.Tk) -> list[ControllerWindow]:
     """Create a mock scenario with 4 nodes, each in its own ControllerWindow.
 
-    The 'Host' node is the primary unit we are testing, so it receives
-    simulation callbacks to control its 'physical' position in the mock ether.
-    The 'Beacons' are static units that do not receive simulation controls.
+    Each node starts at a configured position in MockEther. Edits in the
+    controller UI update both AcousticNode state and MockTransport.position
+    so mock ranging stays aligned with the map.
     """
 
     ether = MockEther(sound_speed=SOUND_SPEED_WATER_M_S)

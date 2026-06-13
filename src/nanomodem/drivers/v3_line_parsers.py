@@ -47,8 +47,9 @@ def parse_local_ack_line(line: str) -> LocalAckMessage | None:
     if test_or_ping is not None:
         return test_or_ping
 
-    if BROADCAST_ACK_RE.match(line):
-        return LocalAckMessage(command="broadcast", target_id=None)
+    broadcast_match = BROADCAST_ACK_RE.match(line)
+    if broadcast_match is not None:
+        return LocalAckMessage(command="broadcast", target_id=broadcast_match.group(1))
 
     return None
 

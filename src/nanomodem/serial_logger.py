@@ -11,7 +11,6 @@ def format_serial_log(direction: str, node_id: str, data: bytes) -> str:
     Matches broker format: [HH:MM:SS.mmm] [direction node_id] decoded_data
     """
     ts = datetime.now().strftime("%H:%M:%S.%f")[:-3]
-    # Replace non-printable ASCII with replacement character
     decoded = data.decode("ascii", errors="replace").strip()
     # Ensure node_id context is clear even if empty
     context = f"{direction} {node_id}".strip()
