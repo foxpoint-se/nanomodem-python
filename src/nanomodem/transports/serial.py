@@ -16,6 +16,7 @@ from typing import Optional
 import serial
 
 from ..protocols import DriverProtocol, OnMessageCallback
+from ..serial_logger import format_serial_log
 from ..types import Coord
 
 logger = logging.getLogger(__name__)
@@ -82,7 +83,7 @@ class SerialTransport:
     def _write(self, data: bytes) -> None:
         with self._lock:
             self._serial.write(data)
-            logger.debug("TX: %s", data)
+            logger.info(format_serial_log("TX", self.node_id, data))
 
     def _read_loop(self) -> None:
         """Background thread: read lines from serial and dispatch."""
@@ -91,10 +92,10 @@ class SerialTransport:
                 raw = self._serial.readline()
                 if not raw:
                     continue
+                logger.info(format_serial_log("RX", self.node_id, raw))
                 line = raw.decode("ascii", errors="replace").strip()
                 if not line:
                     continue
-                logger.debug("RX: %s", line)
                 self._dispatch(line)
             except serial.SerialException:
                 logger.exception("Serial error")

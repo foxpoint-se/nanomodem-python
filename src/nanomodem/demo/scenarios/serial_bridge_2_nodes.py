@@ -14,23 +14,23 @@ import re
 import subprocess
 import threading
 import tkinter as tk
-from datetime import datetime
 from typing import Callable, Optional
 
 import serial
 
+from nanomodem.calculation import calculate_distance_3d
 from nanomodem.codecs.v3 import Codec
 from nanomodem.demo.controller import ControllerWindow
 from nanomodem.demo.scenarios.modem_relay import (
     broadcast_ack,
     broadcast_relay,
-    distance_metres,
     parse_broadcast,
     parse_ping,
     ping_ack,
     range_response,
 )
 from nanomodem.drivers.v3 import NanomodemV3Driver
+from nanomodem.serial_logger import format_serial_log
 from nanomodem.transports.serial import SerialTransport
 from nanomodem.types import Coord
 
@@ -88,8 +88,7 @@ def _open_broker_port(path: str) -> serial.Serial:
 
 
 def _log_bus(label: str, raw: bytes) -> None:
-    ts = datetime.now().strftime("%H:%M:%S.%f")[:-3]
-    print(f"[{ts}] [{label}] {raw.decode('ascii', errors='replace').strip()}")
+    print(format_serial_log(label, "", raw))
 
 
 def _relay_loop(
@@ -123,7 +122,10 @@ def _relay_loop(
                 sender_pos = positions.get(src_id)
                 target_pos = positions.get(target_id)
                 if sender_pos is not None and target_pos is not None:
-                    dist = distance_metres(sender_pos, target_pos)
+                    # sender_pos/target_pos are (lat, lon, depth) tuples
+                    coord_src = Coord(lat=sender_pos[0], lon=sender_pos[1])
+                    coord_dst = Coord(lat=target_pos[0], lon=target_pos[1])
+                    dist = calculate_distance_3d(coord_src, sender_pos[2], coord_dst, target_pos[2])
                     resp = range_response(target_id, dist, SOUND_SPEED)
                     _log_bus(f"BROKER→{src_id}", resp)
                     src.write(resp)

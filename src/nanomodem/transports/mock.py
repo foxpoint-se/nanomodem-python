@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-import math
 from typing import Callable, Optional
 
+from ..calculation import calculate_distance_3d
 from ..protocols import OnMessageCallback
 from ..types import (
     Coord,
@@ -69,21 +69,10 @@ class MockEther:
         sender.deliver(RangeResponseMessage(node_id=target_id, timestamp=timestamp))
 
     def _calculate_distance(self, a: MockTransport, b: MockTransport) -> float:
-        """Euclidean distance in meters using flat-earth approximation.
-
-        - 1 degree lat ~ 111320 m
-        - 1 degree lon ~ 111320 * cos(lat) m
-        """
+        """Euclidean distance in meters using flat-earth approximation."""
         assert a.position is not None
         assert b.position is not None
-
-        lat_m = (b.position.lat - a.position.lat) * 111320.0
-        avg_lat = math.radians((a.position.lat + b.position.lat) / 2.0)
-        lon_m = (b.position.lon - a.position.lon) * 111320.0 * math.cos(avg_lat)
-
-        depth_m = b.depth - a.depth
-
-        return math.sqrt(lat_m**2 + lon_m**2 + depth_m**2)
+        return calculate_distance_3d(a.position, a.depth, b.position, b.depth)
 
 
 class MockTransport:

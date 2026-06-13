@@ -11,6 +11,7 @@ help:
 	@echo "  make verify-dist  - Verify the library is installable and importable"
 	@echo "  make verify-dist-demo - Verify the demo scenarios are installable"
 	@echo "  make run-bridge   - Run the serial bridge scenario (requires socat)"
+	@echo "  make run-controller - Run a single controller (mock or serial)"
 
 install:
 	@echo "Installing dependencies with uv..."
@@ -48,3 +49,14 @@ verify-dist-demo:
 
 run-bridge:
 	uv run nanomodem-bridge
+
+run-controller:
+	@if [ -z "$(ID)" ]; then \
+		echo "Usage: make run-controller ID=001 [PORT=/dev/ttyUSB0]"; \
+		exit 1; \
+	fi
+	@if [ -z "$(PORT)" ]; then \
+		uv run nanomodem-controller $(ID); \
+	else \
+		uv run nanomodem-controller $(ID) --port $(PORT); \
+	fi

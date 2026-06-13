@@ -53,14 +53,17 @@ source .venv/bin/activate
 nanomodem-demo
 ```
 
-**Single node UI (requires node ID):**
+**Single node UI (mock or serial):**
 
 ```bash
-uv run nanomodem-node 001
+# Mock mode (no hardware)
+uv run nanomodem-controller 001
 
-# OR
-source .venv/bin/activate
-nanomodem-node 001
+# Real hardware
+uv run nanomodem-controller 001 --port /dev/ttyUSB0
+
+# Local testing with socat
+uv run nanomodem-controller 001 --port /dev/pts/5
 ```
 
 ### Real Hardware (Single Modem on Serial)

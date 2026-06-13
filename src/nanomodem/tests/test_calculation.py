@@ -4,10 +4,46 @@ import math
 
 import pytest
 
-from nanomodem.calculation import Calculation
+from nanomodem.calculation import Calculation, calculate_distance_3d
 from nanomodem.types import Coord
 
 calc = Calculation()
+
+
+# --- Distance calculation ---
+
+
+def test__should_calculate_correct_distance_between_two_points() -> None:
+    # 1 degree lat ~ 111320m
+    # At 60 deg lat, 1 degree lon ~ 111320 * cos(60) = 55660m
+    a = Coord(lat=60.0, lon=10.0)
+    b = Coord(lat=60.001, lon=10.001)
+    # lat_diff = 0.001 * 111320 = 111.32m
+    # lon_diff = 0.001 * 55660 = 55.66m
+    # depth_diff = 10m
+    # dist = sqrt(111.32^2 + 55.66^2 + 10^2) = sqrt(12392.1424 + 3098.0356 + 100) = sqrt(15590.178) = 124.86m
+    result = calculate_distance_3d(a, 0.0, b, 10.0)
+    assert abs(result - 124.86) < 0.01
+
+
+def test__should_return_zero_distance_for_same_point() -> None:
+    a = Coord(lat=63.0, lon=10.0)
+    result = calculate_distance_3d(a, 5.0, a, 5.0)
+    assert result == 0.0
+
+
+def test__should_calculate_pure_depth_distance() -> None:
+    a = Coord(lat=63.0, lon=10.0)
+    result = calculate_distance_3d(a, 0.0, a, 10.0)
+    assert abs(result - 10.0) < 1e-6
+
+
+def test__should_be_symmetrical() -> None:
+    a = Coord(lat=63.0, lon=10.0)
+    b = Coord(lat=63.001, lon=10.002)
+    dist_ab = calculate_distance_3d(a, 0.0, b, 5.0)
+    dist_ba = calculate_distance_3d(b, 5.0, a, 0.0)
+    assert abs(dist_ab - dist_ba) < 1e-9
 
 
 # --- Trilateration ---
