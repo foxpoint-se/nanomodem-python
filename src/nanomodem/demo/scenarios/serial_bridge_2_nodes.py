@@ -14,7 +14,6 @@ import re
 import subprocess
 import threading
 import tkinter as tk
-from typing import Callable, Optional
 
 import serial
 
@@ -264,28 +263,26 @@ def _start_broker_threads(
 
 
 # ------------------------------------------------------------------ #
-#  Sim pos callbacks                                                   #
+#  Broker position sync                                                #
 # ------------------------------------------------------------------ #
 
 
-def _make_get_sim_pos(node_id: str) -> Callable[[], Optional[Coord]]:
-    def get_sim_pos() -> Optional[Coord]:
-        pos = POSITIONS[node_id]
+def _sync_broker_positions(controllers: list[ControllerWindow]) -> None:
+    for controller in controllers:
+        node_id = controller.node.node_id
+        pos = controller.node.get_position()
         if pos is None:
-            return None
-        lat, lon, _ = pos
-        return Coord(lat=lat, lon=lon)
-
-    return get_sim_pos
+            POSITIONS[node_id] = None
+        else:
+            POSITIONS[node_id] = (pos.lat, pos.lon, controller.node.get_depth())
 
 
-def _make_set_sim_pos(node_id: str) -> Callable[[Coord], None]:
-    def set_sim_pos(coord: Coord) -> None:
-        existing = POSITIONS[node_id]
-        depth = existing[2] if existing is not None else 0.0
-        POSITIONS[node_id] = (coord.lat, coord.lon, depth)
+def _schedule_broker_position_sync(root: tk.Tk, controllers: list[ControllerWindow]) -> None:
+    def tick() -> None:
+        _sync_broker_positions(controllers)
+        root.after(250, tick)
 
-    return set_sim_pos
+    root.after(0, tick)
 
 
 # ------------------------------------------------------------------ #
@@ -360,7 +357,10 @@ def launch_bridge(root: tk.Tk) -> list[ControllerWindow]:
     verify_modem_id_at_startup(controller_a.node)
     verify_modem_id_at_startup(controller_b.node)
 
-    return [controller_a, controller_b]
+    controllers = [controller_a, controller_b]
+    _schedule_broker_position_sync(root, controllers)
+
+    return controllers
 
 
 def main() -> None:

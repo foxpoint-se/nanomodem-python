@@ -9,7 +9,7 @@ import threading
 from typing import Any
 
 from nanomodem.transports.network import NetworkMockTransport
-from nanomodem.types import Coord, PositionMessage
+from nanomodem.types import Coord, Message, PositionMessage
 
 
 class MockSimulatorServer:
@@ -43,11 +43,15 @@ class MockSimulatorServer:
         if not self.server_socket:
             return
         self.server_socket.settimeout(1.0)
-        try:
-            self.client_socket, _ = self.server_socket.accept()
+        while self.running and self.client_socket is None:
+            try:
+                self.client_socket, _ = self.server_socket.accept()
+            except socket.timeout:
+                continue
+            except OSError:
+                break
+        if self.client_socket and self.running:
             self._handle_client()
-        except socket.timeout:
-            pass
 
     def _handle_client(self) -> None:
         if not self.client_socket:
@@ -159,7 +163,7 @@ def test_network_transport_receives_acoustic_message() -> None:
         transport.start()
 
         # Register callback
-        received_messages = []
+        received_messages: list[Message] = []
         transport.on_message(lambda msg: received_messages.append(msg))
 
         # Wait for connection
@@ -239,7 +243,7 @@ def test_network_transport_request_range() -> None:
 
         # Verify it's a ping command
         data = base64.b64decode(msg["data"])
-        assert b"PING" in data or b"002" in data
+        assert data == b"$P002"
 
         transport.stop()
     finally:

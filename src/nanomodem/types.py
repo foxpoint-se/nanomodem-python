@@ -49,7 +49,7 @@ class PositionMessage:
 
 @dataclass(frozen=True)
 class RangeResponseMessage:
-    """A range response with a raw timestamp (100 µs units)."""
+    """A range response with a raw modem timestamp (31.25 µs units per count)."""
 
     node_id: str
     timestamp: int
