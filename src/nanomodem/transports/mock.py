@@ -2,17 +2,27 @@
 
 from __future__ import annotations
 
-import math
 from typing import Callable, Optional
 
+from ..calculation import Calculation, calculate_distance_3d
+from ..constants import SOUND_SPEED_WATER_M_S, validate_sound_speed
 from ..protocols import OnMessageCallback
 from ..types import (
     Coord,
+    LocalAckMessage,
     Message,
+    ModemStatusMessage,
     PositionMessage,
+    QualityIndicatorMessage,
     RangeResponseMessage,
     UnknownMessage,
+    V3TestBroadcastMessage,
 )
+
+MOCK_BYTES_CORRECTED = 3
+MOCK_STATUS_VOLTAGE_RAW = 48123
+
+_calculation = Calculation()
 
 
 class MockEther:
@@ -22,9 +32,10 @@ class MockEther:
     mock range calculation based on node positions.
     """
 
-    def __init__(self, sound_speed: float = 1500.0) -> None:
+    def __init__(self, sound_speed: float = SOUND_SPEED_WATER_M_S) -> None:
         self._transports: dict[str, MockTransport] = {}
-        self._sound_speed = sound_speed
+        self._sound_speed = validate_sound_speed(sound_speed)
+        self._heard_data_packet: dict[str, bool] = {}
 
     def register(self, transport: MockTransport) -> None:
         self._transports[transport.node_id] = transport
@@ -61,29 +72,58 @@ class MockEther:
 
         distance = self._calculate_distance(sender, target)
 
-        # Convert to timestamp in 100us units (per modem spec):
-        # timestamp = round(travel_time / 3.125e-5)
-        travel_time = distance / self._sound_speed
-        timestamp = round(travel_time / 3.125e-5)
-
+        timestamp = _calculation.distance_to_timestamp(distance, self._sound_speed)
         sender.deliver(RangeResponseMessage(node_id=target_id, timestamp=timestamp))
 
-    def _calculate_distance(self, a: MockTransport, b: MockTransport) -> float:
-        """Euclidean distance in meters using flat-earth approximation.
+    def request_test(self, sender_id: str, target_id: str) -> None:
+        """Simulate $T: local ack to sender, test #B from target to listeners."""
+        sender = self.get_transport(sender_id)
+        if sender is None:
+            return
 
-        - 1 degree lat ~ 111320 m
-        - 1 degree lon ~ 111320 * cos(lat) m
-        """
+        if self.get_transport(target_id) is None:
+            return
+
+        sender.deliver(
+            LocalAckMessage(command="test", target_id=target_id),
+        )
+
+        message = V3TestBroadcastMessage(node_id=target_id)
+        for listener in self.get_all_except(target_id):
+            listener.deliver(message)
+            self._heard_data_packet[listener.node_id] = True
+
+    def query_quality(self, node_id: str) -> None:
+        """Simulate $Q: bytes corrected if last data packet was heard."""
+        transport = self.get_transport(node_id)
+        if transport is None:
+            return
+
+        if self._heard_data_packet.pop(node_id, False):
+            transport.deliver(
+                QualityIndicatorMessage(bytes_corrected=MOCK_BYTES_CORRECTED),
+            )
+            return
+
+        transport.deliver(QualityIndicatorMessage(bytes_corrected=None))
+
+    def query_modem_status(self, node_id: str) -> None:
+        """Simulate $?: return stored address and default supply voltage raw."""
+        transport = self.get_transport(node_id)
+        if transport is None:
+            return
+        transport.deliver(
+            ModemStatusMessage(
+                node_id=node_id,
+                voltage_raw=MOCK_STATUS_VOLTAGE_RAW,
+            ),
+        )
+
+    def _calculate_distance(self, a: MockTransport, b: MockTransport) -> float:
+        """Euclidean distance in meters using flat-earth approximation."""
         assert a.position is not None
         assert b.position is not None
-
-        lat_m = (b.position.lat - a.position.lat) * 111320.0
-        avg_lat = math.radians((a.position.lat + b.position.lat) / 2.0)
-        lon_m = (b.position.lon - a.position.lon) * 111320.0 * math.cos(avg_lat)
-
-        depth_m = b.depth - a.depth
-
-        return math.sqrt(lat_m**2 + lon_m**2 + depth_m**2)
+        return calculate_distance_3d(a.position, a.depth, b.position, b.depth)
 
 
 class MockTransport:
@@ -115,6 +155,18 @@ class MockTransport:
     def request_range(self, target_id: str) -> None:
         """Request range to target. Ether simulates the response."""
         self._ether.request_range(self.node_id, target_id)
+
+    def request_test(self, target_id: str) -> None:
+        """Request test transmission from target. Ether simulates acoustic result."""
+        self._ether.request_test(self.node_id, target_id)
+
+    def query_quality(self) -> None:
+        """Query link quality on last received data packet."""
+        self._ether.query_quality(self.node_id)
+
+    def query_modem_status(self) -> None:
+        """Query modem address and supply voltage."""
+        self._ether.query_modem_status(self.node_id)
 
     def on_message(self, callback: OnMessageCallback) -> None:
         self._callback = callback

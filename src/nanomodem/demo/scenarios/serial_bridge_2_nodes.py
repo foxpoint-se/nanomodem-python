@@ -14,29 +14,38 @@ import re
 import subprocess
 import threading
 import tkinter as tk
-from datetime import datetime
-from typing import Callable, Optional
 
 import serial
 
+from nanomodem.calculation import calculate_distance_3d
 from nanomodem.codecs.v3 import Codec
+from nanomodem.constants import SOUND_SPEED_WATER_M_S
 from nanomodem.demo.controller import ControllerWindow
 from nanomodem.demo.scenarios.modem_relay import (
     broadcast_ack,
     broadcast_relay,
-    distance_metres,
     parse_broadcast,
     parse_ping,
+    parse_quality_query,
+    parse_status_query,
+    parse_test_request,
     ping_ack,
     range_response,
+    relay_quality_query,
+    relay_test_request,
+    split_modem_command,
+    status_response,
 )
+from nanomodem.demo.startup import verify_modem_id_at_startup
 from nanomodem.drivers.v3 import NanomodemV3Driver
+from nanomodem.serial_logger import format_serial_log
+from nanomodem.transports.mock import MOCK_STATUS_VOLTAGE_RAW
 from nanomodem.transports.serial import SerialTransport
 from nanomodem.types import Coord
 
 MAP_CENTER = (59.310153, 17.975189)
-MAP_ZOOM = 17
-SOUND_SPEED = 1500.0
+MAP_ZOOM = 16
+SOUND_SPEED = SOUND_SPEED_WATER_M_S
 BAUD = 9600
 TIMEOUT = 0.1
 
@@ -46,6 +55,10 @@ POSITIONS: dict[str, tuple[float, float, float] | None] = {
     "001": None,
     "002": None,
 }
+
+HEARD_DATA_PACKET: dict[str, bool] = {}
+
+PortRegistry = dict[str, tuple[serial.Serial, threading.Lock]]
 
 _SOCAT_PTY_RE = re.compile(r"PTY is (/dev/[^\s]+)")
 
@@ -88,51 +101,103 @@ def _open_broker_port(path: str) -> serial.Serial:
 
 
 def _log_bus(label: str, raw: bytes) -> None:
-    ts = datetime.now().strftime("%H:%M:%S.%f")[:-3]
-    print(f"[{ts}] [{label}] {raw.decode('ascii', errors='replace').strip()}")
+    print(format_serial_log(label, "", raw))
+
+
+def _write_to_node(node_id: str, data: bytes, ports: PortRegistry) -> None:
+    port, lock = ports[node_id]
+    _log_bus(f"BROKER→{node_id}", data)
+    with lock:
+        port.write(data)
+
+
+def _handle_relay_command(
+    command: bytes,
+    src_id: str,
+    peer_id: str,
+    label: str,
+    positions: dict[str, tuple[float, float, float] | None],
+    ports: PortRegistry,
+    heard_data_packet: dict[str, bool],
+) -> None:
+    _log_bus(label, command)
+
+    def send_message(node_id: str, data: bytes) -> None:
+        _write_to_node(node_id, data, ports)
+
+    if parse_status_query(command):
+        send_message(src_id, status_response(src_id, MOCK_STATUS_VOLTAGE_RAW))
+        return
+
+    broadcast = parse_broadcast(command)
+    if broadcast is not None:
+        nn, body = broadcast
+        send_message(src_id, broadcast_ack(nn))
+        send_message(peer_id, broadcast_relay(src_id, nn, body))
+        return
+
+    target_id = parse_ping(command)
+    if target_id is not None:
+        send_message(src_id, ping_ack(target_id))
+        sender_pos = positions.get(src_id)
+        target_pos = positions.get(target_id)
+        if sender_pos is not None and target_pos is not None:
+            coord_src = Coord(lat=sender_pos[0], lon=sender_pos[1])
+            coord_dst = Coord(lat=target_pos[0], lon=target_pos[1])
+            dist = calculate_distance_3d(coord_src, sender_pos[2], coord_dst, target_pos[2])
+            send_message(src_id, range_response(target_id, dist, SOUND_SPEED))
+        else:
+            print(f"[BROKER] Unknown node in range request: {src_id!r} → {target_id!r}")
+        return
+
+    test_target = parse_test_request(command)
+    if test_target is not None:
+        relay_test_request(
+            src_id,
+            test_target,
+            send_message=send_message,
+            get_listener_ids=lambda: list(positions.keys()),
+            known_node_ids=set(positions.keys()),
+            heard_data_packet=heard_data_packet,
+        )
+        return
+
+    if parse_quality_query(command):
+        relay_quality_query(
+            src_id,
+            send_message=send_message,
+            heard_data_packet=heard_data_packet,
+        )
+        return
+
+    send_message(peer_id, command)
 
 
 def _relay_loop(
     src: serial.Serial,
-    dst: serial.Serial,
     src_id: str,
-    dst_id: str,
+    peer_id: str,
     label: str,
     positions: dict[str, tuple[float, float, float] | None],
-    dst_lock: threading.Lock,
+    ports: PortRegistry,
+    heard_data_packet: dict[str, bool],
 ) -> None:
+    buffer = b""
     while True:
         try:
-            raw = src.readline()
-            if not raw:
+            chunk = src.read(src.in_waiting or 1)
+            if not chunk:
                 continue
+            buffer += chunk
 
-            _log_bus(label, raw)
-
-            broadcast = parse_broadcast(raw)
-            if broadcast is not None:
-                nn, body = broadcast
-                src.write(broadcast_ack(nn))
-                with dst_lock:
-                    dst.write(broadcast_relay(src_id, nn, body))
-                continue
-
-            target_id = parse_ping(raw)
-            if target_id is not None:
-                src.write(ping_ack(target_id))
-                sender_pos = positions.get(src_id)
-                target_pos = positions.get(target_id)
-                if sender_pos is not None and target_pos is not None:
-                    dist = distance_metres(sender_pos, target_pos)
-                    resp = range_response(target_id, dist, SOUND_SPEED)
-                    _log_bus(f"BROKER→{src_id}", resp)
-                    src.write(resp)
-                else:
-                    print(f"[BROKER] Unknown node in range request: {src_id!r} → {target_id!r}")
-                continue
-
-            with dst_lock:
-                dst.write(raw)
+            while True:
+                split = split_modem_command(buffer)
+                if split is None:
+                    break
+                command, buffer = split
+                _handle_relay_command(
+                    command, src_id, peer_id, label, positions, ports, heard_data_packet
+                )
 
         except serial.SerialException as e:
             print(f"[BROKER] Serial error on {label}: {e}")
@@ -150,43 +215,61 @@ def _start_broker_threads(
 ) -> None:
     lock_a = threading.Lock()
     lock_b = threading.Lock()
+    ports: PortRegistry = {
+        node_a_id: (port_a, lock_a),
+        node_b_id: (port_b, lock_b),
+    }
     threading.Thread(
         target=_relay_loop,
-        args=(port_a, port_b, node_a_id, node_b_id, f"{node_a_id}→{node_b_id}", positions, lock_b),
+        args=(
+            port_a,
+            node_a_id,
+            node_b_id,
+            f"{node_a_id}→{node_b_id}",
+            positions,
+            ports,
+            HEARD_DATA_PACKET,
+        ),
         daemon=True,
         name="relay-a",
     ).start()
     threading.Thread(
         target=_relay_loop,
-        args=(port_b, port_a, node_b_id, node_a_id, f"{node_b_id}→{node_a_id}", positions, lock_a),
+        args=(
+            port_b,
+            node_b_id,
+            node_a_id,
+            f"{node_b_id}→{node_a_id}",
+            positions,
+            ports,
+            HEARD_DATA_PACKET,
+        ),
         daemon=True,
         name="relay-b",
     ).start()
 
 
 # ------------------------------------------------------------------ #
-#  Sim pos callbacks                                                   #
+#  Broker position sync                                                #
 # ------------------------------------------------------------------ #
 
 
-def _make_get_sim_pos(node_id: str) -> Callable[[], Optional[Coord]]:
-    def get_sim_pos() -> Optional[Coord]:
-        pos = POSITIONS[node_id]
+def _sync_broker_positions(controllers: list[ControllerWindow]) -> None:
+    for controller in controllers:
+        node_id = controller.node.node_id
+        pos = controller.node.get_position()
         if pos is None:
-            return None
-        lat, lon, _ = pos
-        return Coord(lat=lat, lon=lon)
-
-    return get_sim_pos
+            POSITIONS[node_id] = None
+        else:
+            POSITIONS[node_id] = (pos.lat, pos.lon, controller.node.get_depth())
 
 
-def _make_set_sim_pos(node_id: str) -> Callable[[Coord], None]:
-    def set_sim_pos(coord: Coord) -> None:
-        existing = POSITIONS[node_id]
-        depth = existing[2] if existing is not None else 0.0
-        POSITIONS[node_id] = (coord.lat, coord.lon, depth)
+def _schedule_broker_position_sync(root: tk.Tk, controllers: list[ControllerWindow]) -> None:
+    def tick() -> None:
+        _sync_broker_positions(controllers)
+        root.after(250, tick)
 
-    return set_sim_pos
+    root.after(0, tick)
 
 
 # ------------------------------------------------------------------ #
@@ -230,7 +313,6 @@ def launch_bridge(root: tk.Tk) -> list[ControllerWindow]:
     win_h = min(780, screen_h)
 
     # 6. Instantiate ControllerWindows
-    # Node A: sim_pos panel enabled — moving it updates POSITIONS["001"] for the broker
     controller_a = ControllerWindow(
         root=root,
         node_id="001",
@@ -241,12 +323,8 @@ def launch_bridge(root: tk.Tk) -> list[ControllerWindow]:
         map_center=MAP_CENTER,
         map_zoom=MAP_ZOOM,
         window_geometry=f"{win_w}x{win_h}+0+0",
-        get_sim_pos_callback=_make_get_sim_pos("001"),
-        set_sim_pos_callback=_make_set_sim_pos("001"),
     )
 
-    # Node B: sim_pos callbacks wired so that setting Node B's actual position
-    # automatically updates POSITIONS["002"] used by the broker for ranging.
     controller_b = ControllerWindow(
         root=root,
         node_id="002",
@@ -257,15 +335,19 @@ def launch_bridge(root: tk.Tk) -> list[ControllerWindow]:
         map_center=MAP_CENTER,
         map_zoom=MAP_ZOOM,
         window_geometry=f"{win_w}x{win_h}+{win_w}+0",
-        get_sim_pos_callback=_make_get_sim_pos("002"),
-        set_sim_pos_callback=_make_set_sim_pos("002"),
     )
 
     # 7. Start serial readers
     transport_a.start()
     transport_b.start()
 
-    return [controller_a, controller_b]
+    verify_modem_id_at_startup(controller_a.node)
+    verify_modem_id_at_startup(controller_b.node)
+
+    controllers = [controller_a, controller_b]
+    _schedule_broker_position_sync(root, controllers)
+
+    return controllers
 
 
 def main() -> None:

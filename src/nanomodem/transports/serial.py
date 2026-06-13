@@ -16,6 +16,7 @@ from typing import Optional
 import serial
 
 from ..protocols import DriverProtocol, OnMessageCallback
+from ..serial_logger import format_serial_log
 from ..types import Coord
 
 logger = logging.getLogger(__name__)
@@ -56,17 +57,27 @@ class SerialTransport:
             daemon=True,
             name=f"serial-{node_id}-reader",
         )
+        self._reader_started = False
+        self._stopped = False
 
     def start(self) -> None:
         """Start the background serial reader thread."""
+        if self._reader_started:
+            return
         self._running = True
         self._reader_thread.start()
+        self._reader_started = True
 
     def stop(self) -> None:
         """Stop the background reader and close the serial port."""
+        if self._stopped:
+            return
+        self._stopped = True
         self._running = False
-        self._reader_thread.join(timeout=2.0)
-        self._serial.close()
+        if self._reader_started:
+            self._reader_thread.join(timeout=2.0)
+        if self._serial.is_open:
+            self._serial.close()
 
     def broadcast_position(self, coord: Coord, depth: float) -> None:
         cmd = self._driver.format_broadcast(self.node_id, coord, depth)
@@ -76,13 +87,25 @@ class SerialTransport:
         cmd = self._driver.format_ping(target_id)
         self._write(cmd)
 
+    def request_test(self, target_id: str) -> None:
+        cmd = self._driver.format_test_request(target_id)
+        self._write(cmd)
+
+    def query_quality(self) -> None:
+        cmd = self._driver.format_quality_query()
+        self._write(cmd)
+
+    def query_modem_status(self) -> None:
+        cmd = self._driver.format_status_query()
+        self._write(cmd)
+
     def on_message(self, callback: OnMessageCallback) -> None:
         self._callback = callback
 
     def _write(self, data: bytes) -> None:
         with self._lock:
             self._serial.write(data)
-            logger.debug("TX: %s", data)
+            logger.info(format_serial_log("TX", self.node_id, data))
 
     def _read_loop(self) -> None:
         """Background thread: read lines from serial and dispatch."""
@@ -91,10 +114,10 @@ class SerialTransport:
                 raw = self._serial.readline()
                 if not raw:
                     continue
+                logger.info(format_serial_log("RX", self.node_id, raw))
                 line = raw.decode("ascii", errors="replace").strip()
                 if not line:
                     continue
-                logger.debug("RX: %s", line)
                 self._dispatch(line)
             except serial.SerialException:
                 logger.exception("Serial error")

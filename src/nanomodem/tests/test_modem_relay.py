@@ -4,6 +4,9 @@ Spec reference (section 5.2):
 
   $Bnn{body}  -> sender gets $Bnn\\r\\n, others get #B{xxx}nn{body}\\r\\n
   $Pxxx       -> sender gets $Pxxx\\r\\n, then #RxxxTyyyyy\\r\\n on response
+  $?          -> sender gets #AxxxVyyyyy\\r\\n
+  $Txxx       -> sender gets $Txxx\\r\\n, listeners get #Bxxx64{payload}\\r\\n
+  $Q          -> sender gets $Cx\\r\\n or $C-\\r\\n
   Range:        R = yyyyy * c * 3.125e-5  (where c = sound speed in m/s)
 """
 
@@ -15,15 +18,93 @@ from nanomodem.demo.scenarios.modem_relay import (
     broadcast_ack,
     broadcast_relay,
     distance_metres,
+    format_test_request_ack,
+    format_test_request_broadcast,
     parse_broadcast,
     parse_ping,
+    parse_quality_query,
+    parse_status_query,
+    parse_test_request,
     ping_ack,
+    quality_rejected,
+    quality_response,
     range_response,
+    relay_quality_query,
+    relay_test_request,
+    split_modem_command,
+    status_response,
 )
+from nanomodem.drivers.v3_spec import is_test_broadcast_line
+from nanomodem.transports.mock import MOCK_BYTES_CORRECTED
 
 # ------------------------------------------------------------------ #
 #  Broadcast parsing                                                   #
 # ------------------------------------------------------------------ #
+
+
+def test__should_split_broadcast_command_without_newline() -> None:
+    raw = b"$B32P001+59.310000+017.975000005.000"
+    split = split_modem_command(raw)
+    assert split is not None
+    command, rest = split
+    assert command == raw
+    assert rest == b""
+
+
+def test__should_split_ping_command_without_newline() -> None:
+    split = split_modem_command(b"$P002")
+    assert split is not None
+    command, rest = split
+    assert command == b"$P002"
+    assert rest == b""
+
+
+def test__should_split_status_query_command_without_newline() -> None:
+    split = split_modem_command(b"$?")
+    assert split is not None
+    command, rest = split
+    assert command == b"$?"
+    assert rest == b""
+
+
+def test__should_split_status_query_with_remainder() -> None:
+    split = split_modem_command(b"$?extra")
+    assert split is not None
+    command, rest = split
+    assert command == b"$?"
+    assert rest == b"extra"
+
+
+def test__should_split_test_request_command_without_newline() -> None:
+    split = split_modem_command(b"$T002")
+    assert split is not None
+    command, rest = split
+    assert command == b"$T002"
+    assert rest == b""
+
+
+def test__should_split_quality_query_command_without_newline() -> None:
+    split = split_modem_command(b"$Q")
+    assert split is not None
+    command, rest = split
+    assert command == b"$Q"
+    assert rest == b""
+
+
+def test__should_split_quality_query_with_remainder() -> None:
+    split = split_modem_command(b"$Qextra")
+    assert split is not None
+    command, rest = split
+    assert command == b"$Q"
+    assert rest == b"extra"
+
+
+def test__should_return_none_when_broadcast_is_incomplete() -> None:
+    assert split_modem_command(b"$B32P001") is None
+
+
+def test__should_return_none_when_broadcast_length_is_not_numeric() -> None:
+    assert split_modem_command(b"$BxxP001") is None
 
 
 def test__should_parse_broadcast_command() -> None:
@@ -109,6 +190,26 @@ def test__should_return_none_for_range_response() -> None:
 
 
 # ------------------------------------------------------------------ #
+#  Status query ($?)                                                   #
+# ------------------------------------------------------------------ #
+
+
+def test__should_parse_status_query_command() -> None:
+    assert parse_status_query(b"$?") is True
+    assert parse_status_query(b"$?\r\n") is True
+
+
+def test__should_reject_non_status_commands() -> None:
+    assert parse_status_query(b"$B32body") is False
+    assert parse_status_query(b"$P002") is False
+
+
+def test__should_generate_status_response_per_spec() -> None:
+    assert status_response("001", 48123) == b"#A001V48123\r\n"
+    assert status_response("042", 27305) == b"#A042V27305\r\n"
+
+
+# ------------------------------------------------------------------ #
 #  Ping ack (to sender)                                               #
 # ------------------------------------------------------------------ #
 
@@ -184,3 +285,121 @@ def test__should_be_symmetric() -> None:
     a = (59.310153, 17.975189, 0.0)
     b = (59.310500, 17.974500, 5.0)
     assert distance_metres(a, b) == pytest.approx(distance_metres(b, a))
+
+
+# ------------------------------------------------------------------ #
+#  Test request ($T)                                                   #
+# ------------------------------------------------------------------ #
+
+
+def test__should_parse_test_request_command() -> None:
+    assert parse_test_request(b"$T002") == "002"
+    assert parse_test_request(b"$T123\r\n") == "123"
+
+
+def test__should_return_none_for_ping_command_when_parsing_test() -> None:
+    assert parse_test_request(b"$P002") is None
+
+
+def test__should_generate_test_ack_per_spec() -> None:
+    assert format_test_request_ack("002") == b"$T002\r\n"
+
+
+def test__should_generate_test_broadcast_line_per_spec() -> None:
+    line = format_test_request_broadcast("002").decode("ascii").rstrip("\r\n")
+    assert is_test_broadcast_line(line)
+
+
+# ------------------------------------------------------------------ #
+#  Quality query ($Q)                                                  #
+# ------------------------------------------------------------------ #
+
+
+def test__should_parse_quality_query_command() -> None:
+    assert parse_quality_query(b"$Q") is True
+    assert parse_quality_query(b"$Q\r\n") is True
+
+
+def test__should_reject_non_quality_commands() -> None:
+    assert parse_quality_query(b"$?") is False
+    assert parse_quality_query(b"$T002") is False
+
+
+def test__should_generate_quality_response_per_spec() -> None:
+    assert quality_response(3) == b"$C3\r\n"
+
+
+def test__should_generate_quality_rejected_per_spec() -> None:
+    assert quality_rejected() == b"$C-\r\n"
+
+
+def test__should_reject_invalid_quality_byte_count() -> None:
+    with pytest.raises(ValueError):
+        quality_response(9)
+
+
+# ------------------------------------------------------------------ #
+#  Relay orchestration ($T / $Q)                                        #
+# ------------------------------------------------------------------ #
+
+
+def test__should_ack_and_broadcast_test_to_listeners_except_target() -> None:
+    sent: list[tuple[str, bytes]] = []
+    heard: dict[str, bool] = {}
+
+    relay_test_request(
+        "001",
+        "002",
+        send_message=lambda node_id, data: sent.append((node_id, data)),
+        get_listener_ids=lambda: ["001", "002", "003"],
+        known_node_ids={"001", "002", "003"},
+        heard_data_packet=heard,
+    )
+
+    assert ("001", format_test_request_ack("002")) in sent
+    broadcast = format_test_request_broadcast("002")
+    assert ("001", broadcast) in sent
+    assert ("003", broadcast) in sent
+    assert ("002", broadcast) not in sent
+    assert heard == {"001": True, "003": True}
+
+
+def test__should_noop_test_when_target_unknown() -> None:
+    sent: list[tuple[str, bytes]] = []
+
+    relay_test_request(
+        "001",
+        "999",
+        send_message=lambda node_id, data: sent.append((node_id, data)),
+        get_listener_ids=lambda: ["001", "002"],
+        known_node_ids={"001", "002"},
+        heard_data_packet={},
+    )
+
+    assert sent == []
+
+
+def test__should_return_quality_after_test_heard() -> None:
+    sent: list[tuple[str, bytes]] = []
+    heard: dict[str, bool] = {"001": True}
+
+    relay_quality_query(
+        "001",
+        send_message=lambda node_id, data: sent.append((node_id, data)),
+        heard_data_packet=heard,
+    )
+
+    assert sent == [("001", quality_response(MOCK_BYTES_CORRECTED))]
+    assert heard == {}
+
+
+def test__should_reject_quality_without_prior_data() -> None:
+    sent: list[tuple[str, bytes]] = []
+
+    relay_quality_query(
+        "001",
+        send_message=lambda node_id, data: sent.append((node_id, data)),
+        heard_data_packet={},
+    )
+
+    assert sent == [("001", quality_rejected())]

@@ -11,6 +11,7 @@ import argparse
 import logging
 
 from .calculation import Calculation
+from .constants import SOUND_SPEED_WATER_M_S
 from .node import AcousticNode
 from .transports.mock import MockEther, MockTransport
 from .types import Coord
@@ -28,6 +29,7 @@ def _create_mock_node(
     position: Coord,
     ether: MockEther,
     calc: Calculation,
+    sound_speed: float,
 ) -> AcousticNode:
     """Create a node with MockTransport, setting position on both node and transport."""
     transport = MockTransport(node_id, ether)
@@ -37,13 +39,14 @@ def _create_mock_node(
         transport=transport,
         calculation=calc,
         position=position,
+        sound_speed=sound_speed,
     )
 
 
-def run_mock_demo() -> None:
+def run_mock_demo(sound_speed: float = SOUND_SPEED_WATER_M_S) -> None:
     """Scripted demo: 3 beacons + 1 submerged host, full localization cycle."""
 
-    ether = MockEther(sound_speed=1500.0)
+    ether = MockEther(sound_speed=sound_speed)
     calc = Calculation()
 
     # --- Create beacons with known surface positions ---
@@ -56,7 +59,7 @@ def run_mock_demo() -> None:
 
     beacons: dict[str, AcousticNode] = {}
     for nid, pos in beacon_positions.items():
-        node = _create_mock_node(nid, pos, ether, calc)
+        node = _create_mock_node(nid, pos, ether, calc, sound_speed)
         node.set_depth(0.0)
         node.capabilities.is_broadcasting_own_position = True
         beacons[nid] = node
@@ -65,7 +68,7 @@ def run_mock_demo() -> None:
     # --- Create submerged host ---
 
     actual_pos = Coord(lat=63.0004, lon=10.0003)
-    host = _create_mock_node("001", actual_pos, ether, calc)
+    host = _create_mock_node("001", actual_pos, ether, calc, sound_speed)
     host.set_depth(5.0)
     host.capabilities.is_inferring_own_position = True
     logger.info(
@@ -119,6 +122,12 @@ def main() -> None:
     parser.add_argument("--port", type=str, help="Serial port (e.g. /dev/ttyUSB0)")
     parser.add_argument("--baud", type=int, default=9600, help="Baud rate")
     parser.add_argument("--node-id", type=str, default="001", help="This node's ID")
+    parser.add_argument(
+        "--sound-speed",
+        type=float,
+        default=SOUND_SPEED_WATER_M_S,
+        help="Speed of sound in m/s for ranging (default: 1500 water; use 340 for air bench)",
+    )
 
     args = parser.parse_args()
     port: str | None = args.port
@@ -129,8 +138,8 @@ def main() -> None:
         logger.info("Real serial mode: port=%s, baud=%d, node=%s", port, baud, node_id)
         logger.warning("NanomodemTransport not yet implemented (Step 10)")
     else:
-        logger.info("Running mock demo...")
-        run_mock_demo()
+        logger.info("Running mock demo (sound_speed=%.0f m/s)...", args.sound_speed)
+        run_mock_demo(sound_speed=args.sound_speed)
 
 
 if __name__ == "__main__":

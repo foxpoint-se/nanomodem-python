@@ -7,7 +7,26 @@ import math
 import numpy as np
 from scipy.optimize import least_squares
 
+from .constants import MODEM_TIMESTAMP_QUANTUM_S, validate_sound_speed
 from .types import Coord
+
+
+def calculate_distance_3d(
+    coord_a: Coord,
+    depth_a: float,
+    coord_b: Coord,
+    depth_b: float,
+) -> float:
+    """Euclidean distance in meters using flat-earth approximation.
+
+    - 1 degree lat ~ 111320 m
+    - 1 degree lon ~ 111320 * cos(lat) m
+    """
+    lat_m = (coord_b.lat - coord_a.lat) * 111320.0
+    avg_lat = math.radians((coord_a.lat + coord_b.lat) / 2.0)
+    lon_m = (coord_b.lon - coord_a.lon) * 111320.0 * math.cos(avg_lat)
+    depth_m = depth_b - depth_a
+    return math.sqrt(lat_m**2 + lon_m**2 + depth_m**2)
 
 
 class Calculation:
@@ -70,9 +89,14 @@ class Calculation:
         return math.sqrt(d_squared)
 
     def timestamp_to_distance(self, timestamp: int, sound_speed: float) -> float:
-        """Convert modem timestamp (100µs units) to distance in meters.
+        """Convert modem timestamp to distance in meters.
 
-        Formula: distance = timestamp * 3.125e-5 * sound_speed
-        Per nanomodem spec, timestamp is in units of 3.125e-5 seconds.
+        Formula: distance = timestamp * MODEM_TIMESTAMP_QUANTUM_S * sound_speed
         """
-        return timestamp * 3.125e-5 * sound_speed
+        validate_sound_speed(sound_speed)
+        return timestamp * MODEM_TIMESTAMP_QUANTUM_S * sound_speed
+
+    def distance_to_timestamp(self, distance: float, sound_speed: float) -> int:
+        """Convert distance in meters to modem timestamp units."""
+        validate_sound_speed(sound_speed)
+        return round((distance / sound_speed) / MODEM_TIMESTAMP_QUANTUM_S)

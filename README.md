@@ -53,14 +53,68 @@ source .venv/bin/activate
 nanomodem-demo
 ```
 
-**Single node UI (requires node ID):**
+**Single node UI (mock or serial):**
 
 ```bash
-uv run nanomodem-node 001
+# Mock mode (no hardware)
+uv run nanomodem-controller 001
 
-# OR
-source .venv/bin/activate
-nanomodem-node 001
+# Real hardware
+uv run nanomodem-controller 001 --port /dev/ttyUSB0
+```
+
+On startup the controller sends `$?` and **exits** if the modem's stored id does not match the id you passed.
+
+**Speed of sound (ranging):** Defaults to **1500 m/s** (water). For air bench tests with ping/range, use **340 m/s**:
+
+```bash
+# Air bench (USB modems, map range circles)
+uv run nanomodem-controller 001 --port /dev/ttyUSB0 --sound-speed 340
+```
+
+With the God View simulator, use the **same** `--sound-speed` on the simulator and every controller so simulated `#R` timestamps match decode.
+
+**God View Simulator (multi-process testing):**
+
+The simulator provides a "God View" of physical truth separate from controller belief, enabling realistic multi-terminal testing without hardware.
+
+**Network mode (fast, multi-terminal logic testing):**
+
+```bash
+# Start simulator in one terminal
+uv run nanomodem-simulator
+
+# Connect controllers in other terminals
+uv run nanomodem-controller 001 --network 127.0.0.1:5555
+uv run nanomodem-controller 002 --network 127.0.0.1:5555
+
+# Air bench (matching c on simulator + controllers)
+uv run nanomodem-simulator --sound-speed 340
+uv run nanomodem-controller 001 --network 127.0.0.1:5555 --sound-speed 340
+```
+
+**Serial mode (hardware-accurate stack testing with PTYs):**
+
+```bash
+# Start simulator in one terminal
+uv run nanomodem-simulator
+
+# Create PTY pair for Node 001 in another terminal
+socat -d -d pty,raw,echo=0 pty,raw,echo=0
+# Note the PTY paths (e.g., /dev/pts/4 and /dev/pts/5)
+
+# Connect controller 001 in a third terminal
+uv run nanomodem-controller 001 --port /dev/pts/4 --world 127.0.0.1:5555 --world-port /dev/pts/5
+
+# Repeat for additional nodes
+```
+
+Serial mode tests the full `SerialTransport`, `Driver`, and `Codec` stack — the same code that runs on the boat. Acoustic data flows through the PTY, while metadata (registration, GPS updates) flows through a TCP connection to the simulator.
+
+**All-in-one serial test** (socat + simulator + two controllers in one process):
+
+```bash
+uv run python -m nanomodem.demo.scenarios.serial_bridge_with_god_view
 ```
 
 ### Real Hardware (Single Modem on Serial)
@@ -71,13 +125,16 @@ from nanomodem import AcousticNode, SerialTransport, NanomodemV3Driver, Codec, C
 # Wire up: codec -> driver -> transport -> node
 driver = NanomodemV3Driver(codec=Codec())
 transport = SerialTransport(node_id="001", port="/dev/ttyUSB0", driver=driver)
-node = AcousticNode(node_id="001", transport=transport)
+node = AcousticNode(node_id="001", transport=transport)  # sound_speed defaults to 1500 m/s (water)
 
 transport.start()
 
 node.set_position(Coord(lat=63.0, lon=10.0))
 node.broadcast_position()    # Announce to other nodes
 node.request_range("002")    # Ping another node
+node.request_test("002")     # Request test transmission from unit 002
+node.query_quality()         # Bytes corrected on last received data packet
+node.query_modem_status()    # Modem NVM address and supply voltage ($?)
 # ... incoming messages are delivered via on_message callback ...
 
 transport.stop()
@@ -86,9 +143,9 @@ transport.stop()
 ### Two Mock Nodes (No Hardware)
 
 ```python
-from nanomodem import AcousticNode, MockEther, MockTransport, Coord
+from nanomodem import AcousticNode, MockEther, MockTransport, Coord, SOUND_SPEED_WATER_M_S
 
-ether = MockEther()
+ether = MockEther(sound_speed=SOUND_SPEED_WATER_M_S)
 
 node_a = AcousticNode(
     node_id="001",
@@ -144,12 +201,12 @@ graph TD
 
 **AcousticNode** is the only stateful class. It holds its own position, depth, known nodes, and distances. Orchestrates communication and calculation via injected dependencies (transport, calculation).
 
-**TransportProtocol** defines `broadcast_position(coord, depth)`, `request_range(target_id)`, and `on_message(callback)`. Two implementations:
+**TransportProtocol** defines `broadcast_position(coord, depth)`, `request_range(target_id)`, `request_test(target_id)`, `query_quality()`, `query_modem_status()`, and `on_message(callback)`. Two implementations:
 
-- **MockTransport** routes typed `Message` objects through a shared **MockEther** bus. No codec or driver needed.
+- **MockTransport** routes typed `Message` objects through a shared **MockEther** bus (including mock `$T` / `$Q` behavior). No codec or driver needed.
 - **SerialTransport** wraps a serial port. Delegates command formatting and response parsing to a **DriverProtocol** implementation.
 
-**NanomodemV3Driver** handles the nanomodem v3 modem protocol: formats `$P`, `$B` commands and parses `#R`, `#B`, `#U` responses. Uses a **Codec** for message body encoding/decoding.
+**NanomodemV3Driver** handles the nanomodem v3 modem protocol: formats `$P`, `$B`, `$T`, `$Q`, `$?` and parses `#R`, `#B`, `#U`, `#A…V…` (modem status), `$C` / `$C-`, and local acks. Uses a **Codec** for position body encoding/decoding. Fixed test payloads are recognized with `is_test_broadcast_line()` on received `#B` lines. Supply voltage from `$?` uses `supply_voltage_volts(voltage_raw)`.
 
 **Calculation** is stateless and pure. Trilateration (scipy least_squares), 3D-to-2D projection, timestamp-to-distance conversion.
 
@@ -165,18 +222,19 @@ graph TD
 │       ├── calculation.py      # Trilateration, projection, timestamp conversion
 │       ├── transports/
 │       │   ├── mock.py         # MockTransport + MockEther (in-memory)
-│       │   └── serial.py       # SerialTransport (real hardware)
+│       │   ├── serial.py       # SerialTransport (real hardware)
+│       │   └── network.py      # NetworkMockTransport (simulator TCP)
 │       ├── drivers/
 │       │   └── v3.py           # NanomodemV3Driver (modem command protocol)
 │       ├── codecs/
 │       │   └── v3.py           # Codec (message body encoding)
-│       ├── demo/               # Demo scenarios (installed with [demo] extra)
+│       ├── demo/               # Demo tools (installed with [demo] extra)
 │       │   ├── controller.py   # Per-node ControllerWindow
-│       │   └── scenarios/
-│       │       ├── mock_4_nodes.py  # 4-node simulation
-│       │       └── single_node.py  # Single node UI
+│       │   ├── simulator/      # God View simulator (`nanomodem-simulator`)
+│       │   └── scenarios/      # mock_4_nodes, single_node, serial_bridge_with_god_view, …
 │       ├── __main__.py         # CLI entry point (mock demo)
 │       └── tests/              # Unit + integration tests
+├── plans/TODO.md               # Forward-looking backlog
 ├── pyproject.toml
 └── README.md
 ```
