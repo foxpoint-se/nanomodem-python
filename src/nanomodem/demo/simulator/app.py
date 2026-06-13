@@ -17,7 +17,7 @@ from PIL import Image, ImageDraw, ImageTk
 from tkintermapview import TkinterMapView
 from tkintermapview.canvas_position_marker import CanvasPositionMarker
 
-from nanomodem.constants import SOUND_SPEED_WATER_M_S
+from nanomodem.constants import SOUND_SPEED_WATER_M_S, validate_sound_speed
 from nanomodem.demo.simulator.backends import HybridBackend
 from nanomodem.demo.simulator.state import SimulatorState
 from nanomodem.types import Coord
@@ -415,7 +415,7 @@ class SimulatorWindow:
             # Physical position (filled circle)
             phys_pos = self.state.get_physical_position(nid)
             if phys_pos:
-                coord, depth = phys_pos
+                coord, _ = phys_pos
                 icon = self._get_circle_icon(color, transparent=False)
                 self._update_or_create_marker(
                     f"physical_{nid}",
@@ -430,7 +430,7 @@ class SimulatorWindow:
             # Belief position (hollow circle)
             belief_pos = self.state.get_belief_position(nid)
             if belief_pos:
-                coord, depth = belief_pos
+                coord, _ = belief_pos
                 icon = self._get_circle_icon(color, transparent=True)
                 self._update_or_create_marker(
                     f"belief_{nid}",
@@ -502,6 +502,6 @@ def launch_simulator(
         host: Host to bind the metadata server to
         port: Port to bind the metadata server to
     """
-    state = SimulatorState(sound_speed=sound_speed)
+    state = SimulatorState(sound_speed=validate_sound_speed(sound_speed))
     backend = HybridBackend(state, host=host, port=port)
     return SimulatorWindow(root, state, backend)

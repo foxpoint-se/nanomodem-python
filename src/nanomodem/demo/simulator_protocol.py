@@ -155,25 +155,23 @@ class SimulatorMetadataClient:
 
     def _run(self) -> None:
         try:
-            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            sock.settimeout(self._timeout)
-            sock.connect((self._host, self._port))
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+                sock.settimeout(self._timeout)
+                sock.connect((self._host, self._port))
 
-            reg = build_registration(self._node_id, self._acoustic_transport)
-            send_json_line(sock, reg)
-            logger.info("Connected to simulator metadata at %s:%d", self._host, self._port)
+                reg = build_registration(self._node_id, self._acoustic_transport)
+                send_json_line(sock, reg)
+                logger.info("Connected to simulator metadata at %s:%d", self._host, self._port)
 
-            line_buffer = JsonLineBuffer()
-            while self._running:
-                try:
-                    chunk = sock.recv(4096)
-                except socket.timeout:
-                    continue
-                if not chunk:
-                    break
-                for line in line_buffer.feed(chunk):
-                    dispatch_simulator_line(line, self._handlers)
-
-            sock.close()
-        except Exception as e:
-            logger.error("Simulator metadata client error: %s", e)
+                line_buffer = JsonLineBuffer()
+                while self._running:
+                    try:
+                        chunk = sock.recv(4096)
+                    except socket.timeout:
+                        continue
+                    if not chunk:
+                        break
+                    for line in line_buffer.feed(chunk):
+                        dispatch_simulator_line(line, self._handlers)
+        except Exception:
+            logger.exception("Simulator metadata client error")
