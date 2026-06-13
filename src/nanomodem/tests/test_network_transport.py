@@ -6,10 +6,31 @@ import base64
 import json
 import socket
 import threading
-from typing import Any
+import time
+from collections.abc import Callable
+from typing import Any, TypeVar
 
 from nanomodem.transports.network import NetworkMockTransport
 from nanomodem.types import Coord, Message, PositionMessage
+
+POLL_TIMEOUT_S = 2.0
+POLL_INTERVAL_S = 0.01
+
+T = TypeVar("T")
+
+
+def _wait_until(condition: Callable[[], bool], timeout_s: float = POLL_TIMEOUT_S) -> None:
+    deadline = time.monotonic() + timeout_s
+    while time.monotonic() < deadline:
+        if condition():
+            return
+        time.sleep(POLL_INTERVAL_S)
+    raise AssertionError(f"Condition not met within {timeout_s}s")
+
+
+def _wait_for_length(items: list[T], expected: int, timeout_s: float = POLL_TIMEOUT_S) -> list[T]:
+    _wait_until(lambda: len(items) >= expected, timeout_s)
+    return items
 
 
 class MockSimulatorServer:
@@ -91,6 +112,9 @@ class MockSimulatorServer:
         line = json.dumps(msg) + "\n"
         self.client_socket.sendall(line.encode("utf-8"))
 
+    def wait_for_client(self, timeout_s: float = POLL_TIMEOUT_S) -> None:
+        _wait_until(lambda: self.client_socket is not None, timeout_s)
+
 
 def test_network_transport_registers_on_connect() -> None:
     """Should send NodeRegistration message on connect."""
@@ -101,12 +125,8 @@ def test_network_transport_registers_on_connect() -> None:
         transport = NetworkMockTransport(node_id="001", port=5556)
         transport.start()
 
-        # Wait for registration to be received
-        import time
+        _wait_for_length(server.received_messages, 1)
 
-        time.sleep(0.2)
-
-        assert len(server.received_messages) == 1
         reg = server.received_messages[0]
         assert reg["type"] == "register"
         assert reg["node_id"] == "001"
@@ -125,19 +145,13 @@ def test_network_transport_broadcast_position() -> None:
         transport = NetworkMockTransport(node_id="001", port=5557)
         transport.start()
 
-        # Clear registration message
-        import time
-
-        time.sleep(0.2)
+        _wait_for_length(server.received_messages, 1)
         server.received_messages.clear()
 
-        # Broadcast position
         coord = Coord(lat=59.31, lon=17.98)
         transport.broadcast_position(coord, depth=10.0)
 
-        time.sleep(0.2)
-
-        assert len(server.received_messages) == 1
+        _wait_for_length(server.received_messages, 1)
         msg = server.received_messages[0]
         assert msg["type"] == "transmit"
         assert msg["node_id"] == "001"
@@ -166,20 +180,12 @@ def test_network_transport_receives_acoustic_message() -> None:
         received_messages: list[Message] = []
         transport.on_message(lambda msg: received_messages.append(msg))
 
-        # Wait for connection
-        import time
+        server.wait_for_client()
 
-        time.sleep(0.2)
-
-        # Simulate incoming acoustic message (position broadcast)
-        # Format: #Bxxxnnddd... (per v3 protocol)
-        # Example: #B00232P002+59.310000+017.975000010.000
         fake_response = b"#B00232P002+59.310000+017.975000010.000\r\n"
         server.send_acoustic_message(fake_response)
 
-        time.sleep(0.2)
-
-        assert len(received_messages) == 1
+        _wait_for_length(received_messages, 1)
         msg = received_messages[0]
         assert isinstance(msg, PositionMessage)
         assert msg.node_id == "002"
@@ -201,13 +207,10 @@ def test__should_invoke_gps_callback_when_simulator_sends_gps_update() -> None:
         received: list[Coord] = []
         transport.on_gps_update(received.append)
 
-        import time
-
-        time.sleep(0.2)
+        server.wait_for_client()
         server.send_gps_update(59.31, 17.98)
-        time.sleep(0.2)
 
-        assert len(received) == 1
+        _wait_for_length(received, 1)
         assert received[0].lat == 59.31
         assert received[0].lon == 17.98
 
@@ -225,18 +228,12 @@ def test_network_transport_request_range() -> None:
         transport = NetworkMockTransport(node_id="001", port=5559)
         transport.start()
 
-        # Clear registration message
-        import time
-
-        time.sleep(0.2)
+        _wait_for_length(server.received_messages, 1)
         server.received_messages.clear()
 
-        # Request range
         transport.request_range(target_id="002")
 
-        time.sleep(0.2)
-
-        assert len(server.received_messages) == 1
+        _wait_for_length(server.received_messages, 1)
         msg = server.received_messages[0]
         assert msg["type"] == "transmit"
         assert msg["node_id"] == "001"
