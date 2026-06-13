@@ -7,6 +7,7 @@ and acoustic propagation in multi-process simulations.
 from __future__ import annotations
 
 import logging
+import queue
 import tkinter as tk
 from datetime import datetime
 from tkinter import ttk
@@ -39,6 +40,7 @@ NODE_COLORS = [
 
 PHYSICAL_MARKER_STYLE = "circle"  # Filled circle for physical truth
 BELIEF_MARKER_STYLE = "circle_outline"  # Hollow circle for belief
+_REFRESH_UI = object()
 
 
 def _circle_icon(color: str, transparent: bool = False) -> ImageTk.PhotoImage:
@@ -80,6 +82,7 @@ class SimulatorWindow:
         self._editing_target: Optional[str] = None  # node_id being edited
         self._selection_marker_pos: Optional[tuple[float, float]] = None
         self._edit_var = tk.StringVar()
+        self._ui_queue: queue.Queue[object] = queue.Queue()
 
         # Window
         self._window = tk.Toplevel(root)
@@ -102,6 +105,8 @@ class SimulatorWindow:
 
         # Start backend
         self.backend.start()
+
+        self._root.after(50, self._process_ui_queue)
 
         # Initial refresh
         self._refresh_ui()
@@ -156,7 +161,25 @@ class SimulatorWindow:
         self._window.destroy()
 
     def _log_console(self, text: str) -> None:
-        """Log to console with timestamp."""
+        """Queue console output for the Tk main thread (backend callbacks run elsewhere)."""
+        self._ui_queue.put(text)
+
+    def _process_ui_queue(self) -> None:
+        refresh = False
+        while True:
+            try:
+                item = self._ui_queue.get_nowait()
+            except queue.Empty:
+                break
+            if item is _REFRESH_UI:
+                refresh = True
+            elif isinstance(item, str):
+                self._write_console(item)
+        if refresh:
+            self._refresh_ui()
+        self._root.after(50, self._process_ui_queue)
+
+    def _write_console(self, text: str) -> None:
         ts = datetime.now().strftime("%H:%M:%S")
         self._console.configure(state=tk.NORMAL)
         self._console.insert(tk.END, f"[{ts}] {text}\n")
@@ -174,7 +197,7 @@ class SimulatorWindow:
     def _handle_registration(self, node_id: str) -> None:
         """Callback when a new node registers."""
         self._log_console(f"Node {node_id} connected")
-        self._root.after(0, self._refresh_ui)
+        self._ui_queue.put(_REFRESH_UI)
 
     def _on_map_click(self, coords: tuple[float, float]) -> None:
         """Handle map click when editing position."""

@@ -336,10 +336,6 @@ class HybridBackend:
         self.metadata_clients[node_id] = client_socket
         self.state.register_node(node_id)
 
-        # Notify UI of registration
-        if self.on_register:
-            self.on_register(node_id)
-
         transport_type = acoustic_config.get("type", "network")
 
         if transport_type == "serial":
@@ -367,6 +363,9 @@ class HybridBackend:
 
         else:
             logger.warning("Unknown transport type for node %s: %s", node_id, transport_type)
+
+        if self.on_register:
+            self.on_register(node_id)
 
     def _cleanup_node(self, node_id: str) -> None:
         """Clean up resources for a disconnected node."""

@@ -108,10 +108,6 @@ def main() -> None:
     transport_a.start()
     transport_b.start()
 
-    verify_modem_id_at_startup(controller_a.node)
-    verify_modem_id_at_startup(controller_b.node)
-
-    time.sleep(0.3)
     _start_metadata_client(
         root,
         controller_a,
@@ -126,6 +122,14 @@ def main() -> None:
         port=5555,
         acoustic_config={"type": "serial", "pty_path": pty_b_simulator},
     )
+
+    time.sleep(0.3)
+    for _ in range(30):
+        root.update()
+        time.sleep(0.05)
+
+    verify_modem_id_at_startup(controller_a.node)
+    verify_modem_id_at_startup(controller_b.node)
 
     def cleanup() -> None:
         print("\nCleaning up...")
