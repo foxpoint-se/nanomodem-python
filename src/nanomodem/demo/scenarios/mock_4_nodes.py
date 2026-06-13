@@ -9,6 +9,7 @@ import tkinter as tk
 from typing import TypedDict
 
 from nanomodem.demo.controller import ControllerWindow
+from nanomodem.demo.startup import verify_modem_id_at_startup
 from nanomodem.transports.mock import MockEther, MockTransport
 from nanomodem.types import Coord
 
@@ -116,6 +117,9 @@ def launch_mock(root: tk.Tk) -> list[ControllerWindow]:
         b_transport.get_depth_callback = b_controller.node.get_depth
 
         controllers.append(b_controller)
+
+    for controller in controllers:
+        verify_modem_id_at_startup(controller.node)
 
     return controllers
 

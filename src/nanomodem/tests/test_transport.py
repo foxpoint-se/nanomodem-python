@@ -1,10 +1,19 @@
 """Tests for MockTransport + MockEther."""
 
-from nanomodem.transports.mock import MockEther, MockTransport
+from nanomodem.drivers.v3_spec import is_test_broadcast_line
+from nanomodem.transports.mock import (
+    MOCK_BYTES_CORRECTED,
+    MOCK_STATUS_VOLTAGE_RAW,
+    MockEther,
+    MockTransport,
+)
 from nanomodem.types import (
     Coord,
+    LocalAckMessage,
     Message,
+    ModemStatusMessage,
     PositionMessage,
+    QualityIndicatorMessage,
     RangeResponseMessage,
     UnknownMessage,
 )
@@ -157,3 +166,78 @@ def test_should_unregister_transport() -> None:
     sender.broadcast_position(Coord(lat=63.0, lon=10.0), depth=0.0)
 
     assert len(msgs) == 0
+
+
+# --- Test transmission ($T) and quality ($Q) ---
+
+
+def test__should_deliver_local_ack_and_test_broadcast_on_request_test() -> None:
+    ether = MockEther()
+    sender = MockTransport("001", ether)
+    _target = MockTransport("002", ether)
+    listener = MockTransport("003", ether)
+
+    sender_msgs = _collect_messages(sender)
+    listener_msgs = _collect_messages(listener)
+
+    sender.request_test("002")
+
+    assert len(sender_msgs) == 2
+    assert isinstance(sender_msgs[0], LocalAckMessage)
+    assert sender_msgs[0].command == "test"
+    assert sender_msgs[0].target_id == "002"
+    assert isinstance(sender_msgs[1], UnknownMessage)
+    assert is_test_broadcast_line(sender_msgs[1].raw)
+
+    assert len(listener_msgs) == 1
+    assert isinstance(listener_msgs[0], UnknownMessage)
+    assert is_test_broadcast_line(listener_msgs[0].raw)
+
+
+def test__should_return_quality_after_test_broadcast() -> None:
+    ether = MockEther()
+    sender = MockTransport("001", ether)
+    _target = MockTransport("002", ether)
+
+    msgs = _collect_messages(sender)
+    sender.request_test("002")
+    sender.query_quality()
+
+    assert len(msgs) == 3
+    assert isinstance(msgs[2], QualityIndicatorMessage)
+    assert msgs[2].bytes_corrected == MOCK_BYTES_CORRECTED
+
+
+def test__should_return_modem_status_on_status_query() -> None:
+    ether = MockEther()
+    sender = MockTransport("042", ether)
+
+    msgs = _collect_messages(sender)
+    sender.query_modem_status()
+
+    assert len(msgs) == 1
+    assert isinstance(msgs[0], ModemStatusMessage)
+    assert msgs[0].node_id == "042"
+    assert msgs[0].voltage_raw == MOCK_STATUS_VOLTAGE_RAW
+
+
+def test__should_reject_quality_query_without_prior_data() -> None:
+    ether = MockEther()
+    sender = MockTransport("001", ether)
+
+    msgs = _collect_messages(sender)
+    sender.query_quality()
+
+    assert len(msgs) == 1
+    assert isinstance(msgs[0], QualityIndicatorMessage)
+    assert msgs[0].bytes_corrected is None
+
+
+def test__should_do_nothing_when_request_test_target_missing() -> None:
+    ether = MockEther()
+    sender = MockTransport("001", ether)
+
+    msgs = _collect_messages(sender)
+    sender.request_test("999")
+
+    assert msgs == []

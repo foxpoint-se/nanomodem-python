@@ -95,6 +95,21 @@ class NetworkMockTransport:
         cmd = self._driver.format_ping(target_id)
         self._transmit(cmd)
 
+    def request_test(self, target_id: str) -> None:
+        """Request a test transmission from target via the simulator."""
+        cmd = self._driver.format_test_request(target_id)
+        self._transmit(cmd)
+
+    def query_quality(self) -> None:
+        """Query link quality on last data packet via the simulator."""
+        cmd = self._driver.format_quality_query()
+        self._transmit(cmd)
+
+    def query_modem_status(self) -> None:
+        """Query modem address and supply voltage via the simulator."""
+        cmd = self._driver.format_status_query()
+        self._transmit(cmd)
+
     def on_message(self, callback: OnMessageCallback) -> None:
         """Register a callback for received messages."""
         self._callback = callback

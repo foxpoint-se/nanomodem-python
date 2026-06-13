@@ -5,14 +5,21 @@ from __future__ import annotations
 from typing import Callable, Optional
 
 from ..calculation import calculate_distance_3d
+from ..drivers.v3_spec import format_test_broadcast_line
 from ..protocols import OnMessageCallback
 from ..types import (
     Coord,
+    LocalAckMessage,
     Message,
+    ModemStatusMessage,
     PositionMessage,
+    QualityIndicatorMessage,
     RangeResponseMessage,
     UnknownMessage,
 )
+
+MOCK_BYTES_CORRECTED = 3
+MOCK_STATUS_VOLTAGE_RAW = 48123
 
 
 class MockEther:
@@ -25,6 +32,7 @@ class MockEther:
     def __init__(self, sound_speed: float = 1500.0) -> None:
         self._transports: dict[str, MockTransport] = {}
         self._sound_speed = sound_speed
+        self._heard_data_packet: dict[str, bool] = {}
 
     def register(self, transport: MockTransport) -> None:
         self._transports[transport.node_id] = transport
@@ -68,6 +76,51 @@ class MockEther:
 
         sender.deliver(RangeResponseMessage(node_id=target_id, timestamp=timestamp))
 
+    def request_test(self, sender_id: str, target_id: str) -> None:
+        """Simulate $T: local ack to sender, test #B from target to listeners."""
+        sender = self.get_transport(sender_id)
+        if sender is None:
+            return
+
+        if self.get_transport(target_id) is None:
+            return
+
+        sender.deliver(
+            LocalAckMessage(command="test", target_id=target_id),
+        )
+
+        line = format_test_broadcast_line(target_id)
+        message = UnknownMessage(raw=line)
+        for listener in self.get_all_except(target_id):
+            listener.deliver(message)
+            self._heard_data_packet[listener.node_id] = True
+
+    def query_quality(self, node_id: str) -> None:
+        """Simulate $Q: bytes corrected if last data packet was heard."""
+        transport = self.get_transport(node_id)
+        if transport is None:
+            return
+
+        if self._heard_data_packet.pop(node_id, False):
+            transport.deliver(
+                QualityIndicatorMessage(bytes_corrected=MOCK_BYTES_CORRECTED),
+            )
+            return
+
+        transport.deliver(QualityIndicatorMessage(bytes_corrected=None))
+
+    def query_modem_status(self, node_id: str) -> None:
+        """Simulate $?: return stored address and default supply voltage raw."""
+        transport = self.get_transport(node_id)
+        if transport is None:
+            return
+        transport.deliver(
+            ModemStatusMessage(
+                node_id=node_id,
+                voltage_raw=MOCK_STATUS_VOLTAGE_RAW,
+            ),
+        )
+
     def _calculate_distance(self, a: MockTransport, b: MockTransport) -> float:
         """Euclidean distance in meters using flat-earth approximation."""
         assert a.position is not None
@@ -104,6 +157,18 @@ class MockTransport:
     def request_range(self, target_id: str) -> None:
         """Request range to target. Ether simulates the response."""
         self._ether.request_range(self.node_id, target_id)
+
+    def request_test(self, target_id: str) -> None:
+        """Request test transmission from target. Ether simulates acoustic result."""
+        self._ether.request_test(self.node_id, target_id)
+
+    def query_quality(self) -> None:
+        """Query link quality on last received data packet."""
+        self._ether.query_quality(self.node_id)
+
+    def query_modem_status(self) -> None:
+        """Query modem address and supply voltage."""
+        self._ether.query_modem_status(self.node_id)
 
     def on_message(self, callback: OnMessageCallback) -> None:
         self._callback = callback

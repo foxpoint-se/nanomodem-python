@@ -77,6 +77,18 @@ class SerialTransport:
         cmd = self._driver.format_ping(target_id)
         self._write(cmd)
 
+    def request_test(self, target_id: str) -> None:
+        cmd = self._driver.format_test_request(target_id)
+        self._write(cmd)
+
+    def query_quality(self) -> None:
+        cmd = self._driver.format_quality_query()
+        self._write(cmd)
+
+    def query_modem_status(self) -> None:
+        cmd = self._driver.format_status_query()
+        self._write(cmd)
+
     def on_message(self, callback: OnMessageCallback) -> None:
         self._callback = callback
 

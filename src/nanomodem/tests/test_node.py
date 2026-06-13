@@ -3,9 +3,76 @@
 import pytest
 
 from nanomodem.calculation import Calculation
+from nanomodem.drivers.v3_spec import is_test_broadcast_line
+from nanomodem.errors import ModemIdMismatchError, ModemStatusTimeoutError
 from nanomodem.node import AcousticNode
+from nanomodem.protocols import OnMessageCallback
 from nanomodem.transports.mock import MockEther, MockTransport
-from nanomodem.types import Coord, KnownNode, PositionMessage, UnknownMessage
+from nanomodem.types import (
+    Coord,
+    KnownNode,
+    LocalAckMessage,
+    Message,
+    ModemStatusMessage,
+    PositionMessage,
+    QualityIndicatorMessage,
+    UnknownMessage,
+)
+
+
+class _RecordingTransport:
+    """Minimal transport that records test/quality calls."""
+
+    def __init__(self) -> None:
+        self.test_targets: list[str] = []
+        self.quality_query_count = 0
+        self.modem_status_query_count = 0
+        self._callback: OnMessageCallback | None = None
+
+    def broadcast_position(self, coord: Coord, depth: float) -> None:
+        pass
+
+    def request_range(self, target_id: str) -> None:
+        pass
+
+    def request_test(self, target_id: str) -> None:
+        self.test_targets.append(target_id)
+
+    def query_quality(self) -> None:
+        self.quality_query_count += 1
+
+    def query_modem_status(self) -> None:
+        self.modem_status_query_count += 1
+
+    def on_message(self, callback: OnMessageCallback) -> None:
+        self._callback = callback
+
+
+class _StatusReplyTransport:
+    """Transport that immediately delivers a fixed ModemStatusMessage on $? query."""
+
+    def __init__(self, status: ModemStatusMessage) -> None:
+        self._status = status
+        self._callback: OnMessageCallback | None = None
+
+    def broadcast_position(self, coord: Coord, depth: float) -> None:
+        pass
+
+    def request_range(self, target_id: str) -> None:
+        pass
+
+    def request_test(self, target_id: str) -> None:
+        pass
+
+    def query_quality(self) -> None:
+        pass
+
+    def query_modem_status(self) -> None:
+        if self._callback is not None:
+            self._callback(self._status)
+
+    def on_message(self, callback: OnMessageCallback) -> None:
+        self._callback = callback
 
 
 def _make_node(
@@ -184,6 +251,87 @@ def test_should_request_range_and_receive_response() -> None:
     assert known["002"].last_range is not None
     # 5m depth difference → ~5m distance
     assert abs(known["002"].last_range - 5.0) < 0.5
+
+
+def test__should_delegate_request_test_and_query_quality_to_transport() -> None:
+    transport = _RecordingTransport()
+    node = AcousticNode("001", transport=transport)
+
+    node.request_test("002")
+    node.query_quality()
+
+    assert transport.test_targets == ["002"]
+    assert transport.quality_query_count == 1
+
+
+def test__should_pass_ensure_modem_id_matches_on_mock() -> None:
+    node = _make_node("001")
+    status = node.ensure_modem_id_matches()
+    assert status.node_id == "001"
+
+
+def test__should_raise_modem_id_mismatch_when_status_id_differs() -> None:
+    transport = _StatusReplyTransport(ModemStatusMessage(node_id="002", voltage_raw=48123))
+    node = AcousticNode("001", transport=transport)
+    with pytest.raises(ModemIdMismatchError) as exc_info:
+        node.ensure_modem_id_matches()
+    assert exc_info.value.expected_id == "001"
+    assert exc_info.value.actual_id == "002"
+
+
+def test__should_raise_modem_status_timeout_when_no_reply() -> None:
+    transport = _RecordingTransport()
+    node = AcousticNode("001", transport=transport)
+    with pytest.raises(ModemStatusTimeoutError):
+        node.ensure_modem_id_matches(timeout_s=0.1)
+
+
+def test__should_delegate_query_modem_status_to_transport() -> None:
+    transport = _RecordingTransport()
+    node = AcousticNode("001", transport=transport)
+
+    node.query_modem_status()
+
+    assert transport.modem_status_query_count == 1
+
+
+def test__should_receive_modem_status_via_mock() -> None:
+    ether = MockEther()
+    received: list[Message] = []
+    host = AcousticNode(
+        "042",
+        transport=MockTransport("042", ether),
+        on_message_received=lambda msg: received.append(msg),
+    )
+
+    host.query_modem_status()
+
+    assert len(received) == 1
+    assert isinstance(received[0], ModemStatusMessage)
+    assert received[0].node_id == "042"
+
+
+def test__should_receive_test_ack_and_broadcast_via_mock() -> None:
+    ether = MockEther()
+    received: list[Message] = []
+    host = AcousticNode(
+        "001",
+        transport=MockTransport("001", ether),
+        on_message_received=lambda msg: received.append(msg),
+    )
+    _target = _make_node("002", ether=ether)
+
+    host.request_test("002")
+    host.query_quality()
+
+    assert any(isinstance(m, LocalAckMessage) for m in received)
+    assert any(
+        isinstance(m, UnknownMessage) and is_test_broadcast_line(m.raw) for m in received
+    )
+    assert any(
+        isinstance(m, QualityIndicatorMessage) and m.bytes_corrected is not None
+        for m in received
+    )
 
 
 # --- Step 7: Position calculation ---

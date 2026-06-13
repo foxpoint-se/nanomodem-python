@@ -63,6 +63,8 @@ uv run nanomodem-controller 001
 uv run nanomodem-controller 001 --port /dev/ttyUSB0
 ```
 
+On startup the controller sends `$?` and **exits** if the modem's stored id does not match the id you passed.
+
 **God View Simulator (multi-process testing):**
 
 The simulator provides a "God View" of physical truth separate from controller belief, enabling realistic multi-terminal testing without hardware.
@@ -111,6 +113,9 @@ transport.start()
 node.set_position(Coord(lat=63.0, lon=10.0))
 node.broadcast_position()    # Announce to other nodes
 node.request_range("002")    # Ping another node
+node.request_test("002")     # Request test transmission from unit 002
+node.query_quality()         # Bytes corrected on last received data packet
+node.query_modem_status()    # Modem NVM address and supply voltage ($?)
 # ... incoming messages are delivered via on_message callback ...
 
 transport.stop()
@@ -177,12 +182,12 @@ graph TD
 
 **AcousticNode** is the only stateful class. It holds its own position, depth, known nodes, and distances. Orchestrates communication and calculation via injected dependencies (transport, calculation).
 
-**TransportProtocol** defines `broadcast_position(coord, depth)`, `request_range(target_id)`, and `on_message(callback)`. Two implementations:
+**TransportProtocol** defines `broadcast_position(coord, depth)`, `request_range(target_id)`, `request_test(target_id)`, `query_quality()`, `query_modem_status()`, and `on_message(callback)`. Two implementations:
 
-- **MockTransport** routes typed `Message` objects through a shared **MockEther** bus. No codec or driver needed.
+- **MockTransport** routes typed `Message` objects through a shared **MockEther** bus (including mock `$T` / `$Q` behavior). No codec or driver needed.
 - **SerialTransport** wraps a serial port. Delegates command formatting and response parsing to a **DriverProtocol** implementation.
 
-**NanomodemV3Driver** handles the nanomodem v3 modem protocol: formats `$P`, `$B` commands and parses `#R`, `#B`, `#U` responses. Uses a **Codec** for message body encoding/decoding.
+**NanomodemV3Driver** handles the nanomodem v3 modem protocol: formats `$P`, `$B`, `$T`, `$Q`, `$?` and parses `#R`, `#B`, `#U`, `#A…V…` (modem status), `$C` / `$C-`, and local acks. Uses a **Codec** for position body encoding/decoding. Fixed test payloads are recognized with `is_test_broadcast_line()` on received `#B` lines. Supply voltage from `$?` uses `supply_voltage_volts(voltage_raw)`.
 
 **Calculation** is stateless and pure. Trilateration (scipy least_squares), 3D-to-2D projection, timestamp-to-distance conversion.
 

@@ -19,13 +19,17 @@ from tkintermapview import TkinterMapView
 from tkintermapview.canvas_position_marker import CanvasPositionMarker
 from tkintermapview.map_widget import CanvasPath
 
+from nanomodem import supply_voltage_volts
 from nanomodem.node import AcousticNode
 from nanomodem.protocols import TransportProtocol
 from nanomodem.types import (
     Coord,
     KnownNode,
+    LocalAckMessage,
     Message,
+    ModemStatusMessage,
     PositionMessage,
+    QualityIndicatorMessage,
     RangeResponseMessage,
     UnknownMessage,
 )
@@ -240,7 +244,8 @@ class ControllerWindow:
         btn_row.pack(fill=tk.X, padx=4, pady=(2, 4))
 
         ttk.Button(btn_row, text="Broadcast position", command=self._on_broadcast).pack(side=tk.LEFT, padx=(0, 4))
-        ttk.Button(btn_row, text="Calculate position", command=self._on_calculate).pack(side=tk.LEFT)
+        ttk.Button(btn_row, text="Calculate position", command=self._on_calculate).pack(side=tk.LEFT, padx=(0, 4))
+        ttk.Button(btn_row, text="Get info from device", command=self._on_get_modem_info).pack(side=tk.LEFT)
 
     def _build_console(self) -> None:
         frame = ttk.LabelFrame(self._window, text="Console")
@@ -397,6 +402,10 @@ class ControllerWindow:
             self._log(f"Calculated position: ({result.lat:.6f}, {result.lon:.6f})")
         else:
             self._log("Cannot calculate: need 3+ nodes with position and range.")
+
+    def _on_get_modem_info(self) -> None:
+        self._log("Querying modem status ($?)...")
+        self._node.query_modem_status()
 
     def _handle_position_changed(self, pos: Optional[Coord]) -> None:
         """Refresh UI when node position changes."""
@@ -688,5 +697,15 @@ class ControllerWindow:
                 kn = self._node.get_known_nodes().get(nid)
                 dist = f"{kn.last_range:.2f}m" if kn and kn.last_range is not None else "??m"
                 self._log(f"Recv RANGE from {nid}: {dist} (ts={ts})")
+            case LocalAckMessage(command=cmd, target_id=tid):
+                self._log(f"Local ack {cmd} target={tid}")
+            case QualityIndicatorMessage(bytes_corrected=bytes_corrected):
+                if bytes_corrected is None:
+                    self._log("Quality: rejected")
+                else:
+                    self._log(f"Quality: {bytes_corrected} bytes corrected")
+            case ModemStatusMessage(node_id=nid, voltage_raw=raw):
+                volts = supply_voltage_volts(raw)
+                self._log(f"Modem status: id={nid}, {volts:.2f} V (raw {raw})")
             case UnknownMessage(raw=raw):
                 self._log(f"Recv UNKNOWN: {raw}")

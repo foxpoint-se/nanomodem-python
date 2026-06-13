@@ -19,6 +19,7 @@ from nanomodem.codecs.v3 import Codec
 from nanomodem.demo.controller import ControllerWindow
 from nanomodem.demo.scenarios.single_node import _start_metadata_client
 from nanomodem.demo.simulator.app import launch_simulator
+from nanomodem.demo.startup import verify_modem_id_at_startup
 from nanomodem.drivers.v3 import NanomodemV3Driver
 from nanomodem.transports.serial import SerialTransport
 from nanomodem.types import Coord
@@ -106,6 +107,9 @@ def main() -> None:
 
     transport_a.start()
     transport_b.start()
+
+    verify_modem_id_at_startup(controller_a.node)
+    verify_modem_id_at_startup(controller_b.node)
 
     time.sleep(0.3)
     _start_metadata_client(

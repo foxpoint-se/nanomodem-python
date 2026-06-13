@@ -4,6 +4,7 @@ Spec reference (section 5.2):
 
   $Bnn{body}  -> sender gets $Bnn\\r\\n, others get #B{xxx}nn{body}\\r\\n
   $Pxxx       -> sender gets $Pxxx\\r\\n, then #RxxxTyyyyy\\r\\n on response
+  $?          -> sender gets #AxxxVyyyyy\\r\\n
   Range:        R = yyyyy * c * 3.125e-5  (where c = sound speed in m/s)
 """
 
@@ -17,9 +18,11 @@ from nanomodem.demo.scenarios.modem_relay import (
     distance_metres,
     parse_broadcast,
     parse_ping,
+    parse_status_query,
     ping_ack,
     range_response,
     split_modem_command,
+    status_response,
 )
 
 # ------------------------------------------------------------------ #
@@ -42,6 +45,22 @@ def test__should_split_ping_command_without_newline() -> None:
     command, rest = split
     assert command == b"$P002"
     assert rest == b""
+
+
+def test__should_split_status_query_command_without_newline() -> None:
+    split = split_modem_command(b"$?")
+    assert split is not None
+    command, rest = split
+    assert command == b"$?"
+    assert rest == b""
+
+
+def test__should_split_status_query_with_remainder() -> None:
+    split = split_modem_command(b"$?extra")
+    assert split is not None
+    command, rest = split
+    assert command == b"$?"
+    assert rest == b"extra"
 
 
 def test__should_return_none_when_broadcast_is_incomplete() -> None:
@@ -128,6 +147,26 @@ def test__should_return_none_for_broadcast_command() -> None:
 
 def test__should_return_none_for_range_response() -> None:
     assert parse_ping(b"#R002T12345") is None
+
+
+# ------------------------------------------------------------------ #
+#  Status query ($?)                                                   #
+# ------------------------------------------------------------------ #
+
+
+def test__should_parse_status_query_command() -> None:
+    assert parse_status_query(b"$?") is True
+    assert parse_status_query(b"$?\r\n") is True
+
+
+def test__should_reject_non_status_commands() -> None:
+    assert parse_status_query(b"$B32body") is False
+    assert parse_status_query(b"$P002") is False
+
+
+def test__should_generate_status_response_per_spec() -> None:
+    assert status_response("001", 48123) == b"#A001V48123\r\n"
+    assert status_response("042", 27305) == b"#A042V27305\r\n"
 
 
 # ------------------------------------------------------------------ #

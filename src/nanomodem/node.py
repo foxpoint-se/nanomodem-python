@@ -7,17 +7,23 @@ Orchestrates communication and calculation via injected dependencies.
 from __future__ import annotations
 
 import logging
+import threading
 import time
 from typing import Callable, Optional
 
 from .calculation import Calculation
+from .drivers.v3_spec import supply_voltage_volts
+from .errors import ModemIdMismatchError, ModemStatusTimeoutError
 from .protocols import CalculationProtocol, TransportProtocol
 from .types import (
     Coord,
     KnownNode,
+    LocalAckMessage,
     Message,
+    ModemStatusMessage,
     NodeCapabilities,
     PositionMessage,
+    QualityIndicatorMessage,
     RangeResponseMessage,
     UnknownMessage,
 )
@@ -137,6 +143,43 @@ class AcousticNode:
         self._ensure_known_node(target_id)
         self._transport.request_range(target_id)
 
+    def request_test(self, target_id: str) -> None:
+        """Request a test transmission from the unit at target_id."""
+        self._transport.request_test(target_id)
+
+    def query_quality(self) -> None:
+        """Query bytes corrected on the last received data packet."""
+        self._transport.query_quality()
+
+    def query_modem_status(self) -> None:
+        """Query modem NVM address and supply voltage ($?)."""
+        self._transport.query_modem_status()
+
+    def ensure_modem_id_matches(self, timeout_s: float = 2.0) -> ModemStatusMessage:
+        """Send $? and verify the modem NVM id matches this node's id."""
+        received: list[ModemStatusMessage] = []
+        done = threading.Event()
+        previous = self._on_message_received
+
+        def capture(msg: Message) -> None:
+            if isinstance(msg, ModemStatusMessage):
+                received.append(msg)
+                done.set()
+            if previous is not None:
+                previous(msg)
+
+        self._on_message_received = capture
+        try:
+            self.query_modem_status()
+            if not done.wait(timeout_s):
+                raise ModemStatusTimeoutError(self._node_id, timeout_s)
+            status = received[0]
+            if status.node_id != self._node_id:
+                raise ModemIdMismatchError(self._node_id, status.node_id)
+            return status
+        finally:
+            self._on_message_received = previous
+
     def broadcast_position(self) -> None:
         """Broadcast own position to all other nodes."""
         if self._position is not None:
@@ -202,6 +245,21 @@ class AcousticNode:
                 if self._cb_known_nodes_changed is not None:
                     self._cb_known_nodes_changed(dict(self._known_nodes))
                 self._maybe_infer_position()
+            case LocalAckMessage(command=cmd, target_id=tid):
+                logger.info("Local ack %s target=%s", cmd, tid)
+            case QualityIndicatorMessage(bytes_corrected=bytes_corrected):
+                if bytes_corrected is None:
+                    logger.info("Quality: rejected")
+                else:
+                    logger.info("Quality: %d bytes corrected", bytes_corrected)
+            case ModemStatusMessage(node_id=nid, voltage_raw=raw):
+                volts = supply_voltage_volts(raw)
+                logger.info(
+                    "Modem status id=%s voltage_raw=%d (%.2f V)",
+                    nid,
+                    raw,
+                    volts,
+                )
             case UnknownMessage(raw=raw):
                 logger.info("Unhandled message: %s", raw)
 

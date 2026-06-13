@@ -26,11 +26,16 @@ from nanomodem.demo.scenarios.modem_relay import (
     broadcast_relay,
     parse_broadcast,
     parse_ping,
+    parse_status_query,
     ping_ack,
     range_response,
+    split_modem_command,
+    status_response,
 )
+from nanomodem.demo.startup import verify_modem_id_at_startup
 from nanomodem.drivers.v3 import NanomodemV3Driver
 from nanomodem.serial_logger import format_serial_log
+from nanomodem.transports.mock import MOCK_STATUS_VOLTAGE_RAW
 from nanomodem.transports.serial import SerialTransport
 from nanomodem.types import Coord
 
@@ -91,6 +96,51 @@ def _log_bus(label: str, raw: bytes) -> None:
     print(format_serial_log(label, "", raw))
 
 
+def _handle_relay_command(
+    command: bytes,
+    src: serial.Serial,
+    dst: serial.Serial,
+    src_id: str,
+    label: str,
+    positions: dict[str, tuple[float, float, float] | None],
+    dst_lock: threading.Lock,
+) -> None:
+    _log_bus(label, command)
+
+    if parse_status_query(command):
+        response = status_response(src_id, MOCK_STATUS_VOLTAGE_RAW)
+        _log_bus(f"BROKER→{src_id}", response)
+        src.write(response)
+        return
+
+    broadcast = parse_broadcast(command)
+    if broadcast is not None:
+        nn, body = broadcast
+        src.write(broadcast_ack(nn))
+        with dst_lock:
+            dst.write(broadcast_relay(src_id, nn, body))
+        return
+
+    target_id = parse_ping(command)
+    if target_id is not None:
+        src.write(ping_ack(target_id))
+        sender_pos = positions.get(src_id)
+        target_pos = positions.get(target_id)
+        if sender_pos is not None and target_pos is not None:
+            coord_src = Coord(lat=sender_pos[0], lon=sender_pos[1])
+            coord_dst = Coord(lat=target_pos[0], lon=target_pos[1])
+            dist = calculate_distance_3d(coord_src, sender_pos[2], coord_dst, target_pos[2])
+            resp = range_response(target_id, dist, SOUND_SPEED)
+            _log_bus(f"BROKER→{src_id}", resp)
+            src.write(resp)
+        else:
+            print(f"[BROKER] Unknown node in range request: {src_id!r} → {target_id!r}")
+        return
+
+    with dst_lock:
+        dst.write(command)
+
+
 def _relay_loop(
     src: serial.Serial,
     dst: serial.Serial,
@@ -100,41 +150,20 @@ def _relay_loop(
     positions: dict[str, tuple[float, float, float] | None],
     dst_lock: threading.Lock,
 ) -> None:
+    buffer = b""
     while True:
         try:
-            raw = src.readline()
-            if not raw:
+            chunk = src.read(src.in_waiting or 1)
+            if not chunk:
                 continue
+            buffer += chunk
 
-            _log_bus(label, raw)
-
-            broadcast = parse_broadcast(raw)
-            if broadcast is not None:
-                nn, body = broadcast
-                src.write(broadcast_ack(nn))
-                with dst_lock:
-                    dst.write(broadcast_relay(src_id, nn, body))
-                continue
-
-            target_id = parse_ping(raw)
-            if target_id is not None:
-                src.write(ping_ack(target_id))
-                sender_pos = positions.get(src_id)
-                target_pos = positions.get(target_id)
-                if sender_pos is not None and target_pos is not None:
-                    # sender_pos/target_pos are (lat, lon, depth) tuples
-                    coord_src = Coord(lat=sender_pos[0], lon=sender_pos[1])
-                    coord_dst = Coord(lat=target_pos[0], lon=target_pos[1])
-                    dist = calculate_distance_3d(coord_src, sender_pos[2], coord_dst, target_pos[2])
-                    resp = range_response(target_id, dist, SOUND_SPEED)
-                    _log_bus(f"BROKER→{src_id}", resp)
-                    src.write(resp)
-                else:
-                    print(f"[BROKER] Unknown node in range request: {src_id!r} → {target_id!r}")
-                continue
-
-            with dst_lock:
-                dst.write(raw)
+            while True:
+                split = split_modem_command(buffer)
+                if split is None:
+                    break
+                command, buffer = split
+                _handle_relay_command(command, src, dst, src_id, label, positions, dst_lock)
 
         except serial.SerialException as e:
             print(f"[BROKER] Serial error on {label}: {e}")
@@ -259,6 +288,9 @@ def launch_bridge(root: tk.Tk) -> list[ControllerWindow]:
     # 7. Start serial readers
     transport_a.start()
     transport_b.start()
+
+    verify_modem_id_at_startup(controller_a.node)
+    verify_modem_id_at_startup(controller_b.node)
 
     return [controller_a, controller_b]
 

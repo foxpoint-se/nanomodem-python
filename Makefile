@@ -28,7 +28,7 @@ clean-env:
 	fi
 
 lint:
-	uv run ruff check src
+	uv run ruff check src temp_experiments_to_be_removed_later
 
 format:
 	uv run ruff format src & uv run ruff check src --fix

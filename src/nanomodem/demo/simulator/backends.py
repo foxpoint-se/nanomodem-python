@@ -23,13 +23,16 @@ from nanomodem.demo.scenarios.modem_relay import (
     broadcast_relay,
     parse_broadcast,
     parse_ping,
+    parse_status_query,
     ping_ack,
     range_response,
     split_modem_command,
+    status_response,
 )
 from nanomodem.demo.simulator.state import SimulatorState
 from nanomodem.drivers.v3 import NanomodemV3Driver
 from nanomodem.serial_logger import format_serial_log
+from nanomodem.transports.mock import MOCK_STATUS_VOLTAGE_RAW
 from nanomodem.types import Coord, PositionMessage
 
 logger = logging.getLogger(__name__)
@@ -400,6 +403,13 @@ class HybridBackend:
                 self.on_interpreted(
                     f"Belief update: {msg.node_id} at ({msg.coord.lat:.4f}, {msg.coord.lon:.4f}, {msg.depth:.1f}m)"
                 )
+
+        if parse_status_query(data):
+            self.send_message(
+                sender_id,
+                status_response(sender_id, MOCK_STATUS_VOLTAGE_RAW),
+            )
+            return
 
         broadcast = parse_broadcast(data)
         if broadcast is not None:

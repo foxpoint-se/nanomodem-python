@@ -14,6 +14,10 @@ All formats are per the nanomodem v3 user guide (section 5.2):
     Sender sends:   $Pxxx
     Sender gets:    $Pxxx\\r\\n         (immediate ack)
     Sender gets:    #RxxxTyyyyy\\r\\n   (range response, after acoustic round-trip)
+
+  Status:
+    Sender sends:   $?
+    Sender gets:    #AxxxVyyyyy\\r\\n   (node address and supply voltage raw)
 """
 
 from __future__ import annotations
@@ -47,6 +51,10 @@ def split_modem_command(buffer: bytes) -> tuple[bytes, bytes] | None:
         if len(buf) < total:
             return None
         return buf[:total], buf[total:]
+    if buf.startswith(b"$?"):
+        if len(buf) < 2:
+            return None
+        return buf[:2], buf[2:]
     if buf.startswith(b"$P"):
         if len(buf) < 5:
             return None
@@ -97,6 +105,21 @@ def range_response(target_id: str, distance: float, sound_speed: float = SOUND_S
     """
     timestamp = round((distance / sound_speed) / 3.125e-5)
     return f"#R{target_id}T{timestamp:05d}\r\n".encode("ascii")
+
+
+# ------------------------------------------------------------------ #
+#  Status query ($?)                                                   #
+# ------------------------------------------------------------------ #
+
+
+def parse_status_query(raw: bytes) -> bool:
+    """True if raw is a modem status query ($?)."""
+    return raw.strip() == b"$?"
+
+
+def status_response(node_id: str, voltage_raw: int) -> bytes:
+    """Status response to sender: #A{node_id}V{voltage_raw:05d}\\r\\n."""
+    return f"#A{node_id}V{voltage_raw:05d}\r\n".encode("ascii")
 
 
 # ------------------------------------------------------------------ #

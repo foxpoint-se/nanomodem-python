@@ -12,6 +12,7 @@ from nanomodem.codecs.v3 import Codec
 from nanomodem.demo.controller import ControllerWindow
 from nanomodem.demo.sim_types import AcousticTransportConfig
 from nanomodem.demo.simulator_protocol import SimulatorInboundHandlers, SimulatorMetadataClient
+from nanomodem.demo.startup import verify_modem_id_at_startup
 from nanomodem.drivers.v3 import NanomodemV3Driver
 from nanomodem.protocols import TransportProtocol
 from nanomodem.transports.mock import MockEther, MockTransport
@@ -92,6 +93,8 @@ def launch_single(
     # Serial mode: metadata (GPS, etc.) on a separate simulator TCP connection
     if world_host and world_port and acoustic_config:
         _start_metadata_client(root, controller, world_host, world_port, acoustic_config)
+
+    verify_modem_id_at_startup(controller.node)
 
     return controller
 
