@@ -65,6 +65,15 @@ uv run nanomodem-controller 001 --port /dev/ttyUSB0
 
 On startup the controller sends `$?` and **exits** if the modem's stored id does not match the id you passed.
 
+**Speed of sound (ranging):** Defaults to **1500 m/s** (water). For air bench tests with ping/range, use **340 m/s**:
+
+```bash
+# Air bench (USB modems, map range circles)
+uv run nanomodem-controller 001 --port /dev/ttyUSB0 --sound-speed 340
+```
+
+With the God View simulator, use the **same** `--sound-speed` on the simulator and every controller so simulated `#R` timestamps match decode.
+
 **God View Simulator (multi-process testing):**
 
 The simulator provides a "God View" of physical truth separate from controller belief, enabling realistic multi-terminal testing without hardware.
@@ -78,6 +87,10 @@ uv run nanomodem-simulator
 # Connect controllers in other terminals
 uv run nanomodem-controller 001 --network 127.0.0.1:5555
 uv run nanomodem-controller 002 --network 127.0.0.1:5555
+
+# Air bench (matching c on simulator + controllers)
+uv run nanomodem-simulator --sound-speed 340
+uv run nanomodem-controller 001 --network 127.0.0.1:5555 --sound-speed 340
 ```
 
 **Serial mode (hardware-accurate stack testing with PTYs):**
@@ -106,7 +119,7 @@ from nanomodem import AcousticNode, SerialTransport, NanomodemV3Driver, Codec, C
 # Wire up: codec -> driver -> transport -> node
 driver = NanomodemV3Driver(codec=Codec())
 transport = SerialTransport(node_id="001", port="/dev/ttyUSB0", driver=driver)
-node = AcousticNode(node_id="001", transport=transport)
+node = AcousticNode(node_id="001", transport=transport)  # sound_speed defaults to 1500 m/s (water)
 
 transport.start()
 
@@ -124,9 +137,9 @@ transport.stop()
 ### Two Mock Nodes (No Hardware)
 
 ```python
-from nanomodem import AcousticNode, MockEther, MockTransport, Coord
+from nanomodem import AcousticNode, MockEther, MockTransport, Coord, SOUND_SPEED_WATER_M_S
 
-ether = MockEther()
+ether = MockEther(sound_speed=SOUND_SPEED_WATER_M_S)
 
 node_a = AcousticNode(
     node_id="001",

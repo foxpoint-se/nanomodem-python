@@ -2,6 +2,12 @@
 
 from .calculation import Calculation
 from .codecs.v3 import Codec
+from .constants import (
+    MODEM_TIMESTAMP_QUANTUM_S,
+    SOUND_SPEED_AIR_M_S,
+    SOUND_SPEED_WATER_M_S,
+    validate_sound_speed,
+)
 from .drivers.v3 import NanomodemV3Driver
 from .drivers.v3_spec import (
     MAX_BYTES_CORRECTED,
@@ -34,6 +40,7 @@ from .types import (
     QualityIndicatorMessage,
     RangeResponseMessage,
     UnknownMessage,
+    V3TestBroadcastMessage,
 )
 
 __all__ = [
@@ -50,6 +57,7 @@ __all__ = [
     "LocalAckMessage",
     "MAX_BYTES_CORRECTED",
     "Message",
+    "MODEM_TIMESTAMP_QUANTUM_S",
     "ModemIdMismatchError",
     "ModemStatusMessage",
     "ModemStatusTimeoutError",
@@ -61,11 +69,15 @@ __all__ = [
     "PositionMessage",
     "QualityIndicatorMessage",
     "RangeResponseMessage",
+    "V3TestBroadcastMessage",
     "SerialTransport",
+    "SOUND_SPEED_AIR_M_S",
+    "SOUND_SPEED_WATER_M_S",
     "supply_voltage_volts",
     "TEST_MESSAGE_BYTE_COUNT",
     "TEST_MESSAGE_PAYLOAD",
     "TransportProtocol",
     "UnknownMessage",
     "is_test_broadcast_line",
+    "validate_sound_speed",
 ]

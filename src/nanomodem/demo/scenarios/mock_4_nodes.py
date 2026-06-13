@@ -8,6 +8,7 @@ from __future__ import annotations
 import tkinter as tk
 from typing import TypedDict
 
+from nanomodem.constants import SOUND_SPEED_WATER_M_S
 from nanomodem.demo.controller import ControllerWindow
 from nanomodem.demo.startup import verify_modem_id_at_startup
 from nanomodem.transports.mock import MockEther, MockTransport
@@ -27,7 +28,7 @@ def launch_mock(root: tk.Tk) -> list[ControllerWindow]:
     The 'Beacons' are static units that do not receive simulation controls.
     """
 
-    ether = MockEther(sound_speed=1500.0)
+    ether = MockEther(sound_speed=SOUND_SPEED_WATER_M_S)
 
     # 1. Scenario Configuration
     host_config: Config = {
@@ -107,6 +108,7 @@ def launch_mock(root: tk.Tk) -> list[ControllerWindow]:
             map_center=MAP_CENTER,
             map_zoom=MAP_ZOOM,
             window_geometry=get_geometry(i),
+            sound_speed=SOUND_SPEED_WATER_M_S,
         )
 
         # Beacons know their own position in this scenario

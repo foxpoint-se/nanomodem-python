@@ -23,9 +23,13 @@ from nanomodem.demo.scenarios.modem_relay import (
     broadcast_relay,
     parse_broadcast,
     parse_ping,
+    parse_quality_query,
     parse_status_query,
+    parse_test_request,
     ping_ack,
     range_response,
+    relay_quality_query,
+    relay_test_request,
     split_modem_command,
     status_response,
 )
@@ -159,6 +163,8 @@ class HybridBackend:
 
         # Driver for parsing acoustic messages (reuse like Controllers do)
         self._driver = NanomodemV3Driver(Codec())
+
+        self._heard_data_packet: dict[str, bool] = {}
 
         # Callback for UI updates
         self.on_message: Optional[OnMessageCallback] = None
@@ -441,4 +447,24 @@ class HybridBackend:
             self.send_message(
                 sender_id,
                 range_response(ping_target, dist, self.state.sound_speed),
+            )
+            return
+
+        test_target = parse_test_request(data)
+        if test_target is not None:
+            relay_test_request(
+                sender_id,
+                test_target,
+                send_message=self.send_message,
+                get_listener_ids=self.state.get_all_node_ids,
+                known_node_ids=set(self.state.get_all_node_ids()),
+                heard_data_packet=self._heard_data_packet,
+            )
+            return
+
+        if parse_quality_query(data):
+            relay_quality_query(
+                sender_id,
+                send_message=self.send_message,
+                heard_data_packet=self._heard_data_packet,
             )

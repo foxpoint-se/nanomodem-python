@@ -20,15 +20,20 @@ import serial
 
 from nanomodem.calculation import calculate_distance_3d
 from nanomodem.codecs.v3 import Codec
+from nanomodem.constants import SOUND_SPEED_WATER_M_S
 from nanomodem.demo.controller import ControllerWindow
 from nanomodem.demo.scenarios.modem_relay import (
     broadcast_ack,
     broadcast_relay,
     parse_broadcast,
     parse_ping,
+    parse_quality_query,
     parse_status_query,
+    parse_test_request,
     ping_ack,
     range_response,
+    relay_quality_query,
+    relay_test_request,
     split_modem_command,
     status_response,
 )
@@ -41,7 +46,7 @@ from nanomodem.types import Coord
 
 MAP_CENTER = (59.310153, 17.975189)
 MAP_ZOOM = 16
-SOUND_SPEED = 1500.0
+SOUND_SPEED = SOUND_SPEED_WATER_M_S
 BAUD = 9600
 TIMEOUT = 0.1
 
@@ -51,6 +56,8 @@ POSITIONS: dict[str, tuple[float, float, float] | None] = {
     "001": None,
     "002": None,
 }
+
+HEARD_DATA_PACKET: dict[str, bool] = {}
 
 _SOCAT_PTY_RE = re.compile(r"PTY is (/dev/[^\s]+)")
 
@@ -96,6 +103,22 @@ def _log_bus(label: str, raw: bytes) -> None:
     print(format_serial_log(label, "", raw))
 
 
+def _write_to_node(
+    node_id: str,
+    data: bytes,
+    src_id: str,
+    src: serial.Serial,
+    dst: serial.Serial,
+    dst_lock: threading.Lock,
+) -> None:
+    _log_bus(f"BROKER→{node_id}", data)
+    if node_id == src_id:
+        src.write(data)
+    else:
+        with dst_lock:
+            dst.write(data)
+
+
 def _handle_relay_command(
     command: bytes,
     src: serial.Serial,
@@ -104,8 +127,12 @@ def _handle_relay_command(
     label: str,
     positions: dict[str, tuple[float, float, float] | None],
     dst_lock: threading.Lock,
+    heard_data_packet: dict[str, bool],
 ) -> None:
     _log_bus(label, command)
+
+    def send_message(node_id: str, data: bytes) -> None:
+        _write_to_node(node_id, data, src_id, src, dst, dst_lock)
 
     if parse_status_query(command):
         response = status_response(src_id, MOCK_STATUS_VOLTAGE_RAW)
@@ -137,6 +164,26 @@ def _handle_relay_command(
             print(f"[BROKER] Unknown node in range request: {src_id!r} → {target_id!r}")
         return
 
+    test_target = parse_test_request(command)
+    if test_target is not None:
+        relay_test_request(
+            src_id,
+            test_target,
+            send_message=send_message,
+            get_listener_ids=lambda: list(positions.keys()),
+            known_node_ids=set(positions.keys()),
+            heard_data_packet=heard_data_packet,
+        )
+        return
+
+    if parse_quality_query(command):
+        relay_quality_query(
+            src_id,
+            send_message=send_message,
+            heard_data_packet=heard_data_packet,
+        )
+        return
+
     with dst_lock:
         dst.write(command)
 
@@ -149,6 +196,7 @@ def _relay_loop(
     label: str,
     positions: dict[str, tuple[float, float, float] | None],
     dst_lock: threading.Lock,
+    heard_data_packet: dict[str, bool],
 ) -> None:
     buffer = b""
     while True:
@@ -163,7 +211,9 @@ def _relay_loop(
                 if split is None:
                     break
                 command, buffer = split
-                _handle_relay_command(command, src, dst, src_id, label, positions, dst_lock)
+                _handle_relay_command(
+                    command, src, dst, src_id, label, positions, dst_lock, heard_data_packet
+                )
 
         except serial.SerialException as e:
             print(f"[BROKER] Serial error on {label}: {e}")
@@ -183,13 +233,31 @@ def _start_broker_threads(
     lock_b = threading.Lock()
     threading.Thread(
         target=_relay_loop,
-        args=(port_a, port_b, node_a_id, node_b_id, f"{node_a_id}→{node_b_id}", positions, lock_b),
+        args=(
+            port_a,
+            port_b,
+            node_a_id,
+            node_b_id,
+            f"{node_a_id}→{node_b_id}",
+            positions,
+            lock_b,
+            HEARD_DATA_PACKET,
+        ),
         daemon=True,
         name="relay-a",
     ).start()
     threading.Thread(
         target=_relay_loop,
-        args=(port_b, port_a, node_b_id, node_a_id, f"{node_b_id}→{node_a_id}", positions, lock_a),
+        args=(
+            port_b,
+            port_a,
+            node_b_id,
+            node_a_id,
+            f"{node_b_id}→{node_a_id}",
+            positions,
+            lock_a,
+            HEARD_DATA_PACKET,
+        ),
         daemon=True,
         name="relay-b",
     ).start()

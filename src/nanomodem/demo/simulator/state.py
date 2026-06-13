@@ -11,6 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Optional
 
+from nanomodem.constants import SOUND_SPEED_WATER_M_S
 from nanomodem.types import Coord
 
 
@@ -47,7 +48,7 @@ class SimulatorState:
     belief: dict[str, NodeBeliefState] = field(default_factory=dict)
 
     # Acoustic propagation parameters
-    sound_speed: float = 1500.0  # m/s in water
+    sound_speed: float = SOUND_SPEED_WATER_M_S
 
     def register_node(self, node_id: str) -> None:
         """Register a new node in the simulation."""

@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from typing import Callable, Optional
 
-from ..calculation import calculate_distance_3d
-from ..drivers.v3_spec import format_test_broadcast_line
+from ..calculation import Calculation, calculate_distance_3d
+from ..constants import SOUND_SPEED_WATER_M_S, validate_sound_speed
 from ..protocols import OnMessageCallback
 from ..types import (
     Coord,
@@ -16,10 +16,13 @@ from ..types import (
     QualityIndicatorMessage,
     RangeResponseMessage,
     UnknownMessage,
+    V3TestBroadcastMessage,
 )
 
 MOCK_BYTES_CORRECTED = 3
 MOCK_STATUS_VOLTAGE_RAW = 48123
+
+_calculation = Calculation()
 
 
 class MockEther:
@@ -29,9 +32,9 @@ class MockEther:
     mock range calculation based on node positions.
     """
 
-    def __init__(self, sound_speed: float = 1500.0) -> None:
+    def __init__(self, sound_speed: float = SOUND_SPEED_WATER_M_S) -> None:
         self._transports: dict[str, MockTransport] = {}
-        self._sound_speed = sound_speed
+        self._sound_speed = validate_sound_speed(sound_speed)
         self._heard_data_packet: dict[str, bool] = {}
 
     def register(self, transport: MockTransport) -> None:
@@ -69,11 +72,7 @@ class MockEther:
 
         distance = self._calculate_distance(sender, target)
 
-        # Convert to timestamp in 100us units (per modem spec):
-        # timestamp = round(travel_time / 3.125e-5)
-        travel_time = distance / self._sound_speed
-        timestamp = round(travel_time / 3.125e-5)
-
+        timestamp = _calculation.distance_to_timestamp(distance, self._sound_speed)
         sender.deliver(RangeResponseMessage(node_id=target_id, timestamp=timestamp))
 
     def request_test(self, sender_id: str, target_id: str) -> None:
@@ -89,8 +88,7 @@ class MockEther:
             LocalAckMessage(command="test", target_id=target_id),
         )
 
-        line = format_test_broadcast_line(target_id)
-        message = UnknownMessage(raw=line)
+        message = V3TestBroadcastMessage(node_id=target_id)
         for listener in self.get_all_except(target_id):
             listener.deliver(message)
             self._heard_data_packet[listener.node_id] = True

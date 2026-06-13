@@ -15,9 +15,10 @@ from ..types import (
     Message,
     RangeResponseMessage,
     UnknownMessage,
+    V3TestBroadcastMessage,
 )
 from .v3_line_parsers import parse_local_ack_line, parse_quality_line, parse_status_line
-from .v3_spec import normalize_modem_response_line
+from .v3_spec import normalize_modem_response_line, parse_test_broadcast_sender
 
 RANGE_RESPONSE_RE = re.compile(r"^#R(\d{3})T(\d{5})$")
 BROADCAST_DATA_RE = re.compile(r"^#B(\d{3})(\d{2})(.+)$")
@@ -84,6 +85,9 @@ class NanomodemV3Driver:
         match = BROADCAST_DATA_RE.match(line)
         if match is None:
             return None
+        sender_id = parse_test_broadcast_sender(line)
+        if sender_id is not None:
+            return V3TestBroadcastMessage(node_id=sender_id)
         body = match.group(3)
         return self._codec.decode(body.encode("ascii"))
 

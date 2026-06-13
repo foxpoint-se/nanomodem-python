@@ -79,6 +79,13 @@ class ModemStatusMessage:
 
 
 @dataclass(frozen=True)
+class V3TestBroadcastMessage:
+    """Received #B broadcast of the fixed v3 DSSS test payload from node_id."""
+
+    node_id: str
+
+
+@dataclass(frozen=True)
 class UnknownMessage:
     """Catch-all for anything the system can't parse yet. Nothing is lost."""
 
@@ -91,5 +98,6 @@ Message = (
     | QualityIndicatorMessage
     | LocalAckMessage
     | ModemStatusMessage
+    | V3TestBroadcastMessage
     | UnknownMessage
 )

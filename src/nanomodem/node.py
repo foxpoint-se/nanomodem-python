@@ -12,6 +12,7 @@ import time
 from typing import Callable, Optional
 
 from .calculation import Calculation
+from .constants import SOUND_SPEED_WATER_M_S, validate_sound_speed
 from .drivers.v3_spec import supply_voltage_volts
 from .errors import ModemIdMismatchError, ModemStatusTimeoutError
 from .protocols import CalculationProtocol, TransportProtocol
@@ -26,6 +27,7 @@ from .types import (
     QualityIndicatorMessage,
     RangeResponseMessage,
     UnknownMessage,
+    V3TestBroadcastMessage,
 )
 
 logger = logging.getLogger(__name__)
@@ -51,7 +53,7 @@ class AcousticNode:
         transport: TransportProtocol,
         calculation: Optional[CalculationProtocol] = None,
         position: Optional[Coord] = None,
-        sound_speed: float = 1500.0,
+        sound_speed: float = SOUND_SPEED_WATER_M_S,
         on_position_changed: Optional[Callable[[Optional[Coord]], None]] = None,
         on_depth_changed: Optional[Callable[[float], None]] = None,
         on_known_nodes_changed: Optional[Callable[[dict[str, KnownNode]], None]] = None,
@@ -64,7 +66,7 @@ class AcousticNode:
         self._calculation: CalculationProtocol = calculation or Calculation()
         self._position = position
         self._depth = 0.0
-        self._sound_speed = sound_speed
+        self._sound_speed = validate_sound_speed(sound_speed)
         self._capabilities = NodeCapabilities()
         self._known_nodes: dict[str, KnownNode] = {}
 
@@ -88,6 +90,10 @@ class AcousticNode:
     @property
     def calculation(self) -> CalculationProtocol:
         return self._calculation
+
+    @property
+    def sound_speed(self) -> float:
+        return self._sound_speed
 
     @property
     def capabilities(self) -> NodeCapabilities:
@@ -260,6 +266,8 @@ class AcousticNode:
                     raw,
                     volts,
                 )
+            case V3TestBroadcastMessage(node_id=nid):
+                logger.info("Test broadcast from %s", nid)
             case UnknownMessage(raw=raw):
                 logger.info("Unhandled message: %s", raw)
 

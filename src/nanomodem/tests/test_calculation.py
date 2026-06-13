@@ -132,3 +132,24 @@ def test_should_convert_with_different_sound_speed() -> None:
     # Same timestamp, air speed of sound (340 m/s)
     result = calc.timestamp_to_distance(timestamp=32000, sound_speed=340.0)
     assert abs(result - 340.0) < 0.1
+
+
+def test_should_roundtrip_distance_and_timestamp_in_water() -> None:
+    distance = 150.0
+    sound_speed = 1500.0
+    timestamp = calc.distance_to_timestamp(distance, sound_speed)
+    assert abs(calc.timestamp_to_distance(timestamp, sound_speed) - distance) < 0.01
+
+
+def test_should_roundtrip_distance_and_timestamp_in_air() -> None:
+    distance = 10.0
+    sound_speed = 340.0
+    timestamp = calc.distance_to_timestamp(distance, sound_speed)
+    assert abs(calc.timestamp_to_distance(timestamp, sound_speed) - distance) < 0.01
+
+
+def test_should_reject_invalid_sound_speed_in_timestamp_conversion() -> None:
+    with pytest.raises(ValueError, match="positive"):
+        calc.timestamp_to_distance(100, 0.0)
+    with pytest.raises(ValueError, match="positive"):
+        calc.distance_to_timestamp(10.0, -1.0)

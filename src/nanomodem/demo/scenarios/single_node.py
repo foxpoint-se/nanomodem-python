@@ -9,6 +9,7 @@ import tkinter as tk
 from typing import Optional
 
 from nanomodem.codecs.v3 import Codec
+from nanomodem.constants import SOUND_SPEED_WATER_M_S
 from nanomodem.demo.controller import ControllerWindow
 from nanomodem.demo.sim_types import AcousticTransportConfig
 from nanomodem.demo.simulator_protocol import SimulatorInboundHandlers, SimulatorMetadataClient
@@ -36,6 +37,7 @@ def launch_single(
     world_host: Optional[str] = None,
     world_port: Optional[int] = None,
     world_pty: Optional[str] = None,
+    sound_speed: float = SOUND_SPEED_WATER_M_S,
 ) -> ControllerWindow:
     """Create a single controller with the given ID and transport.
 
@@ -64,7 +66,7 @@ def launch_single(
             acoustic_config = None
     else:
         # Mock mode (in-memory)
-        ether = MockEther(sound_speed=1500.0)
+        ether = MockEther(sound_speed=sound_speed)
         mock_transport = MockTransport(node_id, ether)
         transport = mock_transport
         acoustic_config = None
@@ -77,6 +79,7 @@ def launch_single(
         peer_ids=[],  # Starts empty
         map_center=MAP_CENTER,
         map_zoom=MAP_ZOOM,
+        sound_speed=sound_speed,
     )
 
     if isinstance(transport, MockTransport):
@@ -147,6 +150,12 @@ def main() -> None:
         help="PTY path for Simulator to listen on (serial mode only, e.g. /dev/pts/5)",
     )
     parser.add_argument("--log-level", type=str, default="INFO", help="Logging level (default: INFO)")
+    parser.add_argument(
+        "--sound-speed",
+        type=float,
+        default=SOUND_SPEED_WATER_M_S,
+        help="Speed of sound in m/s for ranging (default: 1500 water; use 340 for air bench)",
+    )
 
     args = parser.parse_args()
 
@@ -191,6 +200,7 @@ def main() -> None:
     else:
         print("  Transport: MockTransport (in-memory)")
     print(f"  Log level: {args.log_level.upper()}")
+    print(f"  Sound speed: {args.sound_speed:.0f} m/s")
     print("GUI opened. Use console to see incoming messages.")
 
     root = tk.Tk()
@@ -206,6 +216,7 @@ def main() -> None:
         world_host=world_host,
         world_port=world_port,
         world_pty=args.world_port,
+        sound_speed=args.sound_speed,
     )
 
     root.mainloop()

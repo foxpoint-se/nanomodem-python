@@ -8,8 +8,10 @@ from nanomodem.codecs.v3 import Codec
 from nanomodem.drivers.v3 import NanomodemV3Driver
 from nanomodem.drivers.v3_spec import (
     TEST_MESSAGE_PAYLOAD,
+    format_test_broadcast_line,
     is_test_broadcast_line,
     normalize_modem_response_line,
+    parse_test_broadcast_sender,
     supply_voltage_volts,
 )
 from nanomodem.types import (
@@ -20,6 +22,7 @@ from nanomodem.types import (
     QualityIndicatorMessage,
     RangeResponseMessage,
     UnknownMessage,
+    V3TestBroadcastMessage,
 )
 
 
@@ -158,6 +161,20 @@ def test__should_treat_invalid_quality_line_as_unknown() -> None:
     driver = _make_driver()
     assert isinstance(driver.parse_line("$C9"), UnknownMessage)
     assert isinstance(driver.parse_line("$Cx"), UnknownMessage)
+
+
+def test__should_parse_test_broadcast_sender() -> None:
+    line = format_test_broadcast_line("002")
+    assert parse_test_broadcast_sender(line) == "002"
+    assert is_test_broadcast_line(line) is True
+
+
+def test__should_parse_test_broadcast_line_as_message() -> None:
+    driver = _make_driver()
+    line = format_test_broadcast_line("002")
+    msg = driver.parse_line(line)
+    assert isinstance(msg, V3TestBroadcastMessage)
+    assert msg.node_id == "002"
 
 
 def test__should_detect_test_broadcast_line() -> None:

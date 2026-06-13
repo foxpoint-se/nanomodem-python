@@ -16,6 +16,7 @@ from PIL import Image, ImageDraw, ImageTk
 from tkintermapview import TkinterMapView
 from tkintermapview.canvas_position_marker import CanvasPositionMarker
 
+from nanomodem.constants import SOUND_SPEED_WATER_M_S
 from nanomodem.demo.simulator.backends import HybridBackend
 from nanomodem.demo.simulator.state import SimulatorState
 from nanomodem.types import Coord
@@ -469,6 +470,7 @@ def launch_simulator(
     root: tk.Tk,
     host: str = "127.0.0.1",
     port: int = 5555,
+    sound_speed: float = SOUND_SPEED_WATER_M_S,
 ) -> SimulatorWindow:
     """Launch the God View Simulator with the HybridBackend.
 
@@ -477,6 +479,6 @@ def launch_simulator(
         host: Host to bind the metadata server to
         port: Port to bind the metadata server to
     """
-    state = SimulatorState()
+    state = SimulatorState(sound_speed=sound_speed)
     backend = HybridBackend(state, host=host, port=port)
     return SimulatorWindow(root, state, backend)

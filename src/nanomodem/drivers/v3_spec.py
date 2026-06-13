@@ -46,12 +46,19 @@ def format_test_broadcast_line(node_id: str) -> str:
     return f"#B{node_id}{byte_count}{TEST_MESSAGE_PAYLOAD}"
 
 
-def is_test_broadcast_line(line: str) -> bool:
-    """True if line is a received broadcast of the fixed v3 test payload."""
+def parse_test_broadcast_sender(line: str) -> str | None:
+    """Return sender node id if line is a received v3 test broadcast."""
     match = _BROADCAST_DATA_RE.match(line)
     if match is None:
-        return False
+        return None
     byte_count = int(match.group(2))
     if byte_count != TEST_MESSAGE_BYTE_COUNT:
-        return False
-    return match.group(3) == TEST_MESSAGE_PAYLOAD
+        return None
+    if match.group(3) != TEST_MESSAGE_PAYLOAD:
+        return None
+    return match.group(1)
+
+
+def is_test_broadcast_line(line: str) -> bool:
+    """True if line is a received broadcast of the fixed v3 test payload."""
+    return parse_test_broadcast_sender(line) is not None

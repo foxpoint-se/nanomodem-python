@@ -6,6 +6,7 @@ import argparse
 import logging
 import tkinter as tk
 
+from nanomodem.constants import SOUND_SPEED_WATER_M_S
 from nanomodem.demo.simulator.app import launch_simulator
 
 
@@ -29,6 +30,12 @@ def main() -> None:
         default="INFO",
         help="Logging level (default: INFO)",
     )
+    parser.add_argument(
+        "--sound-speed",
+        type=float,
+        default=SOUND_SPEED_WATER_M_S,
+        help="Speed of sound in m/s for simulated ranging (default: 1500; use 340 for air bench)",
+    )
 
     args = parser.parse_args()
 
@@ -39,6 +46,7 @@ def main() -> None:
 
     print("=== God View Simulator ===")
     print(f"  Metadata server: {args.host}:{args.port}")
+    print(f"  Sound speed: {args.sound_speed:.0f} m/s")
     print("\nWaiting for controllers to connect...")
     print("\nController examples:")
     print("  Network mode:  nanomodem-controller 001 --network 127.0.0.1:5555")
@@ -49,7 +57,12 @@ def main() -> None:
     root = tk.Tk()
     root.withdraw()
 
-    _simulator = launch_simulator(root, host=args.host, port=args.port)
+    _simulator = launch_simulator(
+        root,
+        host=args.host,
+        port=args.port,
+        sound_speed=args.sound_speed,
+    )
 
     root.mainloop()
 

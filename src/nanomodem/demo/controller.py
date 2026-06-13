@@ -20,6 +20,8 @@ from tkintermapview.canvas_position_marker import CanvasPositionMarker
 from tkintermapview.map_widget import CanvasPath
 
 from nanomodem import supply_voltage_volts
+from nanomodem.constants import SOUND_SPEED_WATER_M_S
+from nanomodem.drivers.v3_spec import TEST_MESSAGE_PAYLOAD
 from nanomodem.node import AcousticNode
 from nanomodem.protocols import TransportProtocol
 from nanomodem.types import (
@@ -32,6 +34,7 @@ from nanomodem.types import (
     QualityIndicatorMessage,
     RangeResponseMessage,
     UnknownMessage,
+    V3TestBroadcastMessage,
 )
 
 NODE_COLORS = [
@@ -84,6 +87,7 @@ class ControllerWindow:
         map_zoom: int = 16,
         position: Optional[Coord] = None,
         window_geometry: Optional[str] = None,
+        sound_speed: float = SOUND_SPEED_WATER_M_S,
     ) -> None:
         self._root = root
         self._peer_ids = peer_ids
@@ -128,6 +132,7 @@ class ControllerWindow:
             node_id=node_id,
             transport=transport,
             position=position,
+            sound_speed=sound_speed,
             on_position_changed=self._handle_position_changed,
             on_depth_changed=_on_depth_changed,
             on_known_nodes_changed=_on_known_nodes_changed,
@@ -234,10 +239,12 @@ class ControllerWindow:
         range_row = ttk.Frame(frame)
         range_row.pack(fill=tk.X, padx=4, pady=(4, 2))
 
-        ttk.Label(range_row, text="Range to:").pack(side=tk.LEFT)
+        ttk.Label(range_row, text="Target:").pack(side=tk.LEFT)
         self._range_target = ttk.Combobox(range_row, width=6)
         self._range_target.pack(side=tk.LEFT, padx=4)
-        ttk.Button(range_row, text="Request range", command=self._on_request_range).pack(side=tk.LEFT)
+        ttk.Button(range_row, text="Request range", command=self._on_request_range).pack(side=tk.LEFT, padx=(0, 4))
+        ttk.Button(range_row, text="Request test", command=self._on_request_test).pack(side=tk.LEFT, padx=(0, 4))
+        ttk.Button(range_row, text="Query quality", command=self._on_query_quality).pack(side=tk.LEFT)
 
         # Button row
         btn_row = ttk.Frame(frame)
@@ -383,11 +390,22 @@ class ControllerWindow:
         self._refresh_ui()
 
     def _on_request_range(self) -> None:
-        target = self._range_target.get()
+        target = self._range_target.get().strip()
         if not target:
             return
         self._log(f"Ranging to {target}...")
         self._node.request_range(target)
+
+    def _on_request_test(self) -> None:
+        target = self._range_target.get().strip()
+        if not target:
+            return
+        self._log(f"Requesting test from {target} ($T)...")
+        self._node.request_test(target)
+
+    def _on_query_quality(self) -> None:
+        self._log("Querying link quality ($Q)...")
+        self._node.query_quality()
 
     def _on_broadcast(self) -> None:
         if self._node.get_position() is None:
@@ -707,5 +725,7 @@ class ControllerWindow:
             case ModemStatusMessage(node_id=nid, voltage_raw=raw):
                 volts = supply_voltage_volts(raw)
                 self._log(f"Modem status: id={nid}, {volts:.2f} V (raw {raw})")
+            case V3TestBroadcastMessage(node_id=nid):
+                self._log(f"Recv TEST broadcast from {nid}: {TEST_MESSAGE_PAYLOAD}")
             case UnknownMessage(raw=raw):
                 self._log(f"Recv UNKNOWN: {raw}")

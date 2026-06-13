@@ -3,7 +3,7 @@
 import pytest
 
 from nanomodem.calculation import Calculation
-from nanomodem.drivers.v3_spec import is_test_broadcast_line
+from nanomodem.constants import SOUND_SPEED_AIR_M_S
 from nanomodem.errors import ModemIdMismatchError, ModemStatusTimeoutError
 from nanomodem.node import AcousticNode
 from nanomodem.protocols import OnMessageCallback
@@ -16,7 +16,9 @@ from nanomodem.types import (
     ModemStatusMessage,
     PositionMessage,
     QualityIndicatorMessage,
+    RangeResponseMessage,
     UnknownMessage,
+    V3TestBroadcastMessage,
 )
 
 
@@ -183,6 +185,58 @@ def test_should_store_position_of_other_node_when_position_message_received() ->
     assert known["002"].position == Coord(lat=63.0, lon=10.0)
 
 
+def test_should_expose_sound_speed_property() -> None:
+    node = AcousticNode("001", transport=_RecordingTransport(), sound_speed=SOUND_SPEED_AIR_M_S)
+    assert node.sound_speed == 340.0
+
+
+def test_should_reject_invalid_sound_speed_on_construction() -> None:
+    with pytest.raises(ValueError, match="positive"):
+        AcousticNode("001", transport=_RecordingTransport(), sound_speed=0.0)
+
+
+def test_should_convert_range_with_air_sound_speed() -> None:
+    calc = Calculation()
+    ether = MockEther(sound_speed=SOUND_SPEED_AIR_M_S)
+    host_transport = MockTransport("001", ether)
+    host_transport.position = Coord(lat=63.0, lon=10.0)
+    host = AcousticNode(
+        "001",
+        transport=host_transport,
+        calculation=calc,
+        sound_speed=SOUND_SPEED_AIR_M_S,
+    )
+    host.set_depth(0.0)
+    beacon_transport = MockTransport("002", ether)
+    beacon_transport.position = Coord(lat=63.0, lon=10.0)
+    beacon = AcousticNode("002", transport=beacon_transport, calculation=calc)
+    beacon.set_depth(10.0)
+    beacon_transport.get_depth_callback = beacon.get_depth
+
+    host.request_range("002")
+
+    known = host.get_known_nodes()
+    assert known["002"].last_range is not None
+    assert abs(known["002"].last_range - 10.0) < 0.5
+
+
+def test_should_convert_timestamp_from_range_message_with_custom_sound_speed() -> None:
+    transport = _RecordingTransport()
+    calc = Calculation()
+    node = AcousticNode(
+        "001",
+        transport=transport,
+        calculation=calc,
+        sound_speed=SOUND_SPEED_AIR_M_S,
+    )
+    timestamp = calc.distance_to_timestamp(10.0, SOUND_SPEED_AIR_M_S)
+    assert transport._callback is not None
+    transport._callback(RangeResponseMessage(node_id="002", timestamp=timestamp))
+    known = node.get_known_nodes()
+    assert known["002"].last_range is not None
+    assert abs(known["002"].last_range - 10.0) < 0.01
+
+
 def test_should_update_range_of_known_node_when_range_response_received() -> None:
     ether = MockEther(sound_speed=1500.0)
     host = _make_node("001", position=Coord(lat=63.0, lon=10.0), ether=ether)
@@ -326,7 +380,7 @@ def test__should_receive_test_ack_and_broadcast_via_mock() -> None:
 
     assert any(isinstance(m, LocalAckMessage) for m in received)
     assert any(
-        isinstance(m, UnknownMessage) and is_test_broadcast_line(m.raw) for m in received
+        isinstance(m, V3TestBroadcastMessage) and m.node_id == "002" for m in received
     )
     assert any(
         isinstance(m, QualityIndicatorMessage) and m.bytes_corrected is not None

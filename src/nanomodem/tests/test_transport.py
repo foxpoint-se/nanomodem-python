@@ -1,6 +1,5 @@
 """Tests for MockTransport + MockEther."""
 
-from nanomodem.drivers.v3_spec import is_test_broadcast_line
 from nanomodem.transports.mock import (
     MOCK_BYTES_CORRECTED,
     MOCK_STATUS_VOLTAGE_RAW,
@@ -16,6 +15,7 @@ from nanomodem.types import (
     QualityIndicatorMessage,
     RangeResponseMessage,
     UnknownMessage,
+    V3TestBroadcastMessage,
 )
 
 
@@ -186,12 +186,12 @@ def test__should_deliver_local_ack_and_test_broadcast_on_request_test() -> None:
     assert isinstance(sender_msgs[0], LocalAckMessage)
     assert sender_msgs[0].command == "test"
     assert sender_msgs[0].target_id == "002"
-    assert isinstance(sender_msgs[1], UnknownMessage)
-    assert is_test_broadcast_line(sender_msgs[1].raw)
+    assert isinstance(sender_msgs[1], V3TestBroadcastMessage)
+    assert sender_msgs[1].node_id == "002"
 
     assert len(listener_msgs) == 1
-    assert isinstance(listener_msgs[0], UnknownMessage)
-    assert is_test_broadcast_line(listener_msgs[0].raw)
+    assert isinstance(listener_msgs[0], V3TestBroadcastMessage)
+    assert listener_msgs[0].node_id == "002"
 
 
 def test__should_return_quality_after_test_broadcast() -> None:
