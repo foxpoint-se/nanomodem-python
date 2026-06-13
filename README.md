@@ -111,6 +111,12 @@ uv run nanomodem-controller 001 --port /dev/pts/4 --world 127.0.0.1:5555 --world
 
 Serial mode tests the full `SerialTransport`, `Driver`, and `Codec` stack — the same code that runs on the boat. Acoustic data flows through the PTY, while metadata (registration, GPS updates) flows through a TCP connection to the simulator.
 
+**All-in-one serial test** (socat + simulator + two controllers in one process):
+
+```bash
+uv run python -m nanomodem.demo.scenarios.serial_bridge_with_god_view
+```
+
 ### Real Hardware (Single Modem on Serial)
 
 ```python
@@ -216,18 +222,19 @@ graph TD
 │       ├── calculation.py      # Trilateration, projection, timestamp conversion
 │       ├── transports/
 │       │   ├── mock.py         # MockTransport + MockEther (in-memory)
-│       │   └── serial.py       # SerialTransport (real hardware)
+│       │   ├── serial.py       # SerialTransport (real hardware)
+│       │   └── network.py      # NetworkMockTransport (simulator TCP)
 │       ├── drivers/
 │       │   └── v3.py           # NanomodemV3Driver (modem command protocol)
 │       ├── codecs/
 │       │   └── v3.py           # Codec (message body encoding)
-│       ├── demo/               # Demo scenarios (installed with [demo] extra)
+│       ├── demo/               # Demo tools (installed with [demo] extra)
 │       │   ├── controller.py   # Per-node ControllerWindow
-│       │   └── scenarios/
-│       │       ├── mock_4_nodes.py  # 4-node simulation
-│       │       └── single_node.py  # Single node UI
+│       │   ├── simulator/      # God View simulator (`nanomodem-simulator`)
+│       │   └── scenarios/      # mock_4_nodes, single_node, serial_bridge_with_god_view, …
 │       ├── __main__.py         # CLI entry point (mock demo)
 │       └── tests/              # Unit + integration tests
+├── plans/TODO.md               # Forward-looking backlog
 ├── pyproject.toml
 └── README.md
 ```

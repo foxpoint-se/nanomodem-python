@@ -1,8 +1,16 @@
 # TODO
 
-## Debug / God view
+## Driver / transport layering
 
-- [ ] Optional "god view" window for mock mode debugging — shows all nodes' ground-truth positions on a single map, regardless of what individual nodes know. Useful for validating the system visually, but not part of the primary design.
+- [ ] Expose raw V3 commands ($P, $B, $U, $M, $E, $A…) on driver + transport
+- [ ] Stop hardcoding `request_range()` → ping; let consumer pick command ($M vs $P)
+- [ ] Split hardware responses (#R, #B…) from codec payload decoding
+- [ ] Node owns codec for encode/decode; transport moves bytes only
+
+## AcousticNode API
+
+- [ ] `NodeUpdate` + `update_known_node()`
+- [ ] Callbacks: `on_range_measured`, per-node update/delete, `on_position_inferred`
 
 ## MockEther enhancements
 
@@ -26,11 +34,9 @@
 
 ## Commands and statuses
 
-- [ ] Supply voltage query ($? and $Vxxx)
+- [ ] Supply voltage query ($Vxxx)
 - [ ] Address configuration ($Axxx)
-- [ ] Test message ($Txxx)
 - [ ] Echo test ($Exxx)
-- [ ] Quality indicator ($Q)
 
 ## NanomodemTransport
 

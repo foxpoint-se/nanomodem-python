@@ -41,8 +41,8 @@ include = ["src"]
 "src" = ""
 
 [tool.pytest.ini_options]
-testpaths = ["src/nanomodem/tests", "temp_experiments_to_be_removed_later/tests"]
-pythonpath = ["src", "."]
+testpaths = ["src/nanomodem/tests"]
+pythonpath = ["src"]
 
 [tool.mypy]
 python_version = "3.12"
