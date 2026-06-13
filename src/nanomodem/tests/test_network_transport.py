@@ -244,3 +244,15 @@ def test_network_transport_request_range() -> None:
         transport.stop()
     finally:
         server.stop()
+
+
+def test__should_stop_safely_when_reader_was_never_started() -> None:
+    """stop() before start() must not raise when the reader thread was never started."""
+    server = MockSimulatorServer(port=5561)
+    server.start()
+
+    try:
+        transport = NetworkMockTransport(node_id="001", port=5561)
+        transport.stop()
+    finally:
+        server.stop()

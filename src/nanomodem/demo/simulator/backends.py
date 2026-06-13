@@ -195,11 +195,11 @@ class HybridBackend:
         self.running = False
 
         # Stop all serial readers
-        for reader in self.serial_readers.values():
+        for reader in list(self.serial_readers.values()):
             reader.stop()
 
         # Close all TCP clients
-        for client_socket in self.metadata_clients.values():
+        for client_socket in list(self.metadata_clients.values()):
             client_socket.close()
 
         # Close server

@@ -103,6 +103,10 @@ def test__should_return_none_when_broadcast_is_incomplete() -> None:
     assert split_modem_command(b"$B32P001") is None
 
 
+def test__should_return_none_when_broadcast_length_is_not_numeric() -> None:
+    assert split_modem_command(b"$BxxP001") is None
+
+
 def test__should_parse_broadcast_command() -> None:
     raw = b"$B32P001+59.310000+017.975000005.000"
     result = parse_broadcast(raw)

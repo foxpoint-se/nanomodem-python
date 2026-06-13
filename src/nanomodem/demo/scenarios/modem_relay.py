@@ -64,7 +64,10 @@ def split_modem_command(buffer: bytes) -> tuple[bytes, bytes] | None:
     if buf.startswith(b"$B"):
         if len(buf) < 4:
             return None
-        body_len = int(buf[2:4])
+        length_bytes = buf[2:4]
+        if not length_bytes.isdigit():
+            return None
+        body_len = int(length_bytes)
         total = 4 + body_len
         if len(buf) < total:
             return None

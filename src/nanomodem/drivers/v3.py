@@ -1,8 +1,8 @@
 """Nanomodem v3 driver — modem command protocol and response parsing.
 
-Formats outgoing commands ($P, $B, $T, $Q) and parses incoming responses
-(#R, #B, #U, $C) per the nanomodem v3 user guide. Uses a CodecProtocol
-for body encoding/decoding.
+Formats outgoing commands ($P, $B, $T, $Q, $?) and parses incoming responses
+(#R, #B, #U, #A status, local acks $B/$P/$T, quality $C/$C-) per the
+nanomodem v3 user guide. Uses a CodecProtocol for body encoding/decoding.
 """
 
 from __future__ import annotations

@@ -72,18 +72,25 @@ class NetworkMockTransport:
             daemon=True,
             name=f"network-{node_id}-reader",
         )
+        self._reader_started = False
 
     def start(self) -> None:
         """Start the background reader thread."""
         self._running = True
         self._reader_thread.start()
+        self._reader_started = True
 
     def stop(self) -> None:
         """Stop the background reader and close the socket."""
         self._running = False
-        self._reader_thread.join(timeout=2.0)
         with self._lock:
+            try:
+                self._socket.shutdown(socket.SHUT_RDWR)
+            except OSError:
+                pass
             self._socket.close()
+        if self._reader_started:
+            self._reader_thread.join(timeout=2.0)
 
     def broadcast_position(self, coord: Coord, depth: float) -> None:
         """Broadcast position via the simulator (encodes as modem command)."""
