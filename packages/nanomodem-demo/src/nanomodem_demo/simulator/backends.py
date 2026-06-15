@@ -12,13 +12,14 @@ import json
 import logging
 import socket
 import threading
-from typing import Any, Callable, Optional
+from typing import Callable, Optional
 
 import serial
 from nanomodem.calculation import calculate_distance_3d
 from nanomodem.codecs.v3 import Codec
 from nanomodem.drivers.v3 import NanomodemV3Driver
 from nanomodem.serial_logger import format_serial_log
+from nanomodem.sim_types import AcousticMessageEvent, AcousticTransportConfig, GPSUpdateMessage
 from nanomodem.transports.mock import MOCK_STATUS_VOLTAGE_RAW
 from nanomodem.types import Coord, PositionMessage
 
@@ -223,7 +224,7 @@ class HybridBackend:
 
             client_socket = self.metadata_clients[target_node_id]
             encoded = base64.b64encode(data).decode("ascii")
-            msg: dict[str, Any] = {"type": "acoustic_message", "data": encoded}
+            msg: AcousticMessageEvent = {"type": "acoustic_message", "data": encoded}
             line = json.dumps(msg) + "\n"
 
             try:
