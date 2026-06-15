@@ -40,7 +40,7 @@
 
 ## NanomodemTransport
 
-- [ ] Wire NanomodemTransport into __main__.py main loop
+- [ ] Wire NanomodemTransport into demo scenario main loop (e.g. `text_mock_demo.py`)
 - [ ] Application-level timeout for $M (unicast with ack)
 - [ ] Unicast data send_to / send_to_with_ack methods
 - [ ] Handle serial disconnection and reconnection

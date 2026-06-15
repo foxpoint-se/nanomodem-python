@@ -44,8 +44,10 @@ verify-dist:
 	uv run --no-project --directory packages/nanomodem --with . python -c "from nanomodem.node import AcousticNode; print('✅ Library distribution verified')"
 
 verify-dist-demo:
+	# Tests demo wheel can import lib from sibling path (workspace dev check)
+	# For production install validation, test: pip install from git subdirectories
 	@echo "Verifying demo distribution (isolated install)..."
-	uv run --no-project --directory packages/nanomodem-demo --with . --with ../nanomodem python -c "from nanomodem_demo.scenarios.mock_4_nodes import main; print('✅ Demo distribution verified')"
+	UV_NO_CACHE=1 uv run --no-project --directory packages/nanomodem-demo --with . --with ../nanomodem python -c "from nanomodem_demo.scenarios.mock_4_nodes import main; print('✅ Demo distribution verified')"
 
 run-bridge:
 	uv run nanomodem-bridge

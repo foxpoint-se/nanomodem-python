@@ -120,7 +120,11 @@ uv run python -m nanomodem_demo.scenarios.serial_bridge_with_god_view
 ### Real Hardware (Single Modem on Serial)
 
 ```python
-from nanomodem import AcousticNode, SerialTransport, NanomodemV3Driver, Codec, Coord
+from nanomodem.codecs.v3 import Codec
+from nanomodem.drivers.v3 import NanomodemV3Driver
+from nanomodem.node import AcousticNode
+from nanomodem.transports.serial import SerialTransport
+from nanomodem.types import Coord
 
 # Wire up: codec -> driver -> transport -> node
 driver = NanomodemV3Driver(codec=Codec())
@@ -143,7 +147,10 @@ transport.stop()
 ### Two Mock Nodes (No Hardware)
 
 ```python
-from nanomodem import AcousticNode, MockEther, MockTransport, Coord, SOUND_SPEED_WATER_M_S
+from nanomodem.constants import SOUND_SPEED_WATER_M_S
+from nanomodem.node import AcousticNode
+from nanomodem.transports.mock import MockEther, MockTransport
+from nanomodem.types import Coord
 
 ether = MockEther(sound_speed=SOUND_SPEED_WATER_M_S)
 

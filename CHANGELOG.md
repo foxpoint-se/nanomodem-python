@@ -9,6 +9,7 @@
 - Split monolithic package into uv workspace: `packages/nanomodem` (library) and `packages/nanomodem-demo` (GUI apps).
 - Removed `nanomodem.demo` import path; use `nanomodem_demo` and install `nanomodem-demo` separately.
 - Deprecated `[demo]` extra on the library; install `nanomodem-demo` from git `#subdirectory=packages/nanomodem-demo` instead.
+- Removed root package re-exports; import from submodules (e.g., `from nanomodem.node import AcousticNode`).
 
 ## v1.2.0 (2026-06-13)
 

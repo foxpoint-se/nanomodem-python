@@ -9,5 +9,6 @@ pip install "git+https://github.com/foxpoint-se/nanomodem-python.git#subdirector
 ```
 
 ```python
-from nanomodem import AcousticNode, MockTransport, MockEther
+from nanomodem.node import AcousticNode
+from nanomodem.transports.mock import MockEther, MockTransport
 ```
