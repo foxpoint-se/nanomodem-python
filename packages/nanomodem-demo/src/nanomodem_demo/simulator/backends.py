@@ -127,8 +127,10 @@ class SerialReader:
             except serial.SerialException:
                 logger.exception("Serial error for node %s", self.node_id)
                 break
-            except Exception:
-                logger.exception("Error reading from PTY for node %s", self.node_id)
+            except OSError as exc:
+                logger.exception("I/O error reading from PTY for node %s", self.node_id)
+                self.on_error(self.node_id, exc)
+                break
 
 
 class HybridBackend:
