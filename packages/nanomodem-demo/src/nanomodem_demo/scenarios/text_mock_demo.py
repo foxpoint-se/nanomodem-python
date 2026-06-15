@@ -9,7 +9,11 @@ from __future__ import annotations
 import argparse
 import logging
 
-from nanomodem import SOUND_SPEED_WATER_M_S, AcousticNode, Calculation, Coord, MockEther, MockTransport
+from nanomodem.calculation import Calculation
+from nanomodem.constants import SOUND_SPEED_WATER_M_S
+from nanomodem.node import AcousticNode
+from nanomodem.transports.mock import MockEther, MockTransport
+from nanomodem.types import Coord
 
 logging.basicConfig(
     level=logging.INFO,

@@ -14,9 +14,8 @@ from datetime import datetime
 from tkinter import ttk
 from typing import Callable, Optional
 
-from nanomodem import supply_voltage_volts
 from nanomodem.constants import SOUND_SPEED_WATER_M_S
-from nanomodem.drivers.v3_spec import TEST_MESSAGE_PAYLOAD
+from nanomodem.drivers.v3_spec import TEST_MESSAGE_PAYLOAD, supply_voltage_volts
 from nanomodem.node import AcousticNode
 from nanomodem.protocols import TransportProtocol
 from nanomodem.transports.mock import MockTransport
