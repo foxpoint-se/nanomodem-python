@@ -4,9 +4,7 @@ from __future__ import annotations
 
 import re
 
-TEST_MESSAGE_PAYLOAD = (
-    "Hello! This is a Nanomodem v3 DSSS test transmission at 640 bps."
-)
+TEST_MESSAGE_PAYLOAD = "Hello! This is a Nanomodem v3 DSSS test transmission at 640 bps."
 TEST_MESSAGE_BYTE_COUNT = len(TEST_MESSAGE_PAYLOAD)
 MAX_BYTES_CORRECTED = 8
 SUPPLY_VOLTAGE_SCALE = 15.0 / 65536.0

@@ -2,20 +2,20 @@
 
 help:
 	@echo "Available commands:"
-	@echo "  make install      - Install dependencies using uv"
+	@echo "  make install      - Install workspace dependencies using uv"
 	@echo "  make clean-env    - Delete virtual environment"
 	@echo "  make lint         - Check code style and quality using ruff"
 	@echo "  make format       - Format code using ruff"
 	@echo "  make typecheck    - Check types using mypy"
 	@echo "  make test         - Run all code checks and tests using pytest"
 	@echo "  make verify-dist  - Verify the library is installable and importable"
-	@echo "  make verify-dist-demo - Verify the demo scenarios are installable"
+	@echo "  make verify-dist-demo - Verify the demo package is installable"
 	@echo "  make run-bridge   - Run the serial bridge scenario (requires socat)"
 	@echo "  make run-controller - Run a single controller (mock or serial)"
 
 install:
-	@echo "Installing dependencies with uv..."
-	uv sync --all-extras
+	@echo "Installing workspace dependencies with uv..."
+	uv sync --all-groups
 	@echo "✓ Dependencies installed."
 
 clean-env:
@@ -28,24 +28,24 @@ clean-env:
 	fi
 
 lint:
-	uv run ruff check src
+	uv run ruff check packages
 
 format:
-	uv run ruff format src & uv run ruff check src --fix
+	uv run ruff format packages & uv run ruff check packages --fix
 
 typecheck:
-	uv run mypy src
+	uv run mypy packages/nanomodem/src packages/nanomodem-demo/src
 
 test: lint typecheck
 	uv run pytest
 
 verify-dist:
-	@echo "Verifying distribution (isolated install)..."
-	uv run --no-project --with "." python -c "from nanomodem.node import AcousticNode; print('✅ Distribution verified')"
+	@echo "Verifying library distribution (isolated install)..."
+	uv run --no-project --directory packages/nanomodem --with . python -c "from nanomodem.node import AcousticNode; print('✅ Library distribution verified')"
 
 verify-dist-demo:
 	@echo "Verifying demo distribution (isolated install)..."
-	uv run --no-project --with ".[demo]" python -c "from nanomodem.demo.scenarios.mock_4_nodes import main; print('✅ Demo distribution verified')"
+	uv run --no-project --directory packages/nanomodem-demo --with . --with ../nanomodem python -c "from nanomodem_demo.scenarios.mock_4_nodes import main; print('✅ Demo distribution verified')"
 
 run-bridge:
 	uv run nanomodem-bridge

@@ -10,16 +10,17 @@ from typing import Optional
 
 from nanomodem.codecs.v3 import Codec
 from nanomodem.constants import SOUND_SPEED_WATER_M_S
-from nanomodem.demo.controller import ControllerWindow
-from nanomodem.demo.sim_types import AcousticTransportConfig
-from nanomodem.demo.simulator_protocol import SimulatorInboundHandlers, SimulatorMetadataClient
-from nanomodem.demo.startup import verify_modem_id_at_startup
 from nanomodem.drivers.v3 import NanomodemV3Driver
 from nanomodem.protocols import TransportProtocol
+from nanomodem.sim_types import AcousticTransportConfig
+from nanomodem.simulator_protocol import SimulatorInboundHandlers, SimulatorMetadataClient
 from nanomodem.transports.mock import MockEther, MockTransport
 from nanomodem.transports.network import NetworkMockTransport
 from nanomodem.transports.serial import SerialTransport
 from nanomodem.types import Coord
+
+from nanomodem_demo.controller import ControllerWindow
+from nanomodem_demo.startup import verify_modem_id_at_startup
 
 MAP_CENTER = (59.310153, 17.975189)
 MAP_ZOOM = 16
@@ -90,7 +91,6 @@ def launch_single(
         transport.start()
 
     if isinstance(transport, NetworkMockTransport):
-
         transport.on_gps_update(lambda coord: _schedule_position_update(root, controller, coord))
 
     # Serial mode: metadata (GPS, etc.) on a separate simulator TCP connection

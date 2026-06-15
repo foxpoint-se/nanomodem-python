@@ -15,10 +15,14 @@ import threading
 from typing import Any, Callable, Optional
 
 import serial
-
 from nanomodem.calculation import calculate_distance_3d
 from nanomodem.codecs.v3 import Codec
-from nanomodem.demo.scenarios.modem_relay import (
+from nanomodem.drivers.v3 import NanomodemV3Driver
+from nanomodem.serial_logger import format_serial_log
+from nanomodem.transports.mock import MOCK_STATUS_VOLTAGE_RAW
+from nanomodem.types import Coord, PositionMessage
+
+from nanomodem_demo.scenarios.modem_relay import (
     broadcast_ack,
     broadcast_relay,
     parse_broadcast,
@@ -33,11 +37,7 @@ from nanomodem.demo.scenarios.modem_relay import (
     split_modem_command,
     status_response,
 )
-from nanomodem.demo.simulator.state import SimulatorState
-from nanomodem.drivers.v3 import NanomodemV3Driver
-from nanomodem.serial_logger import format_serial_log
-from nanomodem.transports.mock import MOCK_STATUS_VOLTAGE_RAW
-from nanomodem.types import Coord, PositionMessage
+from nanomodem_demo.simulator.state import SimulatorState
 
 logger = logging.getLogger(__name__)
 

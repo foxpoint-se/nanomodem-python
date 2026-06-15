@@ -14,11 +14,6 @@ from datetime import datetime
 from tkinter import ttk
 from typing import Callable, Optional
 
-from PIL import Image, ImageDraw, ImageTk
-from tkintermapview import TkinterMapView
-from tkintermapview.canvas_position_marker import CanvasPositionMarker
-from tkintermapview.map_widget import CanvasPath
-
 from nanomodem import supply_voltage_volts
 from nanomodem.constants import SOUND_SPEED_WATER_M_S
 from nanomodem.drivers.v3_spec import TEST_MESSAGE_PAYLOAD
@@ -37,6 +32,10 @@ from nanomodem.types import (
     UnknownMessage,
     V3TestBroadcastMessage,
 )
+from PIL import Image, ImageDraw, ImageTk
+from tkintermapview import TkinterMapView
+from tkintermapview.canvas_position_marker import CanvasPositionMarker
+from tkintermapview.map_widget import CanvasPath
 
 NODE_COLORS = [
     "#3498db",  # Blue

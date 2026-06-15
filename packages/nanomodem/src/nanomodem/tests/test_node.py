@@ -379,13 +379,8 @@ def test__should_receive_test_ack_and_broadcast_via_mock() -> None:
     host.query_quality()
 
     assert any(isinstance(m, LocalAckMessage) for m in received)
-    assert any(
-        isinstance(m, V3TestBroadcastMessage) and m.node_id == "002" for m in received
-    )
-    assert any(
-        isinstance(m, QualityIndicatorMessage) and m.bytes_corrected is not None
-        for m in received
-    )
+    assert any(isinstance(m, V3TestBroadcastMessage) and m.node_id == "002" for m in received)
+    assert any(isinstance(m, QualityIndicatorMessage) and m.bytes_corrected is not None for m in received)
 
 
 # --- Step 7: Position calculation ---

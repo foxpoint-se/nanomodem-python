@@ -4,23 +4,23 @@ Python library for underwater acoustic positioning — trilaterate a submerged n
 
 ## Installation
 
-### For Users (Library)
-
-Install the core library (includes `scipy` and `pyserial`):
+### Library Only
 
 ```bash
-pip install git+https://github.com/foxpoint-se/nanomodem-python.git
+pip install "git+https://github.com/foxpoint-se/nanomodem-python.git#subdirectory=packages/nanomodem"
 ```
 
-To include the demo scenarios and their dependencies:
+### Demo Applications
+
+Install the library first, then:
 
 ```bash
-pip install "nanomodem[demo] @ git+https://github.com/foxpoint-se/nanomodem-python.git"
+pip install "git+https://github.com/foxpoint-se/nanomodem-python.git#subdirectory=packages/nanomodem-demo"
 ```
 
 ### For Developers (Local)
 
-Clone and set up the full environment (requires `uv`):
+Clone and set up the full workspace (requires `uv`):
 
 ```bash
 git clone https://github.com/foxpoint-se/nanomodem-python.git
@@ -36,12 +36,12 @@ make lint           # Check for style and logical errors (Ruff)
 make format         # Automatically format code (Ruff)
 make typecheck      # Run strict type checking (Mypy)
 make verify-dist    # Verify the core library is installable in a clean environment
-make verify-dist-demo  # Verify the demo extra is installable in a clean environment
+make verify-dist-demo  # Verify the demo package is installable
 ```
 
 ## Usage
 
-### Demo Scenarios (requires `[demo]` extra)
+### Demo Scenarios (requires `nanomodem-demo`)
 
 **4-node mock simulation (1 host + 3 beacons):**
 
@@ -114,7 +114,7 @@ Serial mode tests the full `SerialTransport`, `Driver`, and `Codec` stack — th
 **All-in-one serial test** (socat + simulator + two controllers in one process):
 
 ```bash
-uv run python -m nanomodem.demo.scenarios.serial_bridge_with_god_view
+uv run python -m nanomodem_demo.scenarios.serial_bridge_with_god_view
 ```
 
 ### Real Hardware (Single Modem on Serial)
@@ -162,14 +162,13 @@ node_a.broadcast_position()
 print(node_b.get_known_nodes())  # Node B now knows about Node A
 ```
 
-### CLI
+### Text Mock Demo (no GUI)
 
 ```bash
-python3 -m nanomodem                                    # Mock demo (no hardware)
-python3 -m nanomodem --port /dev/ttyUSB0 --node-id 001  # Real hardware
+uv run python -m nanomodem_demo.scenarios.text_mock_demo
 ```
 
-For complete scenarios with GUI, trilateration, and multi-node setups, see `src/nanomodem/demo/scenarios/`.
+For complete scenarios with GUI, trilateration, and multi-node setups, see `packages/nanomodem-demo/`.
 
 ## Architecture
 
@@ -214,28 +213,24 @@ graph TD
 
 ```text
 .
-├── src/
-│   └── nanomodem/              # Core library
-│       ├── node.py             # AcousticNode — the only stateful class
-│       ├── protocols.py        # TransportProtocol, DriverProtocol, etc.
-│       ├── types.py            # Coord, KnownNode, Message union, etc.
-│       ├── calculation.py      # Trilateration, projection, timestamp conversion
-│       ├── transports/
-│       │   ├── mock.py         # MockTransport + MockEther (in-memory)
-│       │   ├── serial.py       # SerialTransport (real hardware)
-│       │   └── network.py      # NetworkMockTransport (simulator TCP)
-│       ├── drivers/
-│       │   └── v3.py           # NanomodemV3Driver (modem command protocol)
-│       ├── codecs/
-│       │   └── v3.py           # Codec (message body encoding)
-│       ├── demo/               # Demo tools (installed with [demo] extra)
-│       │   ├── controller.py   # Per-node ControllerWindow
-│       │   ├── simulator/      # God View simulator (`nanomodem-simulator`)
-│       │   └── scenarios/      # mock_4_nodes, single_node, serial_bridge_with_god_view, …
-│       ├── __main__.py         # CLI entry point (mock demo)
-│       └── tests/              # Unit + integration tests
+├── packages/
+│   ├── nanomodem/              # Core library (pip installable)
+│   │   └── src/nanomodem/
+│   │       ├── node.py         # AcousticNode — the only stateful class
+│   │       ├── protocols.py    # TransportProtocol, DriverProtocol, etc.
+│   │       ├── types.py        # Coord, KnownNode, Message union, etc.
+│   │       ├── calculation.py  # Trilateration, projection, timestamp conversion
+│   │       ├── transports/     # mock, serial, network
+│   │       ├── drivers/        # NanomodemV3Driver
+│   │       ├── codecs/         # Codec (message body encoding)
+│   │       └── tests/
+│   └── nanomodem-demo/         # GUI apps and scenarios (pip installable)
+│       └── src/nanomodem_demo/
+│           ├── controller.py   # Per-node ControllerWindow
+│           ├── simulator/      # God View simulator (`nanomodem-simulator`)
+│           └── scenarios/      # mock_4_nodes, single_node, serial_bridge, …
 ├── plans/TODO.md               # Forward-looking backlog
-├── pyproject.toml
+├── pyproject.toml              # Workspace root
 └── README.md
 ```
 

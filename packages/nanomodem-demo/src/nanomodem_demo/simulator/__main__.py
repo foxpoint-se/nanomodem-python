@@ -7,7 +7,8 @@ import logging
 import tkinter as tk
 
 from nanomodem.constants import SOUND_SPEED_WATER_M_S
-from nanomodem.demo.simulator.app import launch_simulator
+
+from nanomodem_demo.simulator.app import launch_simulator
 
 
 def main() -> None:
