@@ -12,9 +12,10 @@ pip install "git+https://github.com/foxpoint-se/nanomodem-python.git#subdirector
 
 ### Demo Applications
 
-Install the library first, then:
+When installing from GitHub, pip cannot pull the library from the same repo automatically (unlike `uv sync` in the dev workspace). Install both:
 
 ```bash
+pip install "git+https://github.com/foxpoint-se/nanomodem-python.git#subdirectory=packages/nanomodem"
 pip install "git+https://github.com/foxpoint-se/nanomodem-python.git#subdirectory=packages/nanomodem-demo"
 ```
 
