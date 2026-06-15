@@ -676,7 +676,8 @@ class ControllerWindow:
                 marker.set_position(lat, lon)
                 marker.set_text(text)
                 return
-            except Exception:
+            except tk.TclError:
+                # Stale widget (e.g. map redraw) — drop and recreate below.
                 self._delete_marker(key)
 
         if icon:
@@ -704,7 +705,7 @@ class ControllerWindow:
             marker = self._markers.pop(key)
             try:
                 marker.delete()
-            except Exception:
+            except tk.TclError:
                 pass
 
     def _delete_path(self, key: str) -> None:
@@ -712,7 +713,7 @@ class ControllerWindow:
             path_obj = self._paths.pop(key)
             try:
                 path_obj.delete()
-            except Exception:
+            except tk.TclError:
                 pass
 
     # ------------------------------------------------------------------ #
