@@ -242,7 +242,7 @@ class HybridBackend:
             return
 
         client_socket = self.metadata_clients[node_id]
-        msg: dict[str, Any] = {
+        msg: GPSUpdateMessage = {
             "type": "gps_update",
             "lat": coord.lat,
             "lon": coord.lon,
@@ -333,7 +333,7 @@ class HybridBackend:
         self,
         node_id: str,
         client_socket: socket.socket,
-        acoustic_config: dict[str, Any],
+        acoustic_config: AcousticTransportConfig,
     ) -> None:
         """Handle node registration and set up acoustic connection."""
         # Store metadata socket
