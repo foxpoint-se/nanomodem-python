@@ -13,7 +13,9 @@ import threading
 from typing import Optional
 
 from ..codecs.v3 import Codec
-from ..demo.simulator_protocol import (
+from ..drivers.v3 import NanomodemV3Driver
+from ..protocols import OnMessageCallback
+from ..simulator_protocol import (
     JsonLineBuffer,
     OnGpsUpdateCallback,
     SimulatorInboundHandlers,
@@ -22,8 +24,6 @@ from ..demo.simulator_protocol import (
     dispatch_simulator_line,
     send_json_line,
 )
-from ..drivers.v3 import NanomodemV3Driver
-from ..protocols import OnMessageCallback
 from ..types import Coord
 
 logger = logging.getLogger(__name__)

@@ -16,12 +16,17 @@ import threading
 import tkinter as tk
 
 import serial
-
 from nanomodem.calculation import calculate_distance_3d
 from nanomodem.codecs.v3 import Codec
 from nanomodem.constants import SOUND_SPEED_WATER_M_S
-from nanomodem.demo.controller import ControllerWindow
-from nanomodem.demo.scenarios.modem_relay import (
+from nanomodem.drivers.v3 import NanomodemV3Driver
+from nanomodem.serial_logger import format_serial_log
+from nanomodem.transports.mock import MOCK_STATUS_VOLTAGE_RAW
+from nanomodem.transports.serial import SerialTransport
+from nanomodem.types import Coord
+
+from nanomodem_demo.controller import ControllerWindow
+from nanomodem_demo.scenarios.modem_relay import (
     broadcast_ack,
     broadcast_relay,
     parse_broadcast,
@@ -36,12 +41,7 @@ from nanomodem.demo.scenarios.modem_relay import (
     split_modem_command,
     status_response,
 )
-from nanomodem.demo.startup import verify_modem_id_at_startup
-from nanomodem.drivers.v3 import NanomodemV3Driver
-from nanomodem.serial_logger import format_serial_log
-from nanomodem.transports.mock import MOCK_STATUS_VOLTAGE_RAW
-from nanomodem.transports.serial import SerialTransport
-from nanomodem.types import Coord
+from nanomodem_demo.startup import verify_modem_id_at_startup
 
 MAP_CENTER = (59.310153, 17.975189)
 MAP_ZOOM = 16
@@ -195,9 +195,7 @@ def _relay_loop(
                 if split is None:
                     break
                 command, buffer = split
-                _handle_relay_command(
-                    command, src_id, peer_id, label, positions, ports, heard_data_packet
-                )
+                _handle_relay_command(command, src_id, peer_id, label, positions, ports, heard_data_packet)
 
         except serial.SerialException as e:
             print(f"[BROKER] Serial error on {label}: {e}")

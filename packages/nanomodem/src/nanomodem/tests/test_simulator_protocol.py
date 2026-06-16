@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import base64
 
-from nanomodem.demo.simulator_protocol import (
+from nanomodem.simulator_protocol import (
     SimulatorInboundHandlers,
     dispatch_simulator_inbound,
     parse_gps_update,

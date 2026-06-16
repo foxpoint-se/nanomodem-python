@@ -1,8 +1,7 @@
-"""Entry point for the acoustic modem localization system.
+"""Text-only mock localization demo (no GUI).
 
 Usage:
-    Mock mode (demo):   python -m nanomodem
-    Real serial:        python -m nanomodem --port /dev/ttyUSB0 --baud 9600 --node-id 001
+    python -m nanomodem_demo.scenarios.text_mock_demo
 """
 
 from __future__ import annotations
@@ -10,11 +9,11 @@ from __future__ import annotations
 import argparse
 import logging
 
-from .calculation import Calculation
-from .constants import SOUND_SPEED_WATER_M_S
-from .node import AcousticNode
-from .transports.mock import MockEther, MockTransport
-from .types import Coord
+from nanomodem.calculation import Calculation
+from nanomodem.constants import SOUND_SPEED_WATER_M_S
+from nanomodem.node import AcousticNode
+from nanomodem.transports.mock import MockEther, MockTransport
+from nanomodem.types import Coord
 
 logging.basicConfig(
     level=logging.INFO,

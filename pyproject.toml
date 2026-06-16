@@ -1,54 +1,42 @@
 [project]
-name = "nanomodem"
-version = "1.2.0"
-description = "Acoustic modem localization system"
-readme = "README.md"
+name = "nanomodem-workspace"
+version = "0.0.0"
+description = "Development workspace for nanomodem packages"
 requires-python = ">=3.12"
 dependencies = [
-    "scipy>=1.10.0",
-    "pyserial>=3.5",
+    "nanomodem",
+    "nanomodem-demo",
 ]
 
-[project.optional-dependencies]
-demo = [
-    "tkintermapview>=1.29",
-    "customtkinter",
-    "pillow",
-]
+[tool.uv.workspace]
+members = ["packages/*"]
+
+[tool.uv.sources]
+nanomodem = { workspace = true }
+nanomodem-demo = { workspace = true }
+
+[dependency-groups]
 dev = [
     "pytest>=7.0",
     "mypy>=1.0.0",
     "ruff>=0.3.0",
 ]
 
-[project.scripts]
-nanomodem-demo = "nanomodem.demo.scenarios.mock_4_nodes:main"
-nanomodem-controller = "nanomodem.demo.scenarios.single_node:main"
-nanomodem-bridge = "nanomodem.demo.scenarios.serial_bridge_2_nodes:main"
-nanomodem-simulator = "nanomodem.demo.simulator.__main__:main"
-
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
-
-[tool.hatch.build.targets.wheel]
-packages = ["src/nanomodem"]
-
-[tool.hatch.build.targets.sdist]
-include = ["src"]
-
-[tool.hatch.build.targets.wheel.sources]
-"src" = ""
-
 [tool.pytest.ini_options]
-testpaths = ["src/nanomodem/tests"]
-pythonpath = ["src"]
+testpaths = [
+    "packages/nanomodem/src/nanomodem/tests",
+    "packages/nanomodem-demo/tests",
+]
+pythonpath = [
+    "packages/nanomodem/src",
+    "packages/nanomodem-demo/src",
+]
 
 [tool.mypy]
 python_version = "3.12"
 strict = true
 ignore_missing_imports = true
-mypy_path = "src"
+mypy_path = "packages/nanomodem/src:packages/nanomodem-demo/src"
 
 [tool.ruff]
 line-length = 120
@@ -65,10 +53,13 @@ skip-magic-trailing-comma = false
 line-ending = "auto"
 
 [tool.semantic_release]
-version_toml = ["pyproject.toml:project.version"]
+version_toml = [
+    "packages/nanomodem/pyproject.toml:project.version",
+    "packages/nanomodem-demo/pyproject.toml:project.version",
+]
 tag_format = "v{version}"
 commit_parser = "conventional"
 build_command = """
-uv lock --upgrade-package "$PACKAGE_NAME"
+uv lock --upgrade-package nanomodem --upgrade-package nanomodem-demo
 git add uv.lock
 """

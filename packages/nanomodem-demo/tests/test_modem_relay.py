@@ -13,8 +13,9 @@ Spec reference (section 5.2):
 from __future__ import annotations
 
 import pytest
-
-from nanomodem.demo.scenarios.modem_relay import (
+from nanomodem.drivers.v3_spec import is_test_broadcast_line
+from nanomodem.transports.mock import MOCK_BYTES_CORRECTED
+from nanomodem_demo.scenarios.modem_relay import (
     broadcast_ack,
     broadcast_relay,
     distance_metres,
@@ -34,8 +35,6 @@ from nanomodem.demo.scenarios.modem_relay import (
     split_modem_command,
     status_response,
 )
-from nanomodem.drivers.v3_spec import is_test_broadcast_line
-from nanomodem.transports.mock import MOCK_BYTES_CORRECTED
 
 # ------------------------------------------------------------------ #
 #  Broadcast parsing                                                   #

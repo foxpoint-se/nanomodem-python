@@ -14,14 +14,8 @@ from datetime import datetime
 from tkinter import ttk
 from typing import Callable, Optional
 
-from PIL import Image, ImageDraw, ImageTk
-from tkintermapview import TkinterMapView
-from tkintermapview.canvas_position_marker import CanvasPositionMarker
-from tkintermapview.map_widget import CanvasPath
-
-from nanomodem import supply_voltage_volts
 from nanomodem.constants import SOUND_SPEED_WATER_M_S
-from nanomodem.drivers.v3_spec import TEST_MESSAGE_PAYLOAD
+from nanomodem.drivers.v3_spec import TEST_MESSAGE_PAYLOAD, supply_voltage_volts
 from nanomodem.node import AcousticNode
 from nanomodem.protocols import TransportProtocol
 from nanomodem.transports.mock import MockTransport
@@ -37,6 +31,10 @@ from nanomodem.types import (
     UnknownMessage,
     V3TestBroadcastMessage,
 )
+from PIL import Image, ImageDraw, ImageTk
+from tkintermapview import TkinterMapView
+from tkintermapview.canvas_position_marker import CanvasPositionMarker
+from tkintermapview.map_widget import CanvasPath
 
 NODE_COLORS = [
     "#3498db",  # Blue
@@ -678,7 +676,8 @@ class ControllerWindow:
                 marker.set_position(lat, lon)
                 marker.set_text(text)
                 return
-            except Exception:
+            except tk.TclError:
+                # Stale widget (e.g. map redraw) — drop and recreate below.
                 self._delete_marker(key)
 
         if icon:
@@ -706,7 +705,7 @@ class ControllerWindow:
             marker = self._markers.pop(key)
             try:
                 marker.delete()
-            except Exception:
+            except tk.TclError:
                 pass
 
     def _delete_path(self, key: str) -> None:
@@ -714,7 +713,7 @@ class ControllerWindow:
             path_obj = self._paths.pop(key)
             try:
                 path_obj.delete()
-            except Exception:
+            except tk.TclError:
                 pass
 
     # ------------------------------------------------------------------ #

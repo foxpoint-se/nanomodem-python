@@ -3,7 +3,7 @@
 Two controllers on socat PTYs; simulator brokers acoustic traffic and metadata.
 
 Usage:
-    python -m nanomodem.demo.scenarios.serial_bridge_with_god_view
+    python -m nanomodem_demo.scenarios.serial_bridge_with_god_view
 """
 
 from __future__ import annotations
@@ -16,13 +16,14 @@ import time
 import tkinter as tk
 
 from nanomodem.codecs.v3 import Codec
-from nanomodem.demo.controller import ControllerWindow
-from nanomodem.demo.scenarios.single_node import _start_metadata_client
-from nanomodem.demo.simulator.app import launch_simulator
-from nanomodem.demo.startup import verify_modem_id_at_startup
 from nanomodem.drivers.v3 import NanomodemV3Driver
 from nanomodem.transports.serial import SerialTransport
 from nanomodem.types import Coord
+
+from nanomodem_demo.controller import ControllerWindow
+from nanomodem_demo.scenarios.single_node import _start_metadata_client
+from nanomodem_demo.simulator.app import launch_simulator
+from nanomodem_demo.startup import verify_modem_id_at_startup
 
 MAP_CENTER = (59.310153, 17.975189)
 MAP_ZOOM = 16

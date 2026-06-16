@@ -13,14 +13,14 @@ from datetime import datetime
 from tkinter import ttk
 from typing import Callable, Optional
 
+from nanomodem.constants import SOUND_SPEED_WATER_M_S, validate_sound_speed
+from nanomodem.types import Coord
 from PIL import Image, ImageDraw, ImageTk
 from tkintermapview import TkinterMapView
 from tkintermapview.canvas_position_marker import CanvasPositionMarker
 
-from nanomodem.constants import SOUND_SPEED_WATER_M_S, validate_sound_speed
-from nanomodem.demo.simulator.backends import HybridBackend
-from nanomodem.demo.simulator.state import SimulatorState
-from nanomodem.types import Coord
+from nanomodem_demo.simulator.backends import HybridBackend
+from nanomodem_demo.simulator.state import SimulatorState
 
 logger = logging.getLogger(__name__)
 

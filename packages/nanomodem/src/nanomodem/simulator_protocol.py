@@ -13,8 +13,8 @@ import threading
 from dataclasses import dataclass
 from typing import Any, Callable, Optional
 
-from ..types import Coord
 from .sim_types import AcousticMessageEvent, AcousticTransportConfig, GPSUpdateMessage
+from .types import Coord
 
 logger = logging.getLogger(__name__)
 

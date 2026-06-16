@@ -8,8 +8,9 @@ import socket
 import threading
 import time
 from collections.abc import Callable
-from typing import Any, TypeVar
+from typing import TypeVar, cast
 
+from nanomodem.sim_types import NodeRegistration, TransmitMessage
 from nanomodem.transports.network import NetworkMockTransport
 from nanomodem.types import Coord, Message, PositionMessage
 
@@ -17,6 +18,8 @@ POLL_TIMEOUT_S = 2.0
 POLL_INTERVAL_S = 0.01
 
 T = TypeVar("T")
+
+SimulatorOutboundMessage = NodeRegistration | TransmitMessage
 
 
 def _wait_until(condition: Callable[[], bool], timeout_s: float = POLL_TIMEOUT_S) -> None:
@@ -41,7 +44,7 @@ class MockSimulatorServer:
         self.server_socket: socket.socket | None = None
         self.client_socket: socket.socket | None = None
         self.running = False
-        self.received_messages: list[dict[str, Any]] = []
+        self.received_messages: list[SimulatorOutboundMessage] = []
         self.thread: threading.Thread | None = None
 
     def start(self) -> None:
@@ -88,7 +91,7 @@ class MockSimulatorServer:
                 while b"\n" in buffer:
                     line, buffer = buffer.split(b"\n", 1)
                     if line:
-                        msg = json.loads(line.decode("utf-8"))
+                        msg = cast(SimulatorOutboundMessage, json.loads(line.decode("utf-8")))
                         self.received_messages.append(msg)
             except socket.timeout:
                 continue
@@ -155,10 +158,11 @@ def test_network_transport_broadcast_position() -> None:
         msg = server.received_messages[0]
         assert msg["type"] == "transmit"
         assert msg["node_id"] == "001"
-        assert "data" in msg
+        payload = msg.get("data")
+        assert isinstance(payload, str)
 
         # Verify it's base64-encoded bytes
-        data = base64.b64decode(msg["data"])
+        data = base64.b64decode(payload)
         assert isinstance(data, bytes)
         assert len(data) > 0
 
@@ -237,9 +241,11 @@ def test_network_transport_request_range() -> None:
         msg = server.received_messages[0]
         assert msg["type"] == "transmit"
         assert msg["node_id"] == "001"
+        payload = msg.get("data")
+        assert isinstance(payload, str)
 
         # Verify it's a ping command
-        data = base64.b64decode(msg["data"])
+        data = base64.b64decode(payload)
         assert data == b"$P002"
 
         transport.stop()

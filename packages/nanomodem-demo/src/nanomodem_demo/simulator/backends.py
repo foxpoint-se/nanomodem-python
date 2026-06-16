@@ -12,13 +12,18 @@ import json
 import logging
 import socket
 import threading
-from typing import Any, Callable, Optional
+from typing import Callable, Optional
 
 import serial
-
 from nanomodem.calculation import calculate_distance_3d
 from nanomodem.codecs.v3 import Codec
-from nanomodem.demo.scenarios.modem_relay import (
+from nanomodem.drivers.v3 import NanomodemV3Driver
+from nanomodem.serial_logger import format_serial_log
+from nanomodem.sim_types import AcousticMessageEvent, AcousticTransportConfig, GPSUpdateMessage
+from nanomodem.transports.mock import MOCK_STATUS_VOLTAGE_RAW
+from nanomodem.types import Coord, PositionMessage
+
+from nanomodem_demo.scenarios.modem_relay import (
     broadcast_ack,
     broadcast_relay,
     parse_broadcast,
@@ -33,11 +38,7 @@ from nanomodem.demo.scenarios.modem_relay import (
     split_modem_command,
     status_response,
 )
-from nanomodem.demo.simulator.state import SimulatorState
-from nanomodem.drivers.v3 import NanomodemV3Driver
-from nanomodem.serial_logger import format_serial_log
-from nanomodem.transports.mock import MOCK_STATUS_VOLTAGE_RAW
-from nanomodem.types import Coord, PositionMessage
+from nanomodem_demo.simulator.state import SimulatorState
 
 logger = logging.getLogger(__name__)
 
@@ -127,8 +128,10 @@ class SerialReader:
             except serial.SerialException:
                 logger.exception("Serial error for node %s", self.node_id)
                 break
-            except Exception:
-                logger.exception("Error reading from PTY for node %s", self.node_id)
+            except OSError as exc:
+                logger.exception("I/O error reading from PTY for node %s", self.node_id)
+                self.on_error(self.node_id, exc)
+                break
 
 
 class HybridBackend:
@@ -221,7 +224,7 @@ class HybridBackend:
 
             client_socket = self.metadata_clients[target_node_id]
             encoded = base64.b64encode(data).decode("ascii")
-            msg: dict[str, Any] = {"type": "acoustic_message", "data": encoded}
+            msg: AcousticMessageEvent = {"type": "acoustic_message", "data": encoded}
             line = json.dumps(msg) + "\n"
 
             try:
@@ -239,7 +242,7 @@ class HybridBackend:
             return
 
         client_socket = self.metadata_clients[node_id]
-        msg: dict[str, Any] = {
+        msg: GPSUpdateMessage = {
             "type": "gps_update",
             "lat": coord.lat,
             "lon": coord.lon,
@@ -330,7 +333,7 @@ class HybridBackend:
         self,
         node_id: str,
         client_socket: socket.socket,
-        acoustic_config: dict[str, Any],
+        acoustic_config: AcousticTransportConfig,
     ) -> None:
         """Handle node registration and set up acoustic connection."""
         # Store metadata socket

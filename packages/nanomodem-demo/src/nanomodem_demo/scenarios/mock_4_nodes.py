@@ -9,10 +9,11 @@ import tkinter as tk
 from typing import TypedDict
 
 from nanomodem.constants import SOUND_SPEED_WATER_M_S
-from nanomodem.demo.controller import ControllerWindow
-from nanomodem.demo.startup import verify_modem_id_at_startup
 from nanomodem.transports.mock import MockEther, MockTransport
 from nanomodem.types import Coord
+
+from nanomodem_demo.controller import ControllerWindow
+from nanomodem_demo.startup import verify_modem_id_at_startup
 
 MAP_CENTER = (59.310153, 17.975189)
 MAP_ZOOM = 16
