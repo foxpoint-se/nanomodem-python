@@ -2,6 +2,52 @@
 
 <!-- version list -->
 
+## v2.0.0 (2026-06-16)
+
+### Bug Fixes
+
+- Catch TclError when updating map markers
+  ([`9313a3c`](https://github.com/foxpoint-se/nanomodem-python/commit/9313a3c8ce5504320ceb08ade9ef468a17acf868))
+
+- Derive __version__ from package metadata
+  ([`ed3bf76`](https://github.com/foxpoint-se/nanomodem-python/commit/ed3bf76589de0726251c7fece16ca9c3f772bbb5))
+
+- Stop PTY reader on I/O errors instead of continuing
+  ([`d373ad9`](https://github.com/foxpoint-se/nanomodem-python/commit/d373ad9fe3cf2c81075ebb05fe835a545387a250))
+
+### Chores
+
+- Mark workspace migration as breaking release
+  ([`65d3428`](https://github.com/foxpoint-se/nanomodem-python/commit/65d34283f2c01b59969cddb310377b276fb015c6))
+
+### Documentation
+
+- Align docs and verify targets with submodule imports
+  ([`e01cd73`](https://github.com/foxpoint-se/nanomodem-python/commit/e01cd73b6d49aa4174de23a83fecd7b84da3a14e))
+
+- Clarify two-step pip install from GitHub
+  ([`573a49c`](https://github.com/foxpoint-se/nanomodem-python/commit/573a49cb4f2cee560eedd8fdab6df9ca9a682455))
+
+### Refactoring
+
+- Replace Any with sim_types in network message paths
+  ([`c4df0a5`](https://github.com/foxpoint-se/nanomodem-python/commit/c4df0a5964cc8d379df43b902baddd2097dfe387))
+
+- Require submodule imports instead of root re-exports
+  ([`a37dd4a`](https://github.com/foxpoint-se/nanomodem-python/commit/a37dd4a1c365e7280c59e2a0f9dc8a0794064b50))
+
+- Split repo into uv workspace with separate lib and demo packages
+  ([`602bb19`](https://github.com/foxpoint-se/nanomodem-python/commit/602bb19f55a6b629392b70631e41a865f751db61))
+
+- Type remaining simulator backend JSON payloads
+  ([`a66f838`](https://github.com/foxpoint-se/nanomodem-python/commit/a66f838284ae65bc266c86e65ba21e0574a4d196))
+
+### Breaking Changes
+
+- Split into nanomodem and nanomodem-demo packages. Removed root re-exports and nanomodem.demo; use
+  nanomodem_demo and submodule imports instead. The [demo] extra is removed.
+
+
 ## Unreleased
 
 ### Breaking
