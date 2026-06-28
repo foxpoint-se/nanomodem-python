@@ -1,0 +1,179 @@
+"""In-memory wire transport for fast modem simulation without serial I/O."""
+
+from __future__ import annotations
+
+from typing import Callable, Optional
+
+from nanomodem.calculation import Calculation, calculate_distance_3d
+from nanomodem.constants import SOUND_SPEED_WATER_M_S, validate_sound_speed
+from nanomodem.types import Coord
+
+from ..protocols import OnModemEventCallback
+from ..wire_types import (
+    BroadcastCommand,
+    ModemCommand,
+    ModemEvent,
+    PingCommand,
+    PingTimeoutEvent,
+    QualityIndicatorEvent,
+    QualityQueryCommand,
+    QualityRejectedEvent,
+    ReceivedBroadcastEvent,
+    ReceivedUnicastEvent,
+    RoundtripResponseEvent,
+    StatusQueryCommand,
+    StatusResponseEvent,
+    TestBroadcastReceivedEvent,
+    TestRequestAckEvent,
+    TestRequestCommand,
+    UnicastCommand,
+)
+
+MOCK_BYTES_CORRECTED = 3
+MOCK_STATUS_VOLTAGE_RAW = 48123
+
+_calculation = Calculation()
+
+
+class InMemoryBus:
+    """Shared in-process bus for InMemoryTransport instances."""
+
+    def __init__(self, sound_speed: float = SOUND_SPEED_WATER_M_S) -> None:
+        self._transports: dict[str, InMemoryTransport] = {}
+        self._sound_speed = validate_sound_speed(sound_speed)
+        self._heard_data_packet: dict[str, bool] = {}
+
+    def register(self, transport: InMemoryTransport) -> None:
+        self._transports[transport.node_id] = transport
+
+    def unregister(self, node_id: str) -> None:
+        self._transports.pop(node_id, None)
+
+    def get_transport(self, node_id: str) -> InMemoryTransport | None:
+        return self._transports.get(node_id)
+
+    def get_all_except(self, node_id: str) -> list[InMemoryTransport]:
+        return [transport for nid, transport in self._transports.items() if nid != node_id]
+
+    def dispatch(self, sender_id: str, command: ModemCommand) -> None:
+        match command:
+            case BroadcastCommand(data=data):
+                self._handle_broadcast(sender_id, data)
+            case UnicastCommand(target_id=target_id, data=data):
+                self._handle_unicast(sender_id, target_id, data)
+            case PingCommand(target_id=target_id):
+                self._handle_ping(sender_id, target_id)
+            case StatusQueryCommand():
+                self._handle_status_query(sender_id)
+            case QualityQueryCommand():
+                self._handle_quality_query(sender_id)
+            case TestRequestCommand(target_id=target_id):
+                self._handle_test_request(sender_id, target_id)
+
+    def _handle_broadcast(self, sender_id: str, data: bytes) -> None:
+        event = ReceivedBroadcastEvent(sender_id=sender_id, data=data)
+        for listener in self.get_all_except(sender_id):
+            listener.deliver(event)
+            self._heard_data_packet[listener.node_id] = True
+
+    def _handle_unicast(self, _sender_id: str, target_id: str, data: bytes) -> None:
+        target = self.get_transport(target_id)
+        if target is None:
+            return
+        target.deliver(ReceivedUnicastEvent(data=data))
+        self._heard_data_packet[target_id] = True
+
+    def _handle_ping(self, sender_id: str, target_id: str) -> None:
+        sender = self.get_transport(sender_id)
+        if sender is None:
+            return
+
+        target = self.get_transport(target_id)
+        if target is None or sender.position is None or target.position is None:
+            sender.deliver(PingTimeoutEvent())
+            return
+
+        distance = calculate_distance_3d(
+            sender.position,
+            sender.depth,
+            target.position,
+            target.depth,
+        )
+        timestamp = _calculation.distance_to_timestamp(distance, self._sound_speed)
+        sender.deliver(
+            RoundtripResponseEvent(
+                responder_id=target_id,
+                timestamp_counts=timestamp,
+            ),
+        )
+
+    def _handle_status_query(self, node_id: str) -> None:
+        transport = self.get_transport(node_id)
+        if transport is None:
+            return
+        transport.deliver(
+            StatusResponseEvent(
+                address=node_id,
+                voltage_raw=MOCK_STATUS_VOLTAGE_RAW,
+            ),
+        )
+
+    def _handle_quality_query(self, node_id: str) -> None:
+        transport = self.get_transport(node_id)
+        if transport is None:
+            return
+
+        if self._heard_data_packet.pop(node_id, False):
+            transport.deliver(QualityIndicatorEvent(bytes_corrected=MOCK_BYTES_CORRECTED))
+            return
+
+        transport.deliver(QualityRejectedEvent())
+
+    def _handle_test_request(self, sender_id: str, target_id: str) -> None:
+        sender = self.get_transport(sender_id)
+        if sender is None:
+            return
+
+        if self.get_transport(target_id) is None:
+            return
+
+        sender.deliver(TestRequestAckEvent(target_id=target_id))
+
+        event = TestBroadcastReceivedEvent(sender_id=target_id)
+        for listener in self.get_all_except(target_id):
+            listener.deliver(event)
+            self._heard_data_packet[listener.node_id] = True
+
+
+class InMemoryTransport:
+    """In-memory WireTransport — simulates modem events without serial encoding."""
+
+    def __init__(self, node_id: str, bus: InMemoryBus) -> None:
+        self.node_id = node_id
+        self.position: Optional[Coord] = None
+        self.get_depth_callback: Optional[Callable[[], float]] = None
+        self._bus = bus
+        self._callback: OnModemEventCallback | None = None
+        bus.register(self)
+
+    @property
+    def depth(self) -> float:
+        if self.get_depth_callback is not None:
+            return self.get_depth_callback()
+        return 0.0
+
+    def send_command(self, command: ModemCommand) -> None:
+        self._bus.dispatch(self.node_id, command)
+
+    def on_event(self, callback: OnModemEventCallback) -> None:
+        self._callback = callback
+
+    def start(self) -> None:
+        return
+
+    def stop(self) -> None:
+        self._bus.unregister(self.node_id)
+
+    def deliver(self, event: ModemEvent) -> None:
+        if self._callback is not None:
+            self._callback(event)

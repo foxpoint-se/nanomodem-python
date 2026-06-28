@@ -9,6 +9,7 @@ from .driver import NanomodemV3Driver
 from .modem_node import ModemNode
 from .protocols import OnModemEventCallback, PayloadCodec, WireTransport
 from .spec import MAX_BYTES_CORRECTED, SUPPLY_VOLTAGE_SCALE, supply_voltage_volts
+from .transports import InMemoryBus, InMemoryTransport, SerialWireTransport
 from .wire_types import (
     AddressSetEvent,
     BroadcastCommand,
@@ -53,6 +54,9 @@ __all__ = [
     "WireTransport",
     "OnModemEventCallback",
     "RawPayloadCodec",
+    "InMemoryTransport",
+    "InMemoryBus",
+    "SerialWireTransport",
     "MAX_BYTES_CORRECTED",
     "SUPPLY_VOLTAGE_SCALE",
     "supply_voltage_volts",
