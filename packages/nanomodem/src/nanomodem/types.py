@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Literal, Optional
+from typing import Literal
 
 LocalAckKind = Literal["test", "ping", "broadcast"]
 
@@ -14,25 +14,6 @@ class Coord:
 
     lat: float
     lon: float
-
-
-@dataclass
-class KnownNode:
-    """Mutable record of what we know about another node."""
-
-    node_id: str
-    position: Optional[Coord] = None
-    depth: float = 0.0
-    last_range: Optional[float] = None
-    last_seen: Optional[float] = None
-
-
-@dataclass
-class NodeCapabilities:
-    """Boolean capabilities that gate automatic node behavior."""
-
-    is_inferring_own_position: bool = False
-    is_broadcasting_own_position: bool = False
 
 
 # --- Messages (discriminated union with catch-all) ---

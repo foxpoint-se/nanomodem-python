@@ -17,15 +17,13 @@ import tkinter as tk
 
 import serial
 from nanomodem.calculation import calculate_distance_3d
-from nanomodem.codecs.v3 import Codec
 from nanomodem.constants import SOUND_SPEED_WATER_M_S
-from nanomodem.drivers.v3 import NanomodemV3Driver
+from nanomodem.core.transports.in_memory import MOCK_STATUS_VOLTAGE_RAW
 from nanomodem.serial_logger import format_serial_log
-from nanomodem.transports.mock import MOCK_STATUS_VOLTAGE_RAW
-from nanomodem.transports.serial import SerialTransport
 from nanomodem.types import Coord
 
 from nanomodem_demo.controller import ControllerWindow
+from nanomodem_demo.node_builder import build_serial_node
 from nanomodem_demo.scenarios.modem_relay import (
     broadcast_ack,
     broadcast_relay,
@@ -290,13 +288,12 @@ def launch_bridge(root: tk.Tk) -> list[ControllerWindow]:
     _start_broker_threads(broker_port_a, broker_port_b, "001", "002", POSITIONS)
 
     # 3. Create node transports (node-side PTYs, real driver + codec)
-    transport_a = SerialTransport(node_id="001", port=pty_a_node, driver=NanomodemV3Driver(Codec()))
-    transport_b = SerialTransport(node_id="002", port=pty_b_node, driver=NanomodemV3Driver(Codec()))
+    node_a = build_serial_node("001", pty_a_node, sound_speed=SOUND_SPEED)
+    node_b = build_serial_node("002", pty_b_node, sound_speed=SOUND_SPEED)
 
-    # 4. Register cleanup
     def _cleanup() -> None:
-        transport_a.stop()
-        transport_b.stop()
+        node_a.transport.stop()
+        node_b.transport.stop()
         broker_port_a.close()
         broker_port_b.close()
         socat_a.terminate()
@@ -313,9 +310,8 @@ def launch_bridge(root: tk.Tk) -> list[ControllerWindow]:
     # 6. Instantiate ControllerWindows
     controller_a = ControllerWindow(
         root=root,
-        node_id="001",
+        node=node_a,
         pretty_name="Node A (Host)",
-        transport=transport_a,
         peer_ids=["002"],
         position=None,
         map_center=MAP_CENTER,
@@ -325,9 +321,8 @@ def launch_bridge(root: tk.Tk) -> list[ControllerWindow]:
 
     controller_b = ControllerWindow(
         root=root,
-        node_id="002",
+        node=node_b,
         pretty_name="Node B (Beacon)",
-        transport=transport_b,
         peer_ids=["001"],
         position=None,
         map_center=MAP_CENTER,
@@ -335,9 +330,8 @@ def launch_bridge(root: tk.Tk) -> list[ControllerWindow]:
         window_geometry=f"{win_w}x{win_h}+{win_w}+0",
     )
 
-    # 7. Start serial readers
-    transport_a.start()
-    transport_b.start()
+    node_a.transport.start()
+    node_b.transport.start()
 
     verify_modem_id_at_startup(controller_a.node)
     verify_modem_id_at_startup(controller_b.node)

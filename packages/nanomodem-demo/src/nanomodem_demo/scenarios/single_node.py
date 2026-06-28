@@ -8,19 +8,15 @@ import sys
 import tkinter as tk
 from typing import Optional
 
-from nanomodem.codecs.v3 import Codec
 from nanomodem.constants import SOUND_SPEED_WATER_M_S
-from nanomodem.drivers.v3 import NanomodemV3Driver
-from nanomodem.protocols import TransportProtocol
-from nanomodem.sim_types import AcousticTransportConfig
-from nanomodem.simulator_protocol import SimulatorInboundHandlers, SimulatorMetadataClient
-from nanomodem.transports.mock import MockEther, MockTransport
-from nanomodem.transports.network import NetworkMockTransport
-from nanomodem.transports.serial import SerialTransport
+from nanomodem.core.transports import InMemoryBus
 from nanomodem.types import Coord
 
 from nanomodem_demo.controller import ControllerWindow
+from nanomodem_demo.node_builder import build_in_memory_node, build_positioning_node, build_serial_node
+from nanomodem_demo.simulator import AcousticTransportConfig, SimulatorInboundHandlers, SimulatorMetadataClient
 from nanomodem_demo.startup import verify_modem_id_at_startup
+from nanomodem_demo.transports import NetworkMockTransport
 
 MAP_CENTER = (59.310153, 17.975189)
 MAP_ZOOM = 16
@@ -40,60 +36,38 @@ def launch_single(
     world_pty: Optional[str] = None,
     sound_speed: float = SOUND_SPEED_WATER_M_S,
 ) -> ControllerWindow:
-    """Create a single controller with the given ID and transport.
-
-    Args:
-        world_host: Host for the World Backend (metadata connection)
-        world_port: Port for the World Backend
-        world_pty: PTY path for the Simulator to listen on (serial mode only)
-    """
-    transport: TransportProtocol
+    """Create a single controller with the given ID and transport."""
     acoustic_config: Optional[AcousticTransportConfig] = None
 
-    if network_host and network_port:
-        # Network mode (TCP/JSON with simulator)
-        # The NetworkMockTransport handles both acoustic and metadata
-        transport = NetworkMockTransport(node_id, host=network_host, port=network_port)
-        acoustic_config = None  # Already handled by NetworkMockTransport
-    elif port:
-        # Serial mode
-        driver = NanomodemV3Driver(Codec())
-        transport = SerialTransport(node_id=node_id, port=port, driver=driver, baud=baud)
+    network_transport: NetworkMockTransport | None = None
 
-        # If world_pty is provided, tell the simulator where to listen
-        if world_pty:
-            acoustic_config = {"type": "serial", "pty_path": world_pty}
-        else:
-            acoustic_config = None
-    else:
-        # Mock mode (in-memory)
-        ether = MockEther(sound_speed=sound_speed)
-        mock_transport = MockTransport(node_id, ether)
-        transport = mock_transport
+    if network_host and network_port:
+        network_transport = NetworkMockTransport(node_id, host=network_host, port=network_port)
+        node = build_positioning_node(node_id, network_transport, sound_speed=sound_speed)
         acoustic_config = None
+    elif port:
+        node = build_serial_node(node_id, port, baud=baud, sound_speed=sound_speed)
+        acoustic_config = {"type": "serial", "pty_path": world_pty} if world_pty else None
+    else:
+        bus = InMemoryBus(sound_speed=sound_speed)
+        node = build_in_memory_node(node_id, bus, sound_speed=sound_speed)
 
     controller = ControllerWindow(
         root=root,
-        node_id=node_id,
+        node=node,
         pretty_name=f"Node {node_id}",
-        transport=transport,
-        peer_ids=[],  # Starts empty
+        peer_ids=[],
         map_center=MAP_CENTER,
         map_zoom=MAP_ZOOM,
-        sound_speed=sound_speed,
     )
 
-    if isinstance(transport, MockTransport):
-        # Link mock transport to pull depth from the node
-        transport.get_depth_callback = controller.node.get_depth
-    elif isinstance(transport, (SerialTransport, NetworkMockTransport)):
-        # Start the background reader thread
-        transport.start()
+    wire_transport = node.transport
+    if hasattr(wire_transport, "start"):
+        wire_transport.start()
 
-    if isinstance(transport, NetworkMockTransport):
-        transport.on_gps_update(lambda coord: _schedule_position_update(root, controller, coord))
+    if network_transport is not None:
+        network_transport.on_gps_update(lambda coord: _schedule_position_update(root, controller, coord))
 
-    # Serial mode: metadata (GPS, etc.) on a separate simulator TCP connection
     if world_host and world_port and acoustic_config:
         metadata_client = _start_metadata_client(root, controller, world_host, world_port, acoustic_config)
         controller.register_shutdown_callback(metadata_client.stop)
@@ -160,20 +134,17 @@ def main() -> None:
 
     args = parser.parse_args()
 
-    # Configure logging
     logging.basicConfig(
         level=getattr(logging, args.log_level.upper()),
-        format="%(message)s",  # Keep it clean for serial logs
+        format="%(message)s",
     )
 
     node_id = args.node_id
 
-    # Simple validation
     if not (len(node_id) == 3 and node_id.isdigit()):
         print(f"\nError: Invalid node ID '{node_id}'. Must be a 3-digit numeric string (001-255).\n")
         sys.exit(1)
 
-    # Parse network address
     network_host = None
     network_port = None
     if args.network:
@@ -181,7 +152,6 @@ def main() -> None:
         network_host = parts[0]
         network_port = int(parts[1]) if len(parts) > 1 else 5555
 
-    # Parse world backend address
     world_host = None
     world_port = None
     if args.world:
@@ -194,18 +164,18 @@ def main() -> None:
     if network_host and network_port:
         print(f"  Transport: NetworkMockTransport ({network_host}:{network_port})")
     elif args.port:
-        print(f"  Transport: SerialTransport ({args.port}, {args.baud} baud)")
+        print(f"  Transport: SerialWireTransport ({args.port}, {args.baud} baud)")
         if world_host and world_port and args.world_port:
             print(f"  World Backend: {world_host}:{world_port}")
             print(f"  World PTY: {args.world_port}")
     else:
-        print("  Transport: MockTransport (in-memory)")
+        print("  Transport: InMemoryTransport (in-memory)")
     print(f"  Log level: {args.log_level.upper()}")
     print(f"  Sound speed: {args.sound_speed:.0f} m/s")
     print("GUI opened. Use console to see incoming messages.")
 
     root = tk.Tk()
-    root.withdraw()  # Hide the main root window
+    root.withdraw()
 
     _controller = launch_single(
         root,

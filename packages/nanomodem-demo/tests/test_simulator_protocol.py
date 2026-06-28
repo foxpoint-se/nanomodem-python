@@ -4,12 +4,12 @@ from __future__ import annotations
 
 import base64
 
-from nanomodem.simulator_protocol import (
+from nanomodem.types import Coord
+from nanomodem_demo.simulator.protocol import (
     SimulatorInboundHandlers,
     dispatch_simulator_inbound,
     parse_gps_update,
 )
-from nanomodem.types import Coord
 
 
 def test__should_parse_gps_update_from_json_object() -> None:

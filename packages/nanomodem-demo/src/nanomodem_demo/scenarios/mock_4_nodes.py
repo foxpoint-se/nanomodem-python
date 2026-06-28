@@ -1,4 +1,4 @@
-"""Launcher: creates Tkinter root, MockEther, and tiled ControllerWindows.
+"""Launcher: creates Tkinter root, InMemoryBus, and tiled ControllerWindows.
 
 Creates a mock scenario with 1 host + 3 beacons.
 """
@@ -9,10 +9,11 @@ import tkinter as tk
 from typing import TypedDict
 
 from nanomodem.constants import SOUND_SPEED_WATER_M_S
-from nanomodem.transports.mock import MockEther, MockTransport
+from nanomodem.core.transports import InMemoryBus
 from nanomodem.types import Coord
 
 from nanomodem_demo.controller import ControllerWindow
+from nanomodem_demo.node_builder import build_in_memory_node
 from nanomodem_demo.startup import verify_modem_id_at_startup
 
 MAP_CENTER = (59.310153, 17.975189)
@@ -22,16 +23,10 @@ Config = TypedDict("Config", {"id": str, "name": str, "sim_pos": Coord, "initial
 
 
 def launch_mock(root: tk.Tk) -> list[ControllerWindow]:
-    """Create a mock scenario with 4 nodes, each in its own ControllerWindow.
+    """Create a mock scenario with 4 nodes, each in its own ControllerWindow."""
 
-    Each node starts at a configured position in MockEther. Edits in the
-    controller UI update both AcousticNode state and MockTransport.position
-    so mock ranging stays aligned with the map.
-    """
+    bus = InMemoryBus(sound_speed=SOUND_SPEED_WATER_M_S)
 
-    ether = MockEther(sound_speed=SOUND_SPEED_WATER_M_S)
-
-    # 1. Scenario Configuration
     host_config: Config = {
         "id": "001",
         "name": "Host (Tracker)",
@@ -47,7 +42,6 @@ def launch_mock(root: tk.Tk) -> list[ControllerWindow]:
 
     all_ids = [host_config["id"]] + [b["id"] for b in beacons_config]
 
-    # 2. Window Tiling Logic
     screen_w = root.winfo_screenwidth()
     screen_h = root.winfo_screenheight()
     win_w = min(480, screen_w // 2)
@@ -62,62 +56,55 @@ def launch_mock(root: tk.Tk) -> list[ControllerWindow]:
 
     controllers: list[ControllerWindow] = []
 
-    # 3. Instantiate the Host (The node we pretend we are using)
-    host_id: str = str(host_config["id"])
-    host_sim_pos: Coord = host_config["sim_pos"]
-    host_transport = MockTransport(host_id, ether)
-    host_transport.position = host_sim_pos
+    host_id = host_config["id"]
+    host_sim_pos = host_config["sim_pos"]
+    host_node = build_in_memory_node(
+        host_id,
+        bus,
+        position=host_sim_pos,
+        sound_speed=SOUND_SPEED_WATER_M_S,
+    )
 
     host_controller = ControllerWindow(
         root=root,
-        node_id=host_id,
+        node=host_node,
         pretty_name=str(host_config["name"]),
-        transport=host_transport,
         peer_ids=[str(b["id"]) for b in beacons_config],
         map_center=MAP_CENTER,
         map_zoom=MAP_ZOOM,
         window_geometry=get_geometry(0),
     )
 
-    # Set the initial logical depth for the host
     host_controller.node.set_depth(float(host_config["initial_depth"]))
 
-    # Link the mock transport to pull depth from the node
-    host_transport.get_depth_callback = host_controller.node.get_depth
-
-    # Pre-populate host registry with beacon positions (simulating a known environment)
     for b in beacons_config:
         host_controller.node.set_known_node_position(str(b["id"]), b["sim_pos"])
         host_controller.node.set_known_node_depth(str(b["id"]), 0.0)
 
     controllers.append(host_controller)
 
-    # 4. Instantiate Beacons (Physical units that just "exist" at a spot)
-    # These do NOT get simulation callbacks because they are static in this scenario.
     for i, b_conf in enumerate(beacons_config, start=1):
-        b_id: str = str(b_conf["id"])
-        b_sim_pos: Coord = b_conf["sim_pos"]
-        b_transport = MockTransport(b_id, ether)
-        b_transport.position = b_sim_pos
+        b_id = str(b_conf["id"])
+        b_sim_pos = b_conf["sim_pos"]
+        beacon_node = build_in_memory_node(
+            b_id,
+            bus,
+            position=b_sim_pos,
+            sound_speed=SOUND_SPEED_WATER_M_S,
+        )
 
         b_controller = ControllerWindow(
             root=root,
-            node_id=b_id,
+            node=beacon_node,
             pretty_name=str(b_conf["name"]),
-            transport=b_transport,
             peer_ids=[str(nid) for nid in all_ids if nid != b_id],
             map_center=MAP_CENTER,
             map_zoom=MAP_ZOOM,
             window_geometry=get_geometry(i),
-            sound_speed=SOUND_SPEED_WATER_M_S,
         )
 
-        # Beacons know their own position in this scenario
         b_controller.node.set_position(b_sim_pos)
         b_controller.node.set_depth(0.0)
-
-        # Link the mock transport to pull depth from the node
-        b_transport.get_depth_callback = b_controller.node.get_depth
 
         controllers.append(b_controller)
 
@@ -129,7 +116,7 @@ def launch_mock(root: tk.Tk) -> list[ControllerWindow]:
 
 def main() -> None:
     root = tk.Tk()
-    root.withdraw()  # Hide root window; ControllerWindows are Toplevels
+    root.withdraw()
 
     _controllers = launch_mock(root)
 

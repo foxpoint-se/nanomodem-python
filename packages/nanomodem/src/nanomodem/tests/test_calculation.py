@@ -4,7 +4,8 @@ import math
 
 import pytest
 
-from nanomodem.calculation import Calculation, calculate_distance_3d
+from nanomodem.calculation import calculate_distance_3d
+from nanomodem.positioning import Calculation
 from nanomodem.types import Coord
 
 calc = Calculation()

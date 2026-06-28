@@ -15,12 +15,10 @@ import subprocess
 import time
 import tkinter as tk
 
-from nanomodem.codecs.v3 import Codec
-from nanomodem.drivers.v3 import NanomodemV3Driver
-from nanomodem.transports.serial import SerialTransport
 from nanomodem.types import Coord
 
 from nanomodem_demo.controller import ControllerWindow
+from nanomodem_demo.node_builder import build_serial_node
 from nanomodem_demo.scenarios.single_node import _start_metadata_client
 from nanomodem_demo.simulator.app import launch_simulator
 from nanomodem_demo.startup import verify_modem_id_at_startup
@@ -78,26 +76,22 @@ def main() -> None:
     win_h = min(780, screen_h)
 
     print("Launching controllers...")
-    driver_a = NanomodemV3Driver(Codec())
-    transport_a = SerialTransport(node_id="001", port=pty_a_controller, driver=driver_a)
+    node_a = build_serial_node("001", pty_a_controller)
     controller_a = ControllerWindow(
         root=root,
-        node_id="001",
+        node=node_a,
         pretty_name="Node A (Host)",
-        transport=transport_a,
         peer_ids=[],
         map_center=MAP_CENTER,
         map_zoom=MAP_ZOOM,
         window_geometry=f"{win_w}x{win_h}+0+0",
     )
 
-    driver_b = NanomodemV3Driver(Codec())
-    transport_b = SerialTransport(node_id="002", port=pty_b_controller, driver=driver_b)
+    node_b = build_serial_node("002", pty_b_controller)
     controller_b = ControllerWindow(
         root=root,
-        node_id="002",
+        node=node_b,
         pretty_name="Node B (Beacon)",
-        transport=transport_b,
         peer_ids=[],
         map_center=MAP_CENTER,
         map_zoom=MAP_ZOOM,
@@ -106,8 +100,8 @@ def main() -> None:
 
     simulator.window.geometry(f"{win_w}x{win_h}+{win_w * 2}+0")
 
-    transport_a.start()
-    transport_b.start()
+    node_a.transport.start()
+    node_b.transport.start()
 
     _start_metadata_client(
         root,
@@ -134,8 +128,8 @@ def main() -> None:
 
     def cleanup() -> None:
         print("\nCleaning up...")
-        transport_a.stop()
-        transport_b.stop()
+        node_a.transport.stop()
+        node_b.transport.stop()
         simulator.backend.stop()
         for proc in _socat_processes:
             proc.terminate()

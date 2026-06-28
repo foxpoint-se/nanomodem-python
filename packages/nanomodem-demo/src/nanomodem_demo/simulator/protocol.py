@@ -13,8 +13,9 @@ import threading
 from dataclasses import dataclass
 from typing import Any, Callable, Optional
 
-from .sim_types import AcousticMessageEvent, AcousticTransportConfig, GPSUpdateMessage
-from .types import Coord
+from nanomodem.types import Coord
+
+from .types import AcousticMessageEvent, AcousticTransportConfig, GPSUpdateMessage
 
 logger = logging.getLogger(__name__)
 

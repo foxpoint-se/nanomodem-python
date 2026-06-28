@@ -1,0 +1,285 @@
+"""Tests for InMemoryTransport and InMemoryBus."""
+
+from __future__ import annotations
+
+import pytest
+
+from nanomodem.constants import MODEM_TIMESTAMP_QUANTUM_S
+from nanomodem.core.transports.in_memory import (
+    MOCK_BYTES_CORRECTED,
+    MOCK_STATUS_VOLTAGE_RAW,
+    InMemoryBus,
+    InMemoryTransport,
+)
+from nanomodem.core.wire_types import (
+    AddressSetEvent,
+    BroadcastCommand,
+    BroadcastCommandAckEvent,
+    EchoCommand,
+    EchoCommandAckEvent,
+    ModemEvent,
+    PingCommand,
+    PingCommandAckEvent,
+    PingTimeoutEvent,
+    QualityIndicatorEvent,
+    QualityQueryCommand,
+    QualityRejectedEvent,
+    ReceivedBroadcastEvent,
+    RemoteVoltageQueryAckEvent,
+    RemoteVoltageQueryCommand,
+    RemoteVoltageResponseEvent,
+    RoundtripResponseEvent,
+    SetAddressCommand,
+    StatusQueryCommand,
+    StatusResponseEvent,
+    UnicastCommand,
+    UnicastCommandAckEvent,
+    UnicastWithAckCommand,
+    UnicastWithAckCommandAckEvent,
+)
+from nanomodem.positioning import Calculation
+from nanomodem.types import Coord
+
+
+def _collect_events(transport: InMemoryTransport) -> list[ModemEvent]:
+    received: list[ModemEvent] = []
+    transport.on_event(lambda event: received.append(event))
+    return received
+
+
+def test__should_deliver_broadcast_to_all_peers() -> None:
+    bus = InMemoryBus()
+    sender = InMemoryTransport("001", bus)
+    receiver_a = InMemoryTransport("002", bus)
+    receiver_b = InMemoryTransport("003", bus)
+
+    events_a = _collect_events(receiver_a)
+    events_b = _collect_events(receiver_b)
+
+    sender.send_command(BroadcastCommand(data=b"hello"))
+
+    assert len(events_a) == 1
+    assert len(events_b) == 1
+    assert events_a[0] == ReceivedBroadcastEvent(sender_id="001", data=b"hello")
+    assert events_b[0] == ReceivedBroadcastEvent(sender_id="001", data=b"hello")
+
+
+def test__should_deliver_broadcast_ack_to_sender() -> None:
+    bus = InMemoryBus()
+    sender = InMemoryTransport("001", bus)
+    _other = InMemoryTransport("002", bus)
+
+    sender_events = _collect_events(sender)
+    sender.send_command(BroadcastCommand(data=b"hello"))
+
+    assert sender_events == [BroadcastCommandAckEvent(byte_count=5)]
+
+
+def test__should_not_deliver_received_broadcast_to_sender() -> None:
+    bus = InMemoryBus()
+    sender = InMemoryTransport("001", bus)
+    _other = InMemoryTransport("002", bus)
+
+    sender_events = _collect_events(sender)
+    sender.send_command(BroadcastCommand(data=b"hello"))
+
+    assert sender_events == [BroadcastCommandAckEvent(byte_count=5)]
+
+
+def test__should_deliver_roundtrip_response_for_ping() -> None:
+    bus = InMemoryBus(sound_speed=1500.0)
+    sender = InMemoryTransport("001", bus)
+    sender.position = Coord(lat=63.0, lon=10.0)
+    target = InMemoryTransport("002", bus)
+    target.position = Coord(lat=63.0, lon=10.0)
+
+    events = _collect_events(sender)
+    sender.send_command(PingCommand(target_id="002"))
+
+    assert len(events) == 2
+    assert events[0] == PingCommandAckEvent(target_id="002")
+    assert isinstance(events[1], RoundtripResponseEvent)
+    assert events[1].responder_id == "002"
+
+
+def test__should_deliver_timeout_for_unreachable_target() -> None:
+    bus = InMemoryBus()
+    sender = InMemoryTransport("001", bus)
+    sender.position = Coord(lat=63.0, lon=10.0)
+
+    events = _collect_events(sender)
+    sender.send_command(PingCommand(target_id="999"))
+
+    assert events == [
+        PingCommandAckEvent(target_id="999"),
+        PingTimeoutEvent(),
+    ]
+
+
+def test__should_calculate_range_from_positions() -> None:
+    sound_speed = 1500.0
+    bus = InMemoryBus(sound_speed=sound_speed)
+    sender = InMemoryTransport("001", bus)
+    sender.position = Coord(lat=63.0, lon=10.0)
+    target = InMemoryTransport("002", bus)
+    target.position = Coord(lat=63.001, lon=10.0)
+
+    events = _collect_events(sender)
+    sender.send_command(PingCommand(target_id="002"))
+
+    assert len(events) == 2
+    assert events[0] == PingCommandAckEvent(target_id="002")
+    event = events[1]
+    assert isinstance(event, RoundtripResponseEvent)
+
+    calculation = Calculation()
+    distance = calculation.timestamp_to_distance(event.timestamp_counts, sound_speed)
+    assert distance > 0.0
+
+
+def test__should_deliver_status_response_for_query() -> None:
+    bus = InMemoryBus()
+    transport = InMemoryTransport("001", bus)
+
+    events = _collect_events(transport)
+    transport.send_command(StatusQueryCommand())
+
+    assert events == [
+        StatusResponseEvent(address="001", voltage_raw=MOCK_STATUS_VOLTAGE_RAW),
+    ]
+
+
+def test__should_deliver_quality_indicator_after_data_received() -> None:
+    bus = InMemoryBus()
+    sender = InMemoryTransport("001", bus)
+    receiver = InMemoryTransport("002", bus)
+
+    _collect_events(receiver)
+    sender.send_command(BroadcastCommand(data=b"packet"))
+
+    events = _collect_events(receiver)
+    receiver.send_command(QualityQueryCommand())
+
+    assert events == [QualityIndicatorEvent(bytes_corrected=MOCK_BYTES_CORRECTED)]
+
+
+def test__should_deliver_quality_rejected_when_no_data() -> None:
+    bus = InMemoryBus()
+    transport = InMemoryTransport("001", bus)
+
+    events = _collect_events(transport)
+    transport.send_command(QualityQueryCommand())
+
+    assert events == [QualityRejectedEvent()]
+
+
+def test__should_match_timestamp_quantum_for_zero_distance_ping() -> None:
+    bus = InMemoryBus(sound_speed=1500.0)
+    sender = InMemoryTransport("001", bus)
+    sender.position = Coord(lat=63.0, lon=10.0)
+    target = InMemoryTransport("002", bus)
+    target.position = Coord(lat=63.0, lon=10.0)
+
+    events = _collect_events(sender)
+    sender.send_command(PingCommand(target_id="002"))
+
+    event = events[1]
+    assert isinstance(event, RoundtripResponseEvent)
+    assert event.timestamp_counts == 0
+
+    calculation = Calculation()
+    assert calculation.timestamp_to_distance(0, 1500.0) == 0.0
+    assert MODEM_TIMESTAMP_QUANTUM_S > 0.0
+
+
+def test__should_deliver_address_set_for_set_address_command() -> None:
+    bus = InMemoryBus()
+    transport = InMemoryTransport("001", bus)
+
+    events = _collect_events(transport)
+    transport.send_command(SetAddressCommand(address="042"))
+
+    assert events == [AddressSetEvent(address="042")]
+
+
+def test__should_rekey_transport_after_set_address_command() -> None:
+    bus = InMemoryBus(sound_speed=1500.0)
+    transport = InMemoryTransport("001", bus)
+    target = InMemoryTransport("002", bus)
+    transport.position = Coord(lat=63.0, lon=10.0)
+    target.position = Coord(lat=63.0, lon=10.0)
+
+    _collect_events(transport)
+    transport.send_command(SetAddressCommand(address="042"))
+
+    assert transport.node_id == "042"
+    assert bus.get_transport("042") is transport
+    assert bus.get_transport("001") is None
+
+    events = _collect_events(transport)
+    transport.send_command(PingCommand(target_id="002"))
+
+    assert events[0] == PingCommandAckEvent(target_id="002")
+    assert isinstance(events[1], RoundtripResponseEvent)
+
+
+def test__should_warn_when_set_address_collides_with_existing_node(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    bus = InMemoryBus()
+    transport = InMemoryTransport("001", bus)
+    _existing = InMemoryTransport("042", bus)
+
+    events = _collect_events(transport)
+    with caplog.at_level("WARNING"):
+        transport.send_command(SetAddressCommand(address="042"))
+
+    assert events == []
+    assert any("address 042 is already in use" in record.message for record in caplog.records)
+
+
+def test__should_deliver_unicast_ack_to_sender() -> None:
+    bus = InMemoryBus()
+    sender = InMemoryTransport("001", bus)
+    _target = InMemoryTransport("002", bus)
+
+    sender_events = _collect_events(sender)
+    sender.send_command(UnicastCommand(target_id="002", data=b"hi"))
+
+    assert sender_events == [UnicastCommandAckEvent(target_id="002", byte_count=2)]
+
+
+def test__should_deliver_unicast_with_ack_to_sender() -> None:
+    bus = InMemoryBus()
+    sender = InMemoryTransport("001", bus)
+    _target = InMemoryTransport("002", bus)
+
+    sender_events = _collect_events(sender)
+    sender.send_command(UnicastWithAckCommand(target_id="002", data=b"hi"))
+
+    assert sender_events == [UnicastWithAckCommandAckEvent(target_id="002", byte_count=2)]
+
+
+def test__should_deliver_remote_voltage_response_for_query() -> None:
+    bus = InMemoryBus()
+    sender = InMemoryTransport("001", bus)
+    _target = InMemoryTransport("002", bus)
+
+    events = _collect_events(sender)
+    sender.send_command(RemoteVoltageQueryCommand(target_id="002"))
+
+    assert events == [
+        RemoteVoltageQueryAckEvent(target_id="002"),
+        RemoteVoltageResponseEvent(responder_id="002", voltage_raw=MOCK_STATUS_VOLTAGE_RAW),
+    ]
+
+
+def test__should_deliver_echo_ack_for_echo_command() -> None:
+    bus = InMemoryBus()
+    sender = InMemoryTransport("001", bus)
+    _target = InMemoryTransport("002", bus)
+
+    events = _collect_events(sender)
+    sender.send_command(EchoCommand(target_id="002", data=b"abc"))
+
+    assert events == [EchoCommandAckEvent(target_id="002", byte_count=3)]

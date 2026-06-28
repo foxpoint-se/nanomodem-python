@@ -10,9 +10,12 @@ import time
 from collections.abc import Callable
 from typing import TypeVar, cast
 
-from nanomodem.sim_types import NodeRegistration, TransmitMessage
-from nanomodem.transports.network import NetworkMockTransport
-from nanomodem.types import Coord, Message, PositionMessage
+from nanomodem.core.wire_types import ModemEvent, ReceivedBroadcastEvent, StatusResponseEvent
+from nanomodem.positioning import BasicPositionCodec
+from nanomodem.types import Coord
+from nanomodem_demo.node_builder import build_positioning_node
+from nanomodem_demo.simulator.types import NodeRegistration, TransmitMessage
+from nanomodem_demo.transports import NetworkMockTransport
 
 POLL_TIMEOUT_S = 2.0
 POLL_INTERVAL_S = 0.01
@@ -99,7 +102,6 @@ class MockSimulatorServer:
                 break
 
     def send_acoustic_message(self, data: bytes) -> None:
-        """Send an acoustic message to the connected client."""
         if not self.client_socket:
             return
         encoded = base64.b64encode(data).decode("ascii")
@@ -108,7 +110,6 @@ class MockSimulatorServer:
         self.client_socket.sendall(line.encode("utf-8"))
 
     def send_gps_update(self, lat: float, lon: float) -> None:
-        """Send a virtual GPS update to the connected client."""
         if not self.client_socket:
             return
         msg = {"type": "gps_update", "lat": lat, "lon": lon}
@@ -120,7 +121,6 @@ class MockSimulatorServer:
 
 
 def test_network_transport_registers_on_connect() -> None:
-    """Should send NodeRegistration message on connect."""
     server = MockSimulatorServer(port=5556)
     server.start()
 
@@ -140,19 +140,21 @@ def test_network_transport_registers_on_connect() -> None:
 
 
 def test_network_transport_broadcast_position() -> None:
-    """Should send TransmitMessage when broadcasting position."""
     server = MockSimulatorServer(port=5557)
     server.start()
 
     try:
         transport = NetworkMockTransport(node_id="001", port=5557)
+        node = build_positioning_node("001", transport)
         transport.start()
 
         _wait_for_length(server.received_messages, 1)
         server.received_messages.clear()
 
         coord = Coord(lat=59.31, lon=17.98)
-        transport.broadcast_position(coord, depth=10.0)
+        node.set_position(coord)
+        node.set_depth(10.0)
+        node.broadcast_position()
 
         _wait_for_length(server.received_messages, 1)
         msg = server.received_messages[0]
@@ -161,7 +163,6 @@ def test_network_transport_broadcast_position() -> None:
         payload = msg.get("data")
         assert isinstance(payload, str)
 
-        # Verify it's base64-encoded bytes
         data = base64.b64decode(payload)
         assert isinstance(data, bytes)
         assert len(data) > 0
@@ -172,7 +173,6 @@ def test_network_transport_broadcast_position() -> None:
 
 
 def test_network_transport_receives_acoustic_message() -> None:
-    """Should receive and parse acoustic messages from simulator."""
     server = MockSimulatorServer(port=5558)
     server.start()
 
@@ -180,19 +180,19 @@ def test_network_transport_receives_acoustic_message() -> None:
         transport = NetworkMockTransport(node_id="001", port=5558)
         transport.start()
 
-        # Register callback
-        received_messages: list[Message] = []
-        transport.on_message(lambda msg: received_messages.append(msg))
+        received_events: list[ModemEvent] = []
+        transport.on_event(received_events.append)
 
         server.wait_for_client()
 
         fake_response = b"#B00232P002+59.310000+017.975000010.000\r\n"
         server.send_acoustic_message(fake_response)
 
-        _wait_for_length(received_messages, 1)
-        msg = received_messages[0]
-        assert isinstance(msg, PositionMessage)
-        assert msg.node_id == "002"
+        _wait_for_length(received_events, 1)
+        event = received_events[0]
+        assert isinstance(event, ReceivedBroadcastEvent)
+        message = BasicPositionCodec().decode(event.data)
+        assert message.node_id == "002"
 
         transport.stop()
     finally:
@@ -200,7 +200,6 @@ def test_network_transport_receives_acoustic_message() -> None:
 
 
 def test__should_invoke_gps_callback_when_simulator_sends_gps_update() -> None:
-    """Virtual GPS from simulator should reach the registered callback."""
     server = MockSimulatorServer(port=5560)
     server.start()
 
@@ -224,18 +223,19 @@ def test__should_invoke_gps_callback_when_simulator_sends_gps_update() -> None:
 
 
 def test_network_transport_request_range() -> None:
-    """Should send TransmitMessage when requesting range."""
     server = MockSimulatorServer(port=5559)
     server.start()
 
     try:
         transport = NetworkMockTransport(node_id="001", port=5559)
+        node = build_positioning_node("001", transport)
+        node.set_known_node_position("002", Coord(lat=59.31, lon=17.98))
         transport.start()
 
         _wait_for_length(server.received_messages, 1)
         server.received_messages.clear()
 
-        transport.request_range(target_id="002")
+        node.request_range("002")
 
         _wait_for_length(server.received_messages, 1)
         msg = server.received_messages[0]
@@ -244,7 +244,6 @@ def test_network_transport_request_range() -> None:
         payload = msg.get("data")
         assert isinstance(payload, str)
 
-        # Verify it's a ping command
         data = base64.b64decode(payload)
         assert data == b"$P002"
 
@@ -254,12 +253,33 @@ def test_network_transport_request_range() -> None:
 
 
 def test__should_stop_safely_when_reader_was_never_started() -> None:
-    """stop() before start() must not raise when the reader thread was never started."""
     server = MockSimulatorServer(port=5561)
     server.start()
 
     try:
         transport = NetworkMockTransport(node_id="001", port=5561)
+        transport.stop()
+    finally:
+        server.stop()
+
+
+def test__should_parse_status_response_from_acoustic_message() -> None:
+    server = MockSimulatorServer(port=5562)
+    server.start()
+
+    try:
+        transport = NetworkMockTransport(node_id="001", port=5562)
+        transport.start()
+
+        received: list[ModemEvent] = []
+        transport.on_event(received.append)
+
+        server.wait_for_client()
+        server.send_acoustic_message(b"#A001V48123\r\n")
+
+        _wait_for_length(received, 1)
+        assert isinstance(received[0], StatusResponseEvent)
+
         transport.stop()
     finally:
         server.stop()

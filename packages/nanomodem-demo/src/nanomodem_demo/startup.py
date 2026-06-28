@@ -3,15 +3,37 @@
 from __future__ import annotations
 
 import sys
+import threading
+from typing import Callable
 
+from nanomodem import PositioningNode
+from nanomodem.core.wire_types import StatusResponseEvent
 from nanomodem.errors import ModemIdMismatchError, ModemStatusTimeoutError
-from nanomodem.node import AcousticNode
 
 
-def verify_modem_id_at_startup(node: AcousticNode) -> None:
+def verify_modem_id_at_startup(node: PositioningNode, timeout_s: float = 2.0) -> None:
     """Run $? and exit the process if the modem id does not match the node."""
+    received: list[StatusResponseEvent] = []
+    done = threading.Event()
+    prior: Callable[[StatusResponseEvent], None] | None = None
+
+    def capture(status: StatusResponseEvent) -> None:
+        received.append(status)
+        done.set()
+        if prior is not None:
+            prior(status)
+
+    prior = node.modem_node.on_status_response(capture)
     try:
-        node.ensure_modem_id_matches()
+        node.query_modem_status()
+        if not done.wait(timeout_s):
+            raise ModemStatusTimeoutError(node.node_id, timeout_s)
+        status = received[0]
+        if status.address != node.node_id:
+            raise ModemIdMismatchError(node.node_id, status.address)
     except (ModemIdMismatchError, ModemStatusTimeoutError) as exc:
         print(f"\nError: {exc}\n", file=sys.stderr)
         sys.exit(1)
+    finally:
+        node.modem_node.on_status_response(prior)
+
