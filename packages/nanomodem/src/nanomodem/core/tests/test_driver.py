@@ -209,6 +209,24 @@ def test__should_parse_received_unicast(driver: NanomodemV3Driver) -> None:
     assert event.data == b"AB"
 
 
+def test__should_replace_non_ascii_broadcast_payload_when_encoding(
+    driver: NanomodemV3Driver,
+) -> None:
+    replacement = chr(0xFFFD)
+    event = driver.parse_line(f"#B00202A{replacement}")
+    assert isinstance(event, ReceivedBroadcastEvent)
+    assert event.data == b"A?"
+
+
+def test__should_replace_non_ascii_unicast_payload_when_encoding(
+    driver: NanomodemV3Driver,
+) -> None:
+    replacement = chr(0xFFFD)
+    event = driver.parse_line(f"#U02A{replacement}")
+    assert isinstance(event, ReceivedUnicastEvent)
+    assert event.data == b"A?"
+
+
 def test__should_parse_command_error(driver: NanomodemV3Driver) -> None:
     event = driver.parse_line("E")
     assert isinstance(event, CommandErrorEvent)

@@ -47,6 +47,10 @@ UNICAST_DATA_RE = re.compile(r"^#U(\d{2})(.+)$")
 REMOTE_VOLTAGE_RE = re.compile(r"^#B(\d{3})06V(\d{5})")
 
 
+def _payload_to_bytes(payload: str) -> bytes:
+    return payload.encode("ascii", errors="replace")
+
+
 class NanomodemV3Driver:
     """Wire protocol handler for nanomodem v3 hardware.
 
@@ -149,11 +153,11 @@ class NanomodemV3Driver:
 
         return ReceivedBroadcastEvent(
             sender_id=sender_id,
-            data=payload.encode("ascii"),
+            data=_payload_to_bytes(payload),
         )
 
     def _parse_unicast_data(self, line: str) -> ReceivedUnicastEvent | None:
         match = UNICAST_DATA_RE.match(line)
         if match is None:
             return None
-        return ReceivedUnicastEvent(data=match.group(2).encode("ascii"))
+        return ReceivedUnicastEvent(data=_payload_to_bytes(match.group(2)))
