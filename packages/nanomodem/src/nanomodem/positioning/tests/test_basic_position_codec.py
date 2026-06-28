@@ -81,3 +81,17 @@ def test__should_raise_value_error_for_non_ascii_payload() -> None:
     codec = BasicPositionCodec()
     with pytest.raises(ValueError, match="Invalid position payload"):
         codec.decode(b"\xff\xfe\xfd")
+
+
+def test__should_raise_when_encoded_payload_exceeds_32_bytes() -> None:
+    codec = BasicPositionCodec()
+    message = PositionMessage(node_id="001", coord=Coord(lat=123.0, lon=10.0), depth=5.0)
+    with pytest.raises(ValueError, match="Position payload must be 32 bytes"):
+        codec.encode(message)
+
+
+def test__should_raise_when_depth_field_expands_payload() -> None:
+    codec = BasicPositionCodec()
+    message = PositionMessage(node_id="001", coord=Coord(lat=63.0, lon=10.0), depth=1000.0)
+    with pytest.raises(ValueError, match="Position payload must be 32 bytes"):
+        codec.encode(message)

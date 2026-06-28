@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from nanomodem.types import Coord, PositionMessage
 
+_POSITION_PAYLOAD_LENGTH = 32
+
 
 def _format_node_id(node_id: str) -> str:
     if not node_id.isdigit():
@@ -26,6 +28,10 @@ class BasicPositionCodec:
         lon_str = f"{msg.coord.lon:+011.6f}"
         depth_str = f"{msg.depth:07.3f}"
         body = f"P{_format_node_id(msg.node_id)}{lat_str}{lon_str}{depth_str}"
+        if len(body) != _POSITION_PAYLOAD_LENGTH:
+            raise ValueError(
+                f"Position payload must be {_POSITION_PAYLOAD_LENGTH} bytes, got {len(body)}: {body!r}",
+            )
         return body.encode("ascii")
 
     def decode(self, data: bytes) -> PositionMessage:
