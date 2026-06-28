@@ -14,6 +14,7 @@ from nanomodem.core.wire_types import (
     ModemCommand,
     ModemEvent,
     PingCommand,
+    PingCommandAckEvent,
     ReceivedBroadcastEvent,
     ReceivedUnicastEvent,
     RoundtripResponseEvent,
@@ -53,6 +54,14 @@ class FakeWireTransport:
 @dataclass(frozen=True)
 class TextPayload:
     text: str
+
+
+class FailingCodec:
+    def encode(self, payload: TextPayload) -> bytes:
+        return payload.text.encode("ascii")
+
+    def decode(self, data: bytes) -> TextPayload:
+        raise ValueError("invalid payload")
 
 
 class UppercaseCodec:
@@ -184,6 +193,35 @@ def test__should_invoke_on_event_for_all_events(
     transport.emit(status)
 
     assert events == [status]
+
+
+def test__should_invoke_local_ack_for_ping_command_ack(
+    node: ModemNode[bytes],
+    transport: FakeWireTransport,
+) -> None:
+    received: list[ModemEvent] = []
+    node.on_local_ack(lambda ack: received.append(ack))
+
+    event = PingCommandAckEvent(target_id="002")
+    transport.emit(event)
+
+    assert received == [event]
+
+
+def test__should_skip_typed_callback_but_still_invoke_on_event_when_decode_fails(
+    transport: FakeWireTransport,
+) -> None:
+    node = ModemNode(node_id="001", transport=transport, codec=FailingCodec())
+    typed_received: list[tuple[str, TextPayload]] = []
+    all_events: list[ModemEvent] = []
+    node.on_received_broadcast(lambda sender_id, payload: typed_received.append((sender_id, payload)))
+    node.on_event(lambda event: all_events.append(event))
+
+    event = ReceivedBroadcastEvent(sender_id="002", data=b"bad")
+    transport.emit(event)
+
+    assert typed_received == []
+    assert all_events == [event]
 
 
 def test__should_register_event_handler_on_construction(

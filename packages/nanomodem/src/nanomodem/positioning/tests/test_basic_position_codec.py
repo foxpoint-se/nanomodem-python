@@ -68,3 +68,16 @@ def test__should_raise_for_unknown_message_type() -> None:
     codec = BasicPositionCodec()
     with pytest.raises(ValueError, match="Invalid position payload"):
         codec.decode(b"Xsome_unknown_stuff_here_padding!")
+
+
+def test__should_zero_pad_numeric_node_id_on_encode() -> None:
+    codec = BasicPositionCodec()
+    message = PositionMessage(node_id="1", coord=Coord(lat=0.0, lon=0.0), depth=0.0)
+    encoded = codec.encode(message)
+    assert encoded[1:4] == b"001"
+
+
+def test__should_raise_value_error_for_non_ascii_payload() -> None:
+    codec = BasicPositionCodec()
+    with pytest.raises(ValueError, match="Invalid position payload"):
+        codec.decode(b"\xff\xfe\xfd")

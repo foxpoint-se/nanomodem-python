@@ -111,14 +111,24 @@ class ModemNode(Generic[T]):
     def on_event(self, callback: OnModemEventCallback) -> None:
         self._on_event = callback
 
+    def _decode_payload(self, data: bytes) -> T | None:
+        try:
+            return self._codec.decode(data)
+        except (ValueError, UnicodeDecodeError):
+            return None
+
     def _handle_event(self, event: ModemEvent) -> None:
         match event:
             case ReceivedBroadcastEvent(sender_id=sender_id, data=data):
                 if self._on_received_broadcast is not None:
-                    self._on_received_broadcast(sender_id, self._codec.decode(data))
+                    decoded = self._decode_payload(data)
+                    if decoded is not None:
+                        self._on_received_broadcast(sender_id, decoded)
             case ReceivedUnicastEvent(data=data):
                 if self._on_received_unicast is not None:
-                    self._on_received_unicast(self._codec.decode(data))
+                    decoded = self._decode_payload(data)
+                    if decoded is not None:
+                        self._on_received_unicast(decoded)
             case RoundtripResponseEvent(responder_id=responder_id, timestamp_counts=timestamp_counts):
                 if self._on_roundtrip_response is not None:
                     self._on_roundtrip_response(responder_id, timestamp_counts)
@@ -134,8 +144,8 @@ class ModemNode(Generic[T]):
                 | RemoteVoltageQueryAckEvent()
                 | EchoCommandAckEvent()
                 | QualityIndicatorEvent()
-                | QualityRejectedEvent() as local_ack
-            ):
+                | QualityRejectedEvent()
+            ) as local_ack:
                 if self._on_local_ack is not None:
                     self._on_local_ack(local_ack)
 
