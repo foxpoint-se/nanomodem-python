@@ -770,3 +770,5 @@ class ControllerWindow:
                 | UnicastWithAckCommandAckEvent()
             ):
                 self._log(f"Local ack: {event!r}")
+            case _:
+                self._log(f"Event: {event!r}")

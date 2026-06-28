@@ -200,6 +200,27 @@ def test__should_deliver_address_set_for_set_address_command() -> None:
     assert events == [AddressSetEvent(address="042")]
 
 
+def test__should_rekey_transport_after_set_address_command() -> None:
+    bus = InMemoryBus(sound_speed=1500.0)
+    transport = InMemoryTransport("001", bus)
+    target = InMemoryTransport("002", bus)
+    transport.position = Coord(lat=63.0, lon=10.0)
+    target.position = Coord(lat=63.0, lon=10.0)
+
+    _collect_events(transport)
+    transport.send_command(SetAddressCommand(address="042"))
+
+    assert transport.node_id == "042"
+    assert bus.get_transport("042") is transport
+    assert bus.get_transport("001") is None
+
+    events = _collect_events(transport)
+    transport.send_command(PingCommand(target_id="002"))
+
+    assert events[0] == PingCommandAckEvent(target_id="002")
+    assert isinstance(events[1], RoundtripResponseEvent)
+
+
 def test__should_deliver_unicast_ack_to_sender() -> None:
     bus = InMemoryBus()
     sender = InMemoryTransport("001", bus)

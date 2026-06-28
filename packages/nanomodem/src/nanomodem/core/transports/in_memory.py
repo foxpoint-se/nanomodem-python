@@ -141,6 +141,18 @@ class InMemoryBus:
         transport = self.get_transport(node_id)
         if transport is None:
             return
+
+        if address != node_id:
+            if address in self._transports and self._transports[address] is not transport:
+                return
+
+            self._transports.pop(node_id, None)
+            transport.node_id = address
+            self._transports[address] = transport
+
+            if node_id in self._heard_data_packet:
+                self._heard_data_packet[address] = self._heard_data_packet.pop(node_id)
+
         transport.deliver(AddressSetEvent(address=address))
 
     def _handle_remote_voltage_query(self, sender_id: str, target_id: str) -> None:
