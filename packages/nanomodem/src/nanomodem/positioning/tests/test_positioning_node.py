@@ -7,7 +7,7 @@ from nanomodem.core.transports.in_memory import InMemoryBus, InMemoryTransport
 from nanomodem.positioning.basic_position_codec import BasicPositionCodec
 from nanomodem.positioning.calculation import Calculation
 from nanomodem.positioning.positioning_node import PositioningNode
-from nanomodem.types import Coord
+from nanomodem.types import Coord, PositionMessage
 
 
 def _make_node(
@@ -40,6 +40,20 @@ def test__should_update_known_node_on_position_broadcast() -> None:
     known = host.get_known_nodes()
     assert "002" in known
     assert known["002"].position == Coord(lat=63.0, lon=10.0)
+
+
+def test__should_use_wire_sender_id_when_payload_node_id_mismatches() -> None:
+    host = _make_node("001")
+    host._handle_position_broadcast(
+        "002",
+        PositionMessage(node_id="999", coord=Coord(lat=63.0, lon=10.0), depth=1.5),
+    )
+
+    known = host.get_known_nodes()
+    assert "002" in known
+    assert "999" not in known
+    assert known["002"].position == Coord(lat=63.0, lon=10.0)
+    assert known["002"].depth == 1.5
 
 
 def test__should_calculate_range_on_roundtrip_response() -> None:

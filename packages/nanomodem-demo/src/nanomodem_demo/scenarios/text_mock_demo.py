@@ -114,7 +114,7 @@ def main() -> None:
 
     if port is not None:
         logger.info("Real serial mode: port=%s, baud=%d, node=%s", port, args.baud, args.node_id)
-        logger.warning("NanomodemTransport not yet implemented (Step 10)")
+        logger.warning("SerialWireTransport demo not yet implemented (Step 10)")
     else:
         logger.info("Running mock demo (sound_speed=%.0f m/s)...", args.sound_speed)
         run_mock_demo(sound_speed=args.sound_speed)

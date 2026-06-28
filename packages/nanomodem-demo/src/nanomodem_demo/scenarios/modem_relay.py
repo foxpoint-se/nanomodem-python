@@ -36,8 +36,8 @@ import re
 from collections.abc import Callable
 
 from nanomodem.constants import SOUND_SPEED_WATER_M_S
+from nanomodem.core.spec import MAX_BYTES_CORRECTED, format_test_broadcast_line
 from nanomodem.core.transports.in_memory import MOCK_BYTES_CORRECTED
-from nanomodem.drivers.v3_spec import MAX_BYTES_CORRECTED, format_test_broadcast_line
 from nanomodem.positioning import Calculation
 
 _BROADCAST_CMD_RE = re.compile(rb"^\$B(\d{2})(.+)$")

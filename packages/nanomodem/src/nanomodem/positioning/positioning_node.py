@@ -203,8 +203,14 @@ class PositioningNode:
             self._cb_position_changed(self._position)
         return self._position
 
-    def _handle_position_broadcast(self, _sender_id: str, message: PositionMessage) -> None:
-        node_id = message.node_id
+    def _handle_position_broadcast(self, sender_id: str, message: PositionMessage) -> None:
+        if message.node_id != sender_id:
+            logger.warning(
+                "Position broadcast sender_id %s disagrees with payload node_id %s; using sender_id",
+                sender_id,
+                message.node_id,
+            )
+        node_id = sender_id
         self._ensure_known_node(node_id)
         self._known_nodes[node_id].position = message.coord
         self._known_nodes[node_id].depth = message.depth
