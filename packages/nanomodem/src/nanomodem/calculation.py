@@ -4,12 +4,9 @@ from __future__ import annotations
 
 import math
 
-# Re-export until step 8 cleanup; prefer nanomodem.positioning.Calculation.
-from nanomodem.positioning.calculation import Calculation
-
 from .types import Coord
 
-__all__ = ["calculate_distance_3d", "Calculation"]
+__all__ = ["calculate_distance_3d"]
 
 
 def calculate_distance_3d(

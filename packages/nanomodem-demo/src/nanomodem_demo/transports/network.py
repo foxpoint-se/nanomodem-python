@@ -12,9 +12,9 @@ import socket
 import threading
 from typing import Optional
 
-from nanomodem.codecs.v3 import Codec
-from nanomodem.drivers.v3 import NanomodemV3Driver
-from nanomodem.protocols import OnMessageCallback
+from nanomodem.core.driver import NanomodemV3Driver
+from nanomodem.core.protocols import OnModemEventCallback
+from nanomodem.core.wire_types import ModemCommand
 from nanomodem.types import Coord
 
 from ..simulator.protocol import (
@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 
 
 class NetworkMockTransport:
-    """Transport that communicates with a God View Simulator via TCP/JSON.
+    """WireTransport that communicates with a God View Simulator via TCP/JSON.
 
     This enables multi-process simulation where each controller runs in
     its own terminal, and the Simulator manages the physical world state,
@@ -48,13 +48,12 @@ class NetworkMockTransport:
         self.node_id = node_id
         self._host = host
         self._port = port
-        self._callback: Optional[OnMessageCallback] = None
+        self._callback: Optional[OnModemEventCallback] = None
         self._gps_callback: Optional[OnGpsUpdateCallback] = None
         self._running = False
         self._lock = threading.Lock()
 
-        self._codec = Codec()
-        self._driver = NanomodemV3Driver(self._codec)
+        self._driver = NanomodemV3Driver()
 
         self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._socket.settimeout(timeout)
@@ -75,6 +74,15 @@ class NetworkMockTransport:
         )
         self._reader_started = False
         self._stopped = False
+
+    def send_command(self, command: ModemCommand) -> None:
+        """Send a modem command via the simulator acoustic channel."""
+        data = self._driver.format_command(command)
+        self._transmit(data)
+
+    def on_event(self, callback: OnModemEventCallback) -> None:
+        """Register a callback for parsed modem events."""
+        self._callback = callback
 
     def start(self) -> None:
         """Start the background reader thread."""
@@ -98,35 +106,6 @@ class NetworkMockTransport:
             self._socket.close()
         if self._reader_started:
             self._reader_thread.join(timeout=2.0)
-
-    def broadcast_position(self, coord: Coord, depth: float) -> None:
-        """Broadcast position via the simulator (encodes as modem command)."""
-        cmd = self._driver.format_broadcast(self.node_id, coord, depth)
-        self._transmit(cmd)
-
-    def request_range(self, target_id: str) -> None:
-        """Request range via the simulator (encodes as modem command)."""
-        cmd = self._driver.format_ping(target_id)
-        self._transmit(cmd)
-
-    def request_test(self, target_id: str) -> None:
-        """Request a test transmission from target via the simulator."""
-        cmd = self._driver.format_test_request(target_id)
-        self._transmit(cmd)
-
-    def query_quality(self) -> None:
-        """Query link quality on last data packet via the simulator."""
-        cmd = self._driver.format_quality_query()
-        self._transmit(cmd)
-
-    def query_modem_status(self) -> None:
-        """Query modem address and supply voltage via the simulator."""
-        cmd = self._driver.format_status_query()
-        self._transmit(cmd)
-
-    def on_message(self, callback: OnMessageCallback) -> None:
-        """Register a callback for received messages."""
-        self._callback = callback
 
     def on_gps_update(self, callback: OnGpsUpdateCallback) -> None:
         """Register a callback for virtual GPS updates from the simulator."""
@@ -165,6 +144,6 @@ class NetworkMockTransport:
         line = data.decode("ascii", errors="replace").strip()
         if not line:
             return
-        msg = self._driver.parse_line(line)
+        event = self._driver.parse_line(line)
         if self._callback is not None:
-            self._callback(msg)
+            self._callback(event)

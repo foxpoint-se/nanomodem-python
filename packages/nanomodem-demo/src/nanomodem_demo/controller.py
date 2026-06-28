@@ -1,6 +1,6 @@
 """Per-node controller window with integrated map visualization.
 
-Each ControllerWindow manages a single AcousticNode and shows
+Each ControllerWindow manages a single PositioningNode and shows
 that node's worldview: own position, known nodes, range circles,
 and a console for events.
 """
@@ -14,23 +14,28 @@ from datetime import datetime
 from tkinter import ttk
 from typing import Callable, Optional
 
-from nanomodem.constants import SOUND_SPEED_WATER_M_S
-from nanomodem.drivers.v3_spec import TEST_MESSAGE_PAYLOAD, supply_voltage_volts
-from nanomodem.node import AcousticNode
-from nanomodem.positioning.types import KnownNode
-from nanomodem.protocols import TransportProtocol
-from nanomodem.transports.mock import MockTransport
-from nanomodem.types import (
-    Coord,
-    LocalAckMessage,
-    Message,
-    ModemStatusMessage,
-    PositionMessage,
-    QualityIndicatorMessage,
-    RangeResponseMessage,
-    UnknownMessage,
-    V3TestBroadcastMessage,
+from nanomodem import PositioningNode
+from nanomodem.core.spec import TEST_MESSAGE_PAYLOAD, supply_voltage_volts
+from nanomodem.core.transports.in_memory import InMemoryTransport
+from nanomodem.core.wire_types import (
+    BroadcastCommandAckEvent,
+    EchoCommandAckEvent,
+    ModemEvent,
+    PingCommandAckEvent,
+    QualityIndicatorEvent,
+    QualityRejectedEvent,
+    ReceivedBroadcastEvent,
+    RemoteVoltageQueryAckEvent,
+    RoundtripResponseEvent,
+    StatusResponseEvent,
+    TestBroadcastReceivedEvent,
+    TestRequestAckEvent,
+    UnicastCommandAckEvent,
+    UnicastWithAckCommandAckEvent,
+    UnknownLineEvent,
 )
+from nanomodem.positioning.types import KnownNode
+from nanomodem.types import Coord
 from PIL import Image, ImageDraw, ImageTk
 from tkintermapview import TkinterMapView
 from tkintermapview.canvas_position_marker import CanvasPositionMarker
@@ -69,7 +74,7 @@ def _circle_coords(lat: float, lon: float, radius_m: float, n: int = 48) -> list
 
 
 class ControllerWindow:
-    """Tkinter window controlling a single AcousticNode.
+    """Tkinter window controlling a single PositioningNode.
 
     Shows the node's worldview on an integrated map, with controls
     for position setting, ranging, broadcasting, and trilateration.
@@ -78,17 +83,18 @@ class ControllerWindow:
     def __init__(
         self,
         root: tk.Tk,
-        node_id: str,
+        node: PositioningNode,
         pretty_name: str,
-        transport: TransportProtocol,
         peer_ids: list[str],
         map_center: tuple[float, float] = (59.310153, 17.975189),
         map_zoom: int = 16,
         position: Optional[Coord] = None,
         window_geometry: Optional[str] = None,
-        sound_speed: float = SOUND_SPEED_WATER_M_S,
     ) -> None:
         self._root = root
+        self._node = node
+        if position is not None:
+            self._node.set_position(position)
         self._peer_ids = peer_ids
         self._markers: dict[str, CanvasPositionMarker] = {}  # node_id -> marker
         self._paths: dict[str, CanvasPath] = {}  # node_id -> path (range circle)
@@ -107,7 +113,7 @@ class ControllerWindow:
 
         # --- Create the window ---
         self._window = tk.Toplevel(root)
-        self._window.title(f"Controller — Node {node_id} ({pretty_name})")
+        self._window.title(f"Controller — Node {node.node_id} ({pretty_name})")
         self._window.protocol("WM_DELETE_WINDOW", self._on_close)
         if window_geometry:
             self._window.geometry(window_geometry)
@@ -119,31 +125,27 @@ class ControllerWindow:
         self._build_actions_panel()
         self._build_console()
 
-        # --- Create AcousticNode ---
+        # --- Wire node callbacks ---
         def _on_depth_changed(_depth: float) -> None:
             root.after(0, self._refresh_ui)
 
         def _on_known_nodes_changed(_known: dict[str, KnownNode]) -> None:
             root.after(0, self._refresh_ui)
 
-        def _on_message_received(msg: Message) -> None:
-            root.after(0, self._log_message, msg)
+        def _on_modem_event(event: ModemEvent) -> None:
+            root.after(0, self._log_event, event)
 
-        self._node = AcousticNode(
-            node_id=node_id,
-            transport=transport,
-            position=position,
-            sound_speed=sound_speed,
+        self._node.register_ui_callbacks(
             on_position_changed=self._handle_position_changed,
             on_depth_changed=_on_depth_changed,
             on_known_nodes_changed=_on_known_nodes_changed,
-            on_message_received=_on_message_received,
         )
+        self._node.modem_node.on_event(_on_modem_event)
 
         self._refresh_ui()
 
     @property
-    def node(self) -> AcousticNode:
+    def node(self) -> PositioningNode:
         return self._node
 
     def register_shutdown_callback(self, callback: Callable[[], None]) -> None:
@@ -443,7 +445,7 @@ class ControllerWindow:
     def _handle_position_changed(self, pos: Optional[Coord]) -> None:
         """Refresh UI when node position changes."""
         transport = self._node.transport
-        if isinstance(transport, MockTransport):
+        if isinstance(transport, InMemoryTransport):
             transport.position = pos
         self._root.after(0, self._refresh_ui)
 
@@ -484,7 +486,7 @@ class ControllerWindow:
         else:
             self._me_depth_edit_f.pack_forget()
             self._me_depth_display_f.pack(side=tk.LEFT, fill=tk.X, expand=True)
-            depth = self._node._depth
+            depth = self._node.get_depth()
             val = f"{depth:.1f} m"
             self._me_depth_val_label.configure(text=val)
 
@@ -727,25 +729,41 @@ class ControllerWindow:
         self._console.see(tk.END)
         self._console.configure(state=tk.DISABLED)
 
-    def _log_message(self, msg: Message) -> None:
-        match msg:
-            case PositionMessage(node_id=nid, coord=c, depth=d):
-                self._log(f"Recv POS from {nid}: ({c.lat:.4f}, {c.lon:.4f}, {d:.1f}m)")
-            case RangeResponseMessage(node_id=nid, timestamp=ts):
+    def _log_event(self, event: ModemEvent) -> None:
+        match event:
+            case ReceivedBroadcastEvent(sender_id=sender_id, data=data):
+                try:
+                    message = self._node.modem_node.codec.decode(data)
+                    self._log(
+                        f"Recv POS from {message.node_id}: "
+                        f"({message.coord.lat:.4f}, {message.coord.lon:.4f}, {message.depth:.1f}m)",
+                    )
+                except Exception:
+                    self._log(f"Recv broadcast from {sender_id}: {data!r}")
+            case RoundtripResponseEvent(responder_id=nid, timestamp_counts=ts):
                 kn = self._node.get_known_nodes().get(nid)
                 dist = f"{kn.last_range:.2f}m" if kn and kn.last_range is not None else "??m"
                 self._log(f"Recv RANGE from {nid}: {dist} (ts={ts})")
-            case LocalAckMessage(command=cmd, target_id=tid):
-                self._log(f"Local ack {cmd} target={tid}")
-            case QualityIndicatorMessage(bytes_corrected=bytes_corrected):
-                if bytes_corrected is None:
-                    self._log("Quality: rejected")
-                else:
-                    self._log(f"Quality: {bytes_corrected} bytes corrected")
-            case ModemStatusMessage(node_id=nid, voltage_raw=raw):
+            case PingCommandAckEvent(target_id=tid):
+                self._log(f"Local ack ping target={tid}")
+            case TestRequestAckEvent(target_id=tid):
+                self._log(f"Local ack test target={tid}")
+            case QualityIndicatorEvent(bytes_corrected=bytes_corrected):
+                self._log(f"Quality: {bytes_corrected} bytes corrected")
+            case QualityRejectedEvent():
+                self._log("Quality: rejected")
+            case StatusResponseEvent(address=nid, voltage_raw=raw):
                 volts = supply_voltage_volts(raw)
                 self._log(f"Modem status: id={nid}, {volts:.2f} V (raw {raw})")
-            case V3TestBroadcastMessage(node_id=nid):
+            case TestBroadcastReceivedEvent(sender_id=nid):
                 self._log(f"Recv TEST broadcast from {nid}: {TEST_MESSAGE_PAYLOAD}")
-            case UnknownMessage(raw=raw):
+            case UnknownLineEvent(raw=raw):
                 self._log(f"Recv UNKNOWN: {raw}")
+            case (
+                BroadcastCommandAckEvent()
+                | EchoCommandAckEvent()
+                | RemoteVoltageQueryAckEvent()
+                | UnicastCommandAckEvent()
+                | UnicastWithAckCommandAckEvent()
+            ):
+                self._log(f"Local ack: {event!r}")

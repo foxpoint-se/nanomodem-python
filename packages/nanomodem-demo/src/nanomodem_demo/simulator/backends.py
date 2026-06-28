@@ -16,10 +16,11 @@ from typing import Callable, Optional
 
 import serial
 from nanomodem.calculation import calculate_distance_3d
-from nanomodem.codecs.v3 import Codec
-from nanomodem.drivers.v3 import NanomodemV3Driver
+from nanomodem.core.driver import NanomodemV3Driver
+from nanomodem.core.transports.in_memory import MOCK_STATUS_VOLTAGE_RAW
+from nanomodem.core.wire_types import ReceivedBroadcastEvent
+from nanomodem.positioning import BasicPositionCodec
 from nanomodem.serial_logger import format_serial_log
-from nanomodem.transports.mock import MOCK_STATUS_VOLTAGE_RAW
 from nanomodem.types import Coord, PositionMessage
 
 from nanomodem_demo.scenarios.modem_relay import (
@@ -165,8 +166,8 @@ class HybridBackend:
         self.client_threads: list[threading.Thread] = []
 
         # Driver for parsing acoustic messages (reuse like Controllers do)
-        self._codec = Codec()
-        self._driver = NanomodemV3Driver(self._codec)
+        self._codec = BasicPositionCodec()
+        self._driver = NanomodemV3Driver()
 
         self._heard_data_packet: dict[str, bool] = {}
 
@@ -413,8 +414,10 @@ class HybridBackend:
 
         line = data.decode("ascii", errors="replace").strip()
         parsed = self._driver.parse_line(line)
-        if isinstance(parsed, PositionMessage):
-            self._apply_belief_update(parsed)
+        if isinstance(parsed, ReceivedBroadcastEvent):
+            belief_msg = self._codec.decode(parsed.data)
+            if isinstance(belief_msg, PositionMessage):
+                self._apply_belief_update(belief_msg)
 
         if parse_status_query(data):
             self.send_message(

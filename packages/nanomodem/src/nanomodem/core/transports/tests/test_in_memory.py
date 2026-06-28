@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from nanomodem.calculation import Calculation
 from nanomodem.constants import MODEM_TIMESTAMP_QUANTUM_S
 from nanomodem.core.transports.in_memory import (
     MOCK_BYTES_CORRECTED,
@@ -23,6 +22,7 @@ from nanomodem.core.wire_types import (
     StatusQueryCommand,
     StatusResponseEvent,
 )
+from nanomodem.positioning import Calculation
 from nanomodem.types import Coord
 
 

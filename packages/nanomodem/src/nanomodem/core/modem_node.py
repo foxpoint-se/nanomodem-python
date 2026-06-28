@@ -97,8 +97,13 @@ class ModemNode(Generic[T]):
     def on_roundtrip_response(self, callback: Callable[[str, int], None]) -> None:
         self._on_roundtrip_response = callback
 
-    def on_status_response(self, callback: Callable[[StatusResponseEvent], None]) -> None:
+    def on_status_response(
+        self,
+        callback: Callable[[StatusResponseEvent], None] | None,
+    ) -> Callable[[StatusResponseEvent], None] | None:
+        prior = self._on_status_response
         self._on_status_response = callback
+        return prior
 
     def on_local_ack(self, callback: Callable[[LocalAckEvent], None]) -> None:
         self._on_local_ack = callback

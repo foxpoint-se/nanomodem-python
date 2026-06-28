@@ -41,7 +41,7 @@ test: lint typecheck
 
 verify-dist:
 	@echo "Verifying library distribution (isolated install)..."
-	uv run --no-project --directory packages/nanomodem --with . python -c "from nanomodem.node import AcousticNode; print('✅ Library distribution verified')"
+	uv run --no-project --directory packages/nanomodem --with . python -c "from nanomodem import PositioningNode; from nanomodem.core.transports import InMemoryTransport; print('✅ Library distribution verified')"
 
 verify-dist-demo:
 	# Tests demo wheel can import lib from sibling path (workspace dev check)

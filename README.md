@@ -110,7 +110,7 @@ uv run nanomodem-controller 001 --port /dev/pts/4 --world 127.0.0.1:5555 --world
 # Repeat for additional nodes
 ```
 
-Serial mode tests the full `SerialTransport`, `Driver`, and `Codec` stack — the same code that runs on the boat. Acoustic data flows through the PTY, while metadata (registration, GPS updates) flows through a TCP connection to the simulator.
+Serial mode tests the full `SerialWireTransport` and core driver stack — the same code that runs on the boat. Acoustic data flows through the PTY, while metadata (registration, GPS updates) flows through a TCP connection to the simulator.
 
 **All-in-one serial test** (socat + simulator + two controllers in one process):
 
@@ -121,53 +121,52 @@ uv run python -m nanomodem_demo.scenarios.serial_bridge_with_god_view
 ### Real Hardware (Single Modem on Serial)
 
 ```python
-from nanomodem.codecs.v3 import Codec
-from nanomodem.drivers.v3 import NanomodemV3Driver
-from nanomodem.node import AcousticNode
-from nanomodem.transports.serial import SerialTransport
+from nanomodem import PositioningNode
+from nanomodem.core.driver import NanomodemV3Driver
+from nanomodem.core.modem_node import ModemNode
+from nanomodem.core.transports import SerialWireTransport
+from nanomodem.positioning import BasicPositionCodec
 from nanomodem.types import Coord
 
-# Wire up: codec -> driver -> transport -> node
-driver = NanomodemV3Driver(codec=Codec())
-transport = SerialTransport(node_id="001", port="/dev/ttyUSB0", driver=driver)
-node = AcousticNode(node_id="001", transport=transport)  # sound_speed defaults to 1500 m/s (water)
+driver = NanomodemV3Driver()
+transport = SerialWireTransport(port="/dev/ttyUSB0", driver=driver)
+modem = ModemNode("001", transport, BasicPositionCodec())
+node = PositioningNode("001", modem)
 
 transport.start()
 
 node.set_position(Coord(lat=63.0, lon=10.0))
-node.broadcast_position()    # Announce to other nodes
-node.request_range("002")    # Ping another node
-node.request_test("002")     # Request test transmission from unit 002
-node.query_quality()         # Bytes corrected on last received data packet
-node.query_modem_status()    # Modem NVM address and supply voltage ($?)
-# ... incoming messages are delivered via on_message callback ...
+node.broadcast_position()
+node.request_range("002")
+node.request_test("002")
+node.query_quality()
+node.query_modem_status()
 
 transport.stop()
 ```
 
-### Two Mock Nodes (No Hardware)
+### Two In-Memory Nodes (No Hardware)
 
 ```python
 from nanomodem.constants import SOUND_SPEED_WATER_M_S
-from nanomodem.node import AcousticNode
-from nanomodem.transports.mock import MockEther, MockTransport
+from nanomodem.core.transports import InMemoryBus, InMemoryTransport
+from nanomodem.core.modem_node import ModemNode
+from nanomodem import PositioningNode
+from nanomodem.positioning import BasicPositionCodec
 from nanomodem.types import Coord
 
-ether = MockEther(sound_speed=SOUND_SPEED_WATER_M_S)
+bus = InMemoryBus(sound_speed=SOUND_SPEED_WATER_M_S)
 
-node_a = AcousticNode(
-    node_id="001",
-    transport=MockTransport("001", ether),
-    position=Coord(lat=63.0, lon=10.0),
-)
-node_b = AcousticNode(
-    node_id="002",
-    transport=MockTransport("002", ether),
-)
+def make_node(node_id: str, position: Coord) -> PositioningNode:
+    transport = InMemoryTransport(node_id, bus)
+    modem = ModemNode(node_id, transport, BasicPositionCodec())
+    return PositioningNode(node_id, modem, position=position)
 
-# Node A broadcasts its position, Node B receives it
+node_a = make_node("001", Coord(lat=63.0, lon=10.0))
+node_b = make_node("002", Coord(lat=63.001, lon=10.0))
+
 node_a.broadcast_position()
-print(node_b.get_known_nodes())  # Node B now knows about Node A
+print(node_b.get_known_nodes())
 ```
 
 ### Text Mock Demo (no GUI)
@@ -183,39 +182,30 @@ For complete scenarios with GUI, trilateration, and multi-node setups, see `pack
 ```mermaid
 graph TD
     Client["Client (ROS, CLI, GUI, test)"]
-    Node["AcousticNode"]
-    TP["TransportProtocol"]
-    Calc["Calculation"]
-    MockT["MockTransport"]
-    MockE["MockEther"]
-    SerialT["SerialTransport"]
+    PosNode["PositioningNode"]
+    ModemNode["ModemNode"]
+    WireT["WireTransport"]
+    Codec["BasicPositionCodec"]
+    InMem["InMemoryTransport"]
+    Serial["SerialWireTransport"]
     Driver["NanomodemV3Driver"]
-    CodecV3["Codec"]
-    Serial["serial.Serial"]
 
-    Client --> Node
-    Node --> TP
-    Node --> Calc
-    TP -.->|"impl"| MockT
-    TP -.->|"impl"| SerialT
-    MockT --> MockE
-    SerialT --> Driver
-    SerialT --> Serial
-    Driver --> CodecV3
+    Client --> PosNode
+    PosNode --> ModemNode
+    ModemNode --> WireT
+    ModemNode --> Codec
+    WireT -.->|"impl"| InMem
+    WireT -.->|"impl"| Serial
+    Serial --> Driver
 ```
 
-**Pluggable design**: all core interfaces live in `protocols.py`. Swap implementations without changing core logic.
+**Layered design**: `nanomodem.core` handles wire protocol and transports; `nanomodem.positioning` adds LBL logic via **PositioningNode**.
 
-**AcousticNode** is the only stateful class. It holds its own position, depth, known nodes, and distances. Orchestrates communication and calculation via injected dependencies (transport, calculation).
+**PositioningNode** wraps **ModemNode** with trilateration, known-node registry, and position broadcast helpers.
 
-**TransportProtocol** defines `broadcast_position(coord, depth)`, `request_range(target_id)`, `request_test(target_id)`, `query_quality()`, `query_modem_status()`, and `on_message(callback)`. Two implementations:
+**WireTransport** implementations send `ModemCommand` and receive typed `ModemEvent`s. **InMemoryTransport** simulates an acoustic bus in-process; **SerialWireTransport** talks to real hardware via **NanomodemV3Driver**.
 
-- **MockTransport** routes typed `Message` objects through a shared **MockEther** bus (including mock `$T` / `$Q` behavior). No codec or driver needed.
-- **SerialTransport** wraps a serial port. Delegates command formatting and response parsing to a **DriverProtocol** implementation.
-
-**NanomodemV3Driver** handles the nanomodem v3 modem protocol: formats `$P`, `$B`, `$T`, `$Q`, `$?` and parses `#R`, `#B`, `#U`, `#A…V…` (modem status), `$C` / `$C-`, and local acks. Uses a **Codec** for position body encoding/decoding. Fixed test payloads are recognized with `is_test_broadcast_line()` on received `#B` lines. Supply voltage from `$?` uses `supply_voltage_volts(voltage_raw)`.
-
-**Calculation** is stateless and pure. Trilateration (scipy least_squares), 3D-to-2D projection, timestamp-to-distance conversion.
+**BasicPositionCodec** encodes/decodes `PositionMessage` payloads inside broadcast/unicast data.
 
 ## Project Structure
 
@@ -224,13 +214,10 @@ graph TD
 ├── packages/
 │   ├── nanomodem/              # Core library (pip installable)
 │   │   └── src/nanomodem/
-│   │       ├── node.py         # AcousticNode — the only stateful class
-│   │       ├── protocols.py    # TransportProtocol, DriverProtocol, etc.
-│   │       ├── types.py        # Coord, KnownNode, Message union, etc.
-│   │       ├── calculation.py  # Trilateration, projection, timestamp conversion
-│   │       ├── transports/     # mock, serial, network
-│   │       ├── drivers/        # NanomodemV3Driver
-│   │       ├── codecs/         # Codec (message body encoding)
+│   │       ├── core/           # Wire protocol, driver, ModemNode, transports
+│   │       ├── positioning/    # PositioningNode, BasicPositionCodec, LBL math
+│   │       ├── types.py        # Coord, PositionMessage, etc.
+│   │       ├── calculation.py  # calculate_distance_3d
 │   │       └── tests/
 │   └── nanomodem-demo/         # GUI apps and scenarios (pip installable)
 │       └── src/nanomodem_demo/
@@ -255,12 +242,13 @@ A "beacon" node sets `is_broadcasting_own_position = True`. A "submerged host" s
 
 ### Callbacks
 
-AcousticNode accepts optional typed callbacks:
+PositioningNode accepts optional typed callbacks:
 
-- `on_position_changed: Callable[[Optional[Coord]], None]` -- called when own position is set or cleared
-- `on_depth_changed: Callable[[float], None]` -- called when own depth changes
-- `on_known_nodes_changed: Callable[[dict[str, KnownNode]], None]` -- called when the peer registry changes (new node seen, range updated, etc.)
-- `on_message_received: Callable[[Message], None]` -- called with each incoming message for logging/display
+- `on_position_changed: Callable[[Optional[Coord]], None]`
+- `on_depth_changed: Callable[[float], None]`
+- `on_known_nodes_changed: Callable[[dict[str, KnownNode]], None]`
+
+ModemNode accepts wire-level callbacks such as `on_event` for console logging.
 
 GUI controllers use these with `root.after(0, ...)` for thread-safe reactive UI updates.
 

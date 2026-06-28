@@ -1,6 +1,6 @@
 # nanomodem
 
-Core library for underwater acoustic positioning — trilateration, transports, drivers, and codecs.
+Core library for underwater acoustic positioning — wire protocol, transports, and LBL positioning.
 
 Install from git:
 
@@ -9,6 +9,6 @@ pip install "git+https://github.com/foxpoint-se/nanomodem-python.git#subdirector
 ```
 
 ```python
-from nanomodem.node import AcousticNode
-from nanomodem.transports.mock import MockEther, MockTransport
+from nanomodem import PositioningNode, BasicPositionCodec
+from nanomodem.core.transports import InMemoryBus, InMemoryTransport
 ```

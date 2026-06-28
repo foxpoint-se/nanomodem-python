@@ -8,7 +8,9 @@ from typing import Callable, Optional
 
 from nanomodem.constants import SOUND_SPEED_WATER_M_S, validate_sound_speed
 from nanomodem.core.modem_node import ModemNode
+from nanomodem.core.protocols import WireTransport
 from nanomodem.core.transports.in_memory import InMemoryTransport
+from nanomodem.core.wire_types import QualityQueryCommand, TestRequestCommand
 from nanomodem.types import Coord, PositionMessage
 
 from .calculation import Calculation
@@ -74,6 +76,10 @@ class PositioningNode:
         return self._modem_node
 
     @property
+    def transport(self) -> WireTransport:
+        return self._modem_node.transport
+
+    @property
     def calculation(self) -> CalculationProtocol:
         return self._calculation
 
@@ -124,9 +130,32 @@ class PositioningNode:
             if self._cb_known_nodes_changed is not None:
                 self._cb_known_nodes_changed(dict(self._known_nodes))
 
+    def register_ui_callbacks(
+        self,
+        *,
+        on_position_changed: Optional[Callable[[Optional[Coord]], None]] = None,
+        on_depth_changed: Optional[Callable[[float], None]] = None,
+        on_known_nodes_changed: Optional[Callable[[dict[str, KnownNode]], None]] = None,
+    ) -> None:
+        if on_position_changed is not None:
+            self._cb_position_changed = on_position_changed
+        if on_depth_changed is not None:
+            self._cb_depth_changed = on_depth_changed
+        if on_known_nodes_changed is not None:
+            self._cb_known_nodes_changed = on_known_nodes_changed
+
     def request_range(self, target_id: str) -> None:
         self._ensure_known_node(target_id)
         self._modem_node.ping(target_id)
+
+    def request_test(self, target_id: str) -> None:
+        self._modem_node.transport.send_command(TestRequestCommand(target_id=target_id))
+
+    def query_quality(self) -> None:
+        self._modem_node.transport.send_command(QualityQueryCommand())
+
+    def query_modem_status(self) -> None:
+        self._modem_node.query_status()
 
     def broadcast_position(self) -> None:
         if self._position is not None:
