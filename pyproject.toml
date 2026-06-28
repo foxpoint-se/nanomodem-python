@@ -25,12 +25,14 @@ dev = [
 [tool.pytest.ini_options]
 testpaths = [
     "packages/nanomodem/src/nanomodem/tests",
+    "packages/nanomodem/src/nanomodem/core/tests",
     "packages/nanomodem-demo/tests",
 ]
 pythonpath = [
     "packages/nanomodem/src",
     "packages/nanomodem-demo/src",
 ]
+python_classes = []
 
 [tool.mypy]
 python_version = "3.12"
