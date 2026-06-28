@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Callable, Optional
 
 from nanomodem.calculation import calculate_distance_3d
@@ -11,7 +12,10 @@ from nanomodem.types import Coord
 
 from ..protocols import OnModemEventCallback
 from ..wire_types import (
+    AddressSetEvent,
     BroadcastCommand,
+    EchoCommand,
+    EchoCommandAckEvent,
     ModemCommand,
     ModemEvent,
     PingCommand,
@@ -21,17 +25,25 @@ from ..wire_types import (
     QualityRejectedEvent,
     ReceivedBroadcastEvent,
     ReceivedUnicastEvent,
+    RemoteVoltageQueryAckEvent,
+    RemoteVoltageQueryCommand,
+    RemoteVoltageResponseEvent,
     RoundtripResponseEvent,
+    SetAddressCommand,
     StatusQueryCommand,
     StatusResponseEvent,
     TestBroadcastReceivedEvent,
     TestRequestAckEvent,
     TestRequestCommand,
     UnicastCommand,
+    UnicastWithAckCommand,
+    UnicastWithAckCommandAckEvent,
 )
 
 MOCK_BYTES_CORRECTED = 3
 MOCK_STATUS_VOLTAGE_RAW = 48123
+
+logger = logging.getLogger(__name__)
 
 _calculation = Calculation()
 
@@ -62,6 +74,8 @@ class InMemoryBus:
                 self._handle_broadcast(sender_id, data)
             case UnicastCommand(target_id=target_id, data=data):
                 self._handle_unicast(sender_id, target_id, data)
+            case UnicastWithAckCommand(target_id=target_id, data=data):
+                self._handle_unicast_with_ack(sender_id, target_id, data)
             case PingCommand(target_id=target_id):
                 self._handle_ping(sender_id, target_id)
             case StatusQueryCommand():
@@ -70,6 +84,18 @@ class InMemoryBus:
                 self._handle_quality_query(sender_id)
             case TestRequestCommand(target_id=target_id):
                 self._handle_test_request(sender_id, target_id)
+            case SetAddressCommand(address=address):
+                self._handle_set_address(sender_id, address)
+            case RemoteVoltageQueryCommand(target_id=target_id):
+                self._handle_remote_voltage_query(sender_id, target_id)
+            case EchoCommand(target_id=target_id, data=data):
+                self._handle_echo(sender_id, target_id, data)
+            case _:
+                logger.warning(
+                    "InMemoryBus does not simulate %s from node %s",
+                    type(command).__name__,
+                    sender_id,
+                )
 
     def _handle_broadcast(self, sender_id: str, data: bytes) -> None:
         event = ReceivedBroadcastEvent(sender_id=sender_id, data=data)
@@ -83,6 +109,47 @@ class InMemoryBus:
             return
         target.deliver(ReceivedUnicastEvent(data=data))
         self._heard_data_packet[target_id] = True
+
+    def _handle_unicast_with_ack(self, sender_id: str, target_id: str, data: bytes) -> None:
+        self._handle_unicast(sender_id, target_id, data)
+        sender = self.get_transport(sender_id)
+        if sender is None:
+            return
+        sender.deliver(
+            UnicastWithAckCommandAckEvent(target_id=target_id, byte_count=len(data)),
+        )
+
+    def _handle_set_address(self, node_id: str, address: str) -> None:
+        transport = self.get_transport(node_id)
+        if transport is None:
+            return
+        transport.deliver(AddressSetEvent(address=address))
+
+    def _handle_remote_voltage_query(self, sender_id: str, target_id: str) -> None:
+        sender = self.get_transport(sender_id)
+        if sender is None:
+            return
+
+        sender.deliver(RemoteVoltageQueryAckEvent(target_id=target_id))
+
+        target = self.get_transport(target_id)
+        if target is None:
+            return
+
+        sender.deliver(
+            RemoteVoltageResponseEvent(
+                responder_id=target_id,
+                voltage_raw=MOCK_STATUS_VOLTAGE_RAW,
+            ),
+        )
+
+    def _handle_echo(self, sender_id: str, target_id: str, data: bytes) -> None:
+        sender = self.get_transport(sender_id)
+        if sender is None:
+            return
+        if self.get_transport(target_id) is None:
+            return
+        sender.deliver(EchoCommandAckEvent(target_id=target_id, byte_count=len(data)))
 
     def _handle_ping(self, sender_id: str, target_id: str) -> None:
         sender = self.get_transport(sender_id)

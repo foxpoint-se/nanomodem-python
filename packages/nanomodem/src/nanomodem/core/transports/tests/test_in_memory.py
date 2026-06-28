@@ -10,7 +10,10 @@ from nanomodem.core.transports.in_memory import (
     InMemoryTransport,
 )
 from nanomodem.core.wire_types import (
+    AddressSetEvent,
     BroadcastCommand,
+    EchoCommand,
+    EchoCommandAckEvent,
     ModemEvent,
     PingCommand,
     PingTimeoutEvent,
@@ -18,9 +21,15 @@ from nanomodem.core.wire_types import (
     QualityQueryCommand,
     QualityRejectedEvent,
     ReceivedBroadcastEvent,
+    RemoteVoltageQueryAckEvent,
+    RemoteVoltageQueryCommand,
+    RemoteVoltageResponseEvent,
     RoundtripResponseEvent,
+    SetAddressCommand,
     StatusQueryCommand,
     StatusResponseEvent,
+    UnicastWithAckCommand,
+    UnicastWithAckCommandAckEvent,
 )
 from nanomodem.positioning import Calculation
 from nanomodem.types import Coord
@@ -159,3 +168,49 @@ def test__should_match_timestamp_quantum_for_zero_distance_ping() -> None:
     calculation = Calculation()
     assert calculation.timestamp_to_distance(0, 1500.0) == 0.0
     assert MODEM_TIMESTAMP_QUANTUM_S > 0.0
+
+
+def test__should_deliver_address_set_for_set_address_command() -> None:
+    bus = InMemoryBus()
+    transport = InMemoryTransport("001", bus)
+
+    events = _collect_events(transport)
+    transport.send_command(SetAddressCommand(address="042"))
+
+    assert events == [AddressSetEvent(address="042")]
+
+
+def test__should_deliver_unicast_with_ack_to_sender() -> None:
+    bus = InMemoryBus()
+    sender = InMemoryTransport("001", bus)
+    _target = InMemoryTransport("002", bus)
+
+    sender_events = _collect_events(sender)
+    sender.send_command(UnicastWithAckCommand(target_id="002", data=b"hi"))
+
+    assert sender_events == [UnicastWithAckCommandAckEvent(target_id="002", byte_count=2)]
+
+
+def test__should_deliver_remote_voltage_response_for_query() -> None:
+    bus = InMemoryBus()
+    sender = InMemoryTransport("001", bus)
+    _target = InMemoryTransport("002", bus)
+
+    events = _collect_events(sender)
+    sender.send_command(RemoteVoltageQueryCommand(target_id="002"))
+
+    assert events == [
+        RemoteVoltageQueryAckEvent(target_id="002"),
+        RemoteVoltageResponseEvent(responder_id="002", voltage_raw=MOCK_STATUS_VOLTAGE_RAW),
+    ]
+
+
+def test__should_deliver_echo_ack_for_echo_command() -> None:
+    bus = InMemoryBus()
+    sender = InMemoryTransport("001", bus)
+    _target = InMemoryTransport("002", bus)
+
+    events = _collect_events(sender)
+    sender.send_command(EchoCommand(target_id="002", data=b"abc"))
+
+    assert events == [EchoCommandAckEvent(target_id="002", byte_count=3)]
