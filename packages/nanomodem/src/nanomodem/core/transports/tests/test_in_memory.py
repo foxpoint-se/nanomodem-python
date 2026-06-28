@@ -12,10 +12,12 @@ from nanomodem.core.transports.in_memory import (
 from nanomodem.core.wire_types import (
     AddressSetEvent,
     BroadcastCommand,
+    BroadcastCommandAckEvent,
     EchoCommand,
     EchoCommandAckEvent,
     ModemEvent,
     PingCommand,
+    PingCommandAckEvent,
     PingTimeoutEvent,
     QualityIndicatorEvent,
     QualityQueryCommand,
@@ -28,6 +30,8 @@ from nanomodem.core.wire_types import (
     SetAddressCommand,
     StatusQueryCommand,
     StatusResponseEvent,
+    UnicastCommand,
+    UnicastCommandAckEvent,
     UnicastWithAckCommand,
     UnicastWithAckCommandAckEvent,
 )
@@ -58,7 +62,7 @@ def test__should_deliver_broadcast_to_all_peers() -> None:
     assert events_b[0] == ReceivedBroadcastEvent(sender_id="001", data=b"hello")
 
 
-def test__should_not_deliver_broadcast_to_sender() -> None:
+def test__should_deliver_broadcast_ack_to_sender() -> None:
     bus = InMemoryBus()
     sender = InMemoryTransport("001", bus)
     _other = InMemoryTransport("002", bus)
@@ -66,7 +70,18 @@ def test__should_not_deliver_broadcast_to_sender() -> None:
     sender_events = _collect_events(sender)
     sender.send_command(BroadcastCommand(data=b"hello"))
 
-    assert sender_events == []
+    assert sender_events == [BroadcastCommandAckEvent(byte_count=5)]
+
+
+def test__should_not_deliver_received_broadcast_to_sender() -> None:
+    bus = InMemoryBus()
+    sender = InMemoryTransport("001", bus)
+    _other = InMemoryTransport("002", bus)
+
+    sender_events = _collect_events(sender)
+    sender.send_command(BroadcastCommand(data=b"hello"))
+
+    assert sender_events == [BroadcastCommandAckEvent(byte_count=5)]
 
 
 def test__should_deliver_roundtrip_response_for_ping() -> None:
@@ -79,9 +94,10 @@ def test__should_deliver_roundtrip_response_for_ping() -> None:
     events = _collect_events(sender)
     sender.send_command(PingCommand(target_id="002"))
 
-    assert len(events) == 1
-    assert isinstance(events[0], RoundtripResponseEvent)
-    assert events[0].responder_id == "002"
+    assert len(events) == 2
+    assert events[0] == PingCommandAckEvent(target_id="002")
+    assert isinstance(events[1], RoundtripResponseEvent)
+    assert events[1].responder_id == "002"
 
 
 def test__should_deliver_timeout_for_unreachable_target() -> None:
@@ -92,7 +108,10 @@ def test__should_deliver_timeout_for_unreachable_target() -> None:
     events = _collect_events(sender)
     sender.send_command(PingCommand(target_id="999"))
 
-    assert events == [PingTimeoutEvent()]
+    assert events == [
+        PingCommandAckEvent(target_id="999"),
+        PingTimeoutEvent(),
+    ]
 
 
 def test__should_calculate_range_from_positions() -> None:
@@ -106,8 +125,9 @@ def test__should_calculate_range_from_positions() -> None:
     events = _collect_events(sender)
     sender.send_command(PingCommand(target_id="002"))
 
-    assert len(events) == 1
-    event = events[0]
+    assert len(events) == 2
+    assert events[0] == PingCommandAckEvent(target_id="002")
+    event = events[1]
     assert isinstance(event, RoundtripResponseEvent)
 
     calculation = Calculation()
@@ -161,7 +181,7 @@ def test__should_match_timestamp_quantum_for_zero_distance_ping() -> None:
     events = _collect_events(sender)
     sender.send_command(PingCommand(target_id="002"))
 
-    event = events[0]
+    event = events[1]
     assert isinstance(event, RoundtripResponseEvent)
     assert event.timestamp_counts == 0
 
@@ -178,6 +198,17 @@ def test__should_deliver_address_set_for_set_address_command() -> None:
     transport.send_command(SetAddressCommand(address="042"))
 
     assert events == [AddressSetEvent(address="042")]
+
+
+def test__should_deliver_unicast_ack_to_sender() -> None:
+    bus = InMemoryBus()
+    sender = InMemoryTransport("001", bus)
+    _target = InMemoryTransport("002", bus)
+
+    sender_events = _collect_events(sender)
+    sender.send_command(UnicastCommand(target_id="002", data=b"hi"))
+
+    assert sender_events == [UnicastCommandAckEvent(target_id="002", byte_count=2)]
 
 
 def test__should_deliver_unicast_with_ack_to_sender() -> None:

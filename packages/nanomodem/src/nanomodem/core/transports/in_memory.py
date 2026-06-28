@@ -14,11 +14,13 @@ from ..spec import distance_to_timestamp
 from ..wire_types import (
     AddressSetEvent,
     BroadcastCommand,
+    BroadcastCommandAckEvent,
     EchoCommand,
     EchoCommandAckEvent,
     ModemCommand,
     ModemEvent,
     PingCommand,
+    PingCommandAckEvent,
     PingTimeoutEvent,
     QualityIndicatorEvent,
     QualityQueryCommand,
@@ -36,6 +38,7 @@ from ..wire_types import (
     TestRequestAckEvent,
     TestRequestCommand,
     UnicastCommand,
+    UnicastCommandAckEvent,
     UnicastWithAckCommand,
     UnicastWithAckCommandAckEvent,
 )
@@ -96,20 +99,37 @@ class InMemoryBus:
                 )
 
     def _handle_broadcast(self, sender_id: str, data: bytes) -> None:
+        sender = self.get_transport(sender_id)
+        if sender is not None:
+            sender.deliver(BroadcastCommandAckEvent(byte_count=len(data)))
+
         event = ReceivedBroadcastEvent(sender_id=sender_id, data=data)
         for listener in self.get_all_except(sender_id):
             listener.deliver(event)
             self._heard_data_packet[listener.node_id] = True
 
-    def _handle_unicast(self, _sender_id: str, target_id: str, data: bytes) -> None:
+    def _deliver_unicast_to_target(self, target_id: str, data: bytes) -> bool:
         target = self.get_transport(target_id)
         if target is None:
-            return
+            return False
         target.deliver(ReceivedUnicastEvent(data=data))
         self._heard_data_packet[target_id] = True
+        return True
+
+    def _handle_unicast(self, sender_id: str, target_id: str, data: bytes) -> None:
+        if not self._deliver_unicast_to_target(target_id, data):
+            return
+
+        sender = self.get_transport(sender_id)
+        if sender is not None:
+            sender.deliver(
+                UnicastCommandAckEvent(target_id=target_id, byte_count=len(data)),
+            )
 
     def _handle_unicast_with_ack(self, sender_id: str, target_id: str, data: bytes) -> None:
-        self._handle_unicast(sender_id, target_id, data)
+        if not self._deliver_unicast_to_target(target_id, data):
+            return
+
         sender = self.get_transport(sender_id)
         if sender is None:
             return
@@ -153,6 +173,8 @@ class InMemoryBus:
         sender = self.get_transport(sender_id)
         if sender is None:
             return
+
+        sender.deliver(PingCommandAckEvent(target_id=target_id))
 
         target = self.get_transport(target_id)
         if target is None or sender.position is None or target.position is None:
