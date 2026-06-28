@@ -214,6 +214,18 @@ def test__should_parse_received_unicast(driver: NanomodemV3Driver) -> None:
     assert event.data == b"AB"
 
 
+def test__should_slice_broadcast_payload_to_declared_byte_count(driver: NanomodemV3Driver) -> None:
+    event = driver.parse_line("#B00202ABextra")
+    assert isinstance(event, ReceivedBroadcastEvent)
+    assert event.data == b"AB"
+
+
+def test__should_slice_unicast_payload_to_declared_byte_count(driver: NanomodemV3Driver) -> None:
+    event = driver.parse_line("#U02ABextra")
+    assert isinstance(event, ReceivedUnicastEvent)
+    assert event.data == b"AB"
+
+
 def test__should_replace_non_ascii_broadcast_payload_when_encoding(
     driver: NanomodemV3Driver,
 ) -> None:

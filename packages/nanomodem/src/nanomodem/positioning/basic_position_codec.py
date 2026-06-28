@@ -40,7 +40,7 @@ class BasicPositionCodec:
             text = data.decode("ascii")
         except UnicodeDecodeError as exc:
             raise ValueError(f"Invalid position payload: {data!r}") from exc
-        if len(text) < 32 or text[0] != "P":
+        if len(text) != _POSITION_PAYLOAD_LENGTH or text[0] != "P":
             raise ValueError(f"Invalid position payload: {text!r}")
         node_id = text[1:4]
         lat = float(text[4:14])

@@ -70,6 +70,14 @@ def test__should_raise_for_unknown_message_type() -> None:
         codec.decode(b"Xsome_unknown_stuff_here_padding!")
 
 
+def test__should_raise_for_trailing_bytes_in_position_payload() -> None:
+    codec = BasicPositionCodec()
+    message = PositionMessage(node_id="001", coord=Coord(lat=63.0, lon=10.0), depth=5.0)
+    padded = codec.encode(message) + b"extra"
+    with pytest.raises(ValueError, match="Invalid position payload"):
+        codec.decode(padded)
+
+
 def test__should_zero_pad_numeric_node_id_on_encode() -> None:
     codec = BasicPositionCodec()
     message = PositionMessage(node_id="1", coord=Coord(lat=0.0, lon=0.0), depth=0.0)

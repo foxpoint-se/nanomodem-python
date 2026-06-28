@@ -148,7 +148,7 @@ class NanomodemV3Driver:
 
         sender_id = match.group(1)
         byte_count = int(match.group(2))
-        payload = match.group(3)
+        payload = match.group(3)[:byte_count]
 
         if byte_count == TEST_MESSAGE_BYTE_COUNT and payload == TEST_MESSAGE_PAYLOAD:
             return TestBroadcastReceivedEvent(sender_id=sender_id)
@@ -162,4 +162,6 @@ class NanomodemV3Driver:
         match = UNICAST_DATA_RE.match(line)
         if match is None:
             return None
-        return ReceivedUnicastEvent(data=_payload_to_bytes(match.group(2)))
+        byte_count = int(match.group(1))
+        payload = match.group(2)[:byte_count]
+        return ReceivedUnicastEvent(data=_payload_to_bytes(payload))
