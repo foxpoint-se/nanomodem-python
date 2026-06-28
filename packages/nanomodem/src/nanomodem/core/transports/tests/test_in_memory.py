@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from nanomodem.constants import MODEM_TIMESTAMP_QUANTUM_S
 from nanomodem.core.transports.in_memory import (
     MOCK_BYTES_CORRECTED,
@@ -219,6 +221,21 @@ def test__should_rekey_transport_after_set_address_command() -> None:
 
     assert events[0] == PingCommandAckEvent(target_id="002")
     assert isinstance(events[1], RoundtripResponseEvent)
+
+
+def test__should_warn_when_set_address_collides_with_existing_node(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    bus = InMemoryBus()
+    transport = InMemoryTransport("001", bus)
+    _existing = InMemoryTransport("042", bus)
+
+    events = _collect_events(transport)
+    with caplog.at_level("WARNING"):
+        transport.send_command(SetAddressCommand(address="042"))
+
+    assert events == []
+    assert any("address 042 is already in use" in record.message for record in caplog.records)
 
 
 def test__should_deliver_unicast_ack_to_sender() -> None:

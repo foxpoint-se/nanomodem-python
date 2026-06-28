@@ -144,6 +144,11 @@ class InMemoryBus:
 
         if address != node_id:
             if address in self._transports and self._transports[address] is not transport:
+                logger.warning(
+                    "InMemoryBus rejected SetAddressCommand: address %s is already in use (node %s)",
+                    address,
+                    node_id,
+                )
                 return
 
             self._transports.pop(node_id, None)
