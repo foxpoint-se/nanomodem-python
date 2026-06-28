@@ -11,18 +11,18 @@ import threading
 import time
 from typing import Callable, Optional
 
-from .calculation import Calculation
+from nanomodem.positioning.calculation import Calculation
+from nanomodem.positioning.types import KnownNode, NodeCapabilities
+
 from .constants import SOUND_SPEED_WATER_M_S, validate_sound_speed
 from .drivers.v3_spec import supply_voltage_volts
 from .errors import ModemIdMismatchError, ModemStatusTimeoutError
 from .protocols import CalculationProtocol, TransportProtocol
 from .types import (
     Coord,
-    KnownNode,
     LocalAckMessage,
     Message,
     ModemStatusMessage,
-    NodeCapabilities,
     PositionMessage,
     QualityIndicatorMessage,
     RangeResponseMessage,

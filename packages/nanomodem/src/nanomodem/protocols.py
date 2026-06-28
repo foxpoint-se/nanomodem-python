@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from typing import Callable, Protocol
 
+from nanomodem.positioning.protocols import CalculationProtocol
+
 from .types import Coord, Message
 
 OnMessageCallback = Callable[[Message], None]
@@ -62,13 +64,10 @@ class CodecProtocol(Protocol):
     def decode(self, payload: bytes) -> Message: ...
 
 
-class CalculationProtocol(Protocol):
-    """Math functions for localization. Inject into AcousticNode."""
-
-    def trilaterate(self, positions: list[Coord], distances: list[float]) -> Coord: ...
-
-    def project_3d_to_2d(self, distance_3d: float, host_depth: float, beacon_depth: float) -> float: ...
-
-    def timestamp_to_distance(self, timestamp: int, sound_speed: float) -> float: ...
-
-    def distance_to_timestamp(self, distance: float, sound_speed: float) -> int: ...
+__all__ = [
+    "OnMessageCallback",
+    "TransportProtocol",
+    "DriverProtocol",
+    "CodecProtocol",
+    "CalculationProtocol",
+]

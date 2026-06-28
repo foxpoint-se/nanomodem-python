@@ -27,6 +27,7 @@ testpaths = [
     "packages/nanomodem/src/nanomodem/tests",
     "packages/nanomodem/src/nanomodem/core/tests",
     "packages/nanomodem/src/nanomodem/core/transports/tests",
+    "packages/nanomodem/src/nanomodem/positioning/tests",
     "packages/nanomodem-demo/tests",
 ]
 pythonpath = [

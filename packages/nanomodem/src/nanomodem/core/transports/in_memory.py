@@ -4,8 +4,9 @@ from __future__ import annotations
 
 from typing import Callable, Optional
 
-from nanomodem.calculation import Calculation, calculate_distance_3d
+from nanomodem.calculation import calculate_distance_3d
 from nanomodem.constants import SOUND_SPEED_WATER_M_S, validate_sound_speed
+from nanomodem.positioning.calculation import Calculation
 from nanomodem.types import Coord
 
 from ..protocols import OnModemEventCallback

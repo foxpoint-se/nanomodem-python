@@ -17,11 +17,11 @@ from typing import Callable, Optional
 from nanomodem.constants import SOUND_SPEED_WATER_M_S
 from nanomodem.drivers.v3_spec import TEST_MESSAGE_PAYLOAD, supply_voltage_volts
 from nanomodem.node import AcousticNode
+from nanomodem.positioning.types import KnownNode
 from nanomodem.protocols import TransportProtocol
 from nanomodem.transports.mock import MockTransport
 from nanomodem.types import (
     Coord,
-    KnownNode,
     LocalAckMessage,
     Message,
     ModemStatusMessage,

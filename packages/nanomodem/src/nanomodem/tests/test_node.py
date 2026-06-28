@@ -6,11 +6,11 @@ from nanomodem.calculation import Calculation
 from nanomodem.constants import SOUND_SPEED_AIR_M_S
 from nanomodem.errors import ModemIdMismatchError, ModemStatusTimeoutError
 from nanomodem.node import AcousticNode
+from nanomodem.positioning.types import KnownNode
 from nanomodem.protocols import OnMessageCallback
 from nanomodem.transports.mock import MockEther, MockTransport
 from nanomodem.types import (
     Coord,
-    KnownNode,
     LocalAckMessage,
     Message,
     ModemStatusMessage,
