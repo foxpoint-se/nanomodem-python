@@ -10,9 +10,9 @@ import time
 from collections.abc import Callable
 from typing import TypeVar, cast
 
-from nanomodem.sim_types import NodeRegistration, TransmitMessage
-from nanomodem.transports.network import NetworkMockTransport
 from nanomodem.types import Coord, Message, PositionMessage
+from nanomodem_demo.simulator.types import NodeRegistration, TransmitMessage
+from nanomodem_demo.transports import NetworkMockTransport
 
 POLL_TIMEOUT_S = 2.0
 POLL_INTERVAL_S = 0.01
