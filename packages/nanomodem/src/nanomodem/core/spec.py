@@ -9,6 +9,7 @@ from nanomodem.constants import MODEM_TIMESTAMP_QUANTUM_S, validate_sound_speed
 TEST_MESSAGE_PAYLOAD = "Hello! This is a Nanomodem v3 DSSS test transmission at 640 bps."
 TEST_MESSAGE_BYTE_COUNT = len(TEST_MESSAGE_PAYLOAD)
 MAX_BYTES_CORRECTED = 8
+MAX_WIRE_PAYLOAD_BYTES = 99
 SUPPLY_VOLTAGE_SCALE = 15.0 / 65536.0
 
 _BROADCAST_DATA_RE = re.compile(r"^#B(\d{3})(\d{2})(.+)$")
@@ -17,6 +18,14 @@ _BROADCAST_DATA_RE = re.compile(r"^#B(\d{3})(\d{2})(.+)$")
 def supply_voltage_volts(voltage_raw: int) -> float:
     """Convert voltage raw value to volts per user guide."""
     return voltage_raw * SUPPLY_VOLTAGE_SCALE
+
+
+def format_wire_byte_count(data: bytes) -> str:
+    """Format a 2-digit payload length field for $B/$U/$M/$E commands."""
+    length = len(data)
+    if length > MAX_WIRE_PAYLOAD_BYTES:
+        raise ValueError(f"Payload length must be 0..{MAX_WIRE_PAYLOAD_BYTES}, got {length}")
+    return f"{length:02d}"
 
 
 def normalize_line(line: str) -> str:

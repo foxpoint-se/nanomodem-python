@@ -16,7 +16,12 @@ from .line_parsers import (
     parse_unicast_ack,
     parse_unicast_with_ack_ack,
 )
-from .spec import TEST_MESSAGE_BYTE_COUNT, TEST_MESSAGE_PAYLOAD, normalize_line
+from .spec import (
+    TEST_MESSAGE_BYTE_COUNT,
+    TEST_MESSAGE_PAYLOAD,
+    format_wire_byte_count,
+    normalize_line,
+)
 from .wire_types import (
     BroadcastCommand,
     CommandErrorEvent,
@@ -40,11 +45,11 @@ from .wire_types import (
     UnknownLineEvent,
 )
 
-ROUNDTRIP_RE = re.compile(r"^#R(\d{3})T(\d{5})")
+ROUNDTRIP_RE = re.compile(r"^#R(\d{3})T(\d{5})$")
 TIMEOUT_RE = re.compile(r"^#TO$")
 BROADCAST_DATA_RE = re.compile(r"^#B(\d{3})(\d{2})(.+)$")
 UNICAST_DATA_RE = re.compile(r"^#U(\d{2})(.+)$")
-REMOTE_VOLTAGE_RE = re.compile(r"^#B(\d{3})06V(\d{5})")
+REMOTE_VOLTAGE_RE = re.compile(r"^#B(\d{3})06V(\d{5})$")
 
 
 def _payload_to_bytes(payload: str) -> bytes:
@@ -70,19 +75,15 @@ class NanomodemV3Driver:
             case RemoteVoltageQueryCommand(target_id=target_id):
                 return f"$V{target_id}".encode("ascii")
             case BroadcastCommand(data=data):
-                byte_count = f"{len(data):02d}"
-                return f"$B{byte_count}".encode("ascii") + data
+                return f"$B{format_wire_byte_count(data)}".encode("ascii") + data
             case UnicastCommand(target_id=target_id, data=data):
-                byte_count = f"{len(data):02d}"
-                return f"$U{target_id}{byte_count}".encode("ascii") + data
+                return f"$U{target_id}{format_wire_byte_count(data)}".encode("ascii") + data
             case UnicastWithAckCommand(target_id=target_id, data=data):
-                byte_count = f"{len(data):02d}"
-                return f"$M{target_id}{byte_count}".encode("ascii") + data
+                return f"$M{target_id}{format_wire_byte_count(data)}".encode("ascii") + data
             case TestRequestCommand(target_id=target_id):
                 return f"$T{target_id}".encode("ascii")
             case EchoCommand(target_id=target_id, data=data):
-                byte_count = f"{len(data):02d}"
-                return f"$E{target_id}{byte_count}".encode("ascii") + data
+                return f"$E{target_id}{format_wire_byte_count(data)}".encode("ascii") + data
             case QualityQueryCommand():
                 return b"$Q"
             case _:

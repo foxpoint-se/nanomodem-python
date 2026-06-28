@@ -91,6 +91,12 @@ def test__should_format_quality_query_command(driver: NanomodemV3Driver) -> None
     assert driver.format_command(QualityQueryCommand()) == b"$Q"
 
 
+def test__should_raise_for_payload_exceeding_wire_byte_count_limit(driver: NanomodemV3Driver) -> None:
+    oversized = b"x" * 100
+    with pytest.raises(ValueError, match="Payload length must be 0..99"):
+        driver.format_command(BroadcastCommand(data=oversized))
+
+
 def test__should_raise_for_unsupported_command(driver: NanomodemV3Driver) -> None:
     with pytest.raises(TypeError, match="Unsupported ModemCommand"):
         driver.format_command(object())  # type: ignore[arg-type]
@@ -182,6 +188,11 @@ def test__should_parse_roundtrip_response(driver: NanomodemV3Driver) -> None:
     assert event.timestamp_counts == 12345
 
 
+def test__should_reject_roundtrip_line_with_trailing_junk(driver: NanomodemV3Driver) -> None:
+    event = driver.parse_line("#R002T12345junk")
+    assert isinstance(event, UnknownLineEvent)
+
+
 def test__should_parse_ping_timeout(driver: NanomodemV3Driver) -> None:
     event = driver.parse_line("#TO")
     assert isinstance(event, PingTimeoutEvent)
@@ -192,6 +203,13 @@ def test__should_parse_remote_voltage_response(driver: NanomodemV3Driver) -> Non
     assert isinstance(event, RemoteVoltageResponseEvent)
     assert event.responder_id == "042"
     assert event.voltage_raw == 48123
+
+
+def test__should_not_parse_remote_voltage_line_with_trailing_junk_as_voltage(
+    driver: NanomodemV3Driver,
+) -> None:
+    event = driver.parse_line("#B04206V48123extra")
+    assert not isinstance(event, RemoteVoltageResponseEvent)
 
 
 def test__should_parse_received_broadcast_with_raw_data(driver: NanomodemV3Driver) -> None:
