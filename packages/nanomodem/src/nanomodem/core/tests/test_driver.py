@@ -219,6 +219,13 @@ def test__should_parse_received_broadcast_with_raw_data(driver: NanomodemV3Drive
     assert event.data == b"AB"
 
 
+def test__should_parse_empty_broadcast_payload(driver: NanomodemV3Driver) -> None:
+    event = driver.parse_line("#B00200")
+    assert isinstance(event, ReceivedBroadcastEvent)
+    assert event.sender_id == "002"
+    assert event.data == b""
+
+
 def test__should_parse_test_broadcast_received(driver: NanomodemV3Driver) -> None:
     line = format_test_broadcast_line("002")
     event = driver.parse_line(line)
@@ -230,6 +237,12 @@ def test__should_parse_received_unicast(driver: NanomodemV3Driver) -> None:
     event = driver.parse_line("#U02AB")
     assert isinstance(event, ReceivedUnicastEvent)
     assert event.data == b"AB"
+
+
+def test__should_parse_empty_unicast_payload(driver: NanomodemV3Driver) -> None:
+    event = driver.parse_line("#U00")
+    assert isinstance(event, ReceivedUnicastEvent)
+    assert event.data == b""
 
 
 def test__should_slice_broadcast_payload_to_declared_byte_count(driver: NanomodemV3Driver) -> None:

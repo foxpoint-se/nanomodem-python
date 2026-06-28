@@ -47,8 +47,8 @@ from .wire_types import (
 
 ROUNDTRIP_RE = re.compile(r"^#R(\d{3})T(\d{5})$")
 TIMEOUT_RE = re.compile(r"^#TO$")
-BROADCAST_DATA_RE = re.compile(r"^#B(\d{3})(\d{2})(.+)$")
-UNICAST_DATA_RE = re.compile(r"^#U(\d{2})(.+)$")
+BROADCAST_DATA_RE = re.compile(r"^#B(\d{3})(\d{2})(.*)$")
+UNICAST_DATA_RE = re.compile(r"^#U(\d{2})(.*)$")
 REMOTE_VOLTAGE_RE = re.compile(r"^#B(\d{3})06V(\d{5})$")
 
 
