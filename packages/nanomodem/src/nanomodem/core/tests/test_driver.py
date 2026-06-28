@@ -91,6 +91,11 @@ def test__should_format_quality_query_command(driver: NanomodemV3Driver) -> None
     assert driver.format_command(QualityQueryCommand()) == b"$Q"
 
 
+def test__should_raise_for_unsupported_command(driver: NanomodemV3Driver) -> None:
+    with pytest.raises(TypeError, match="Unsupported ModemCommand"):
+        driver.format_command(object())  # type: ignore[arg-type]
+
+
 def test__should_parse_status_response(driver: NanomodemV3Driver) -> None:
     event = driver.parse_line("#A042V48123")
     assert isinstance(event, StatusResponseEvent)

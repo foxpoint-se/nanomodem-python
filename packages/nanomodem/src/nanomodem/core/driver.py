@@ -85,6 +85,8 @@ class NanomodemV3Driver:
                 return f"$E{target_id}{byte_count}".encode("ascii") + data
             case QualityQueryCommand():
                 return b"$Q"
+            case _:
+                raise TypeError(f"Unsupported ModemCommand: {type(cmd).__name__}")
 
     def parse_line(self, line: str) -> ModemEvent:
         """Parse a serial response line into a ModemEvent."""
