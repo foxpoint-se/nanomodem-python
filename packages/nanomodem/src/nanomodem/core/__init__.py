@@ -4,6 +4,8 @@ This package handles serial communication with nanomodem v3 hardware per the
 user guide. No LBL positioning assumptions.
 """
 
+from .driver import NanomodemV3Driver
+from .spec import MAX_BYTES_CORRECTED, SUPPLY_VOLTAGE_SCALE, supply_voltage_volts
 from .wire_types import (
     AddressSetEvent,
     BroadcastCommand,
@@ -42,6 +44,10 @@ from .wire_types import (
 )
 
 __all__ = [
+    "NanomodemV3Driver",
+    "MAX_BYTES_CORRECTED",
+    "SUPPLY_VOLTAGE_SCALE",
+    "supply_voltage_volts",
     "ModemCommand",
     "SetAddressCommand",
     "StatusQueryCommand",
