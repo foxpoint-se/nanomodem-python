@@ -4,7 +4,10 @@ This package handles serial communication with nanomodem v3 hardware per the
 user guide. No LBL positioning assumptions.
 """
 
+from .codecs import RawPayloadCodec
 from .driver import NanomodemV3Driver
+from .modem_node import ModemNode
+from .protocols import OnModemEventCallback, PayloadCodec, WireTransport
 from .spec import MAX_BYTES_CORRECTED, SUPPLY_VOLTAGE_SCALE, supply_voltage_volts
 from .wire_types import (
     AddressSetEvent,
@@ -45,6 +48,11 @@ from .wire_types import (
 
 __all__ = [
     "NanomodemV3Driver",
+    "ModemNode",
+    "PayloadCodec",
+    "WireTransport",
+    "OnModemEventCallback",
+    "RawPayloadCodec",
     "MAX_BYTES_CORRECTED",
     "SUPPLY_VOLTAGE_SCALE",
     "supply_voltage_volts",
