@@ -2,6 +2,90 @@
 
 <!-- version list -->
 
+## v3.0.0 (2026-06-28)
+
+### Bug Fixes
+
+- Address Copilot review on sender id, spec imports, and log text
+  ([`544fef7`](https://github.com/foxpoint-se/nanomodem-python/commit/544fef77deb7206ed10356b63c8fb42dd41cff5a))
+
+- Allow zero-byte payloads in broadcast and unicast wire regexes
+  ([`a82bc1f`](https://github.com/foxpoint-se/nanomodem-python/commit/a82bc1f672ddeb93e4927b97e63437a2deb3f86a))
+
+- Emit local ack events from InMemoryBus command handlers
+  ([`a8a032b`](https://github.com/foxpoint-se/nanomodem-python/commit/a8a032b88a00bcf42957c69c26da3dcb9ffd0679))
+
+- End-anchor driver regexes and cap wire payload length at 99 bytes
+  ([`97ecc82`](https://github.com/foxpoint-se/nanomodem-python/commit/97ecc82e45eca3131a0df9e2251aa358ba37caa1))
+
+- Enforce wire byte counts in driver and strict 32-byte decode
+  ([`1c86b43`](https://github.com/foxpoint-se/nanomodem-python/commit/1c86b43873e870096093e307edbafbd06cc5b024))
+
+- Harden ModemNode event handling and position codec encoding
+  ([`0fc0c90`](https://github.com/foxpoint-se/nanomodem-python/commit/0fc0c902804ed8a71ce10892ba5742a77fd04729))
+
+- Keep core free of positioning deps and log wire sender id
+  ([`d743605`](https://github.com/foxpoint-se/nanomodem-python/commit/d743605f1a1f4a5ce776a5af0e4194140ebb7ff4))
+
+- Lazy-load positioning exports from nanomodem package root
+  ([`5cf6039`](https://github.com/foxpoint-se/nanomodem-python/commit/5cf6039471b253796cc4183a7a7582860a1c87b4))
+
+- Log InMemoryBus address collision on SetAddressCommand
+  ([`4939458`](https://github.com/foxpoint-se/nanomodem-python/commit/4939458febd58d01d28719974f2fe8837508e9b9))
+
+- Raise on unsupported ModemCommand in driver format_command
+  ([`f8a0dc2`](https://github.com/foxpoint-se/nanomodem-python/commit/f8a0dc21e344a543ed0daf9e70c6f89b5bbe289e))
+
+- Reject BasicPositionCodec payloads that are not exactly 32 bytes
+  ([`4549bee`](https://github.com/foxpoint-se/nanomodem-python/commit/4549bee3b4e25bb9cf781fc48f66735613bc4432))
+
+- Rekey in-memory transport on set-address and log all modem events
+  ([`6297705`](https://github.com/foxpoint-se/nanomodem-python/commit/6297705ca25f787240dcaa0ff4063ecdde052cb4))
+
+- Simulate all ModemCommand variants in InMemoryBus
+  ([`8081cc0`](https://github.com/foxpoint-se/nanomodem-python/commit/8081cc0866982c107c95d5e555d897974ebb2102))
+
+- Tolerate replacement chars when encoding broadcast/unicast payloads
+  ([`2a7f94f`](https://github.com/foxpoint-se/nanomodem-python/commit/2a7f94fd79669211b83513bc9e2f74bd44d4cd9c))
+
+### Chores
+
+- Sync uv.lock workspace package versions
+  ([`ed0ea77`](https://github.com/foxpoint-se/nanomodem-python/commit/ed0ea7772c4543d9522feb9f9585db723d2d7a2d))
+
+### Features
+
+- Remove legacy AcousticNode API in favor of core/positioning stack
+  ([`34e8e3a`](https://github.com/foxpoint-se/nanomodem-python/commit/34e8e3a27b8ceb17d3daed516ca6ed92d579e08c))
+
+- **core**: Add codec-free NanomodemV3Driver
+  ([`00d57fc`](https://github.com/foxpoint-se/nanomodem-python/commit/00d57fc9313f19d835d6800627dea4042a2da8b5))
+
+- **core**: Add ModemCommand and ModemEvent wire types
+  ([`767485e`](https://github.com/foxpoint-se/nanomodem-python/commit/767485e242eb3e93842dddd719c9f1c3e9bf2000))
+
+- **core**: Add ModemNode with generic PayloadCodec
+  ([`e05f54b`](https://github.com/foxpoint-se/nanomodem-python/commit/e05f54b9486583d3ae0f02d4faee177ea1f0b43c))
+
+- **core**: Add WireTransport implementations for serial and in-memory
+  ([`5dd1881`](https://github.com/foxpoint-se/nanomodem-python/commit/5dd18815cacbe7ab5f6877134db426318e2f9e2c))
+
+- **positioning**: Add PositioningNode and move LBL types
+  ([`afa025d`](https://github.com/foxpoint-se/nanomodem-python/commit/afa025db334dc54d7102ed1d27bb4648be53a247))
+
+### Refactoring
+
+- Add core and positioning package skeleton
+  ([`fded14d`](https://github.com/foxpoint-se/nanomodem-python/commit/fded14d1b69a3466f407de43713453755954c6e3))
+
+- **demo**: Move God View simulator glue out of core
+  ([`b096cd8`](https://github.com/foxpoint-se/nanomodem-python/commit/b096cd878a5d270a77aefa392369e0ed4df33297))
+
+### Breaking Changes
+
+- The public API has been redesigned for cleaner separation.
+
+
 ## v2.0.0 (2026-06-16)
 
 ### Bug Fixes
