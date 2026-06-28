@@ -734,8 +734,11 @@ class ControllerWindow:
             case ReceivedBroadcastEvent(sender_id=sender_id, data=data):
                 try:
                     message = self._node.modem_node.codec.decode(data)
+                    label = f"Recv POS from {sender_id}"
+                    if message.node_id != sender_id:
+                        label += f" (payload id {message.node_id})"
                     self._log(
-                        f"Recv POS from {message.node_id}: "
+                        f"{label}: "
                         f"({message.coord.lat:.4f}, {message.coord.lon:.4f}, {message.depth:.1f}m)",
                     )
                 except Exception:

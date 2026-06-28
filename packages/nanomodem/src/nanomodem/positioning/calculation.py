@@ -7,7 +7,7 @@ import math
 import numpy as np
 from scipy.optimize import least_squares
 
-from nanomodem.constants import MODEM_TIMESTAMP_QUANTUM_S, validate_sound_speed
+from nanomodem.core.spec import distance_to_timestamp, timestamp_to_distance
 from nanomodem.types import Coord
 
 
@@ -59,10 +59,8 @@ class Calculation:
 
     def timestamp_to_distance(self, timestamp: int, sound_speed: float) -> float:
         """Convert modem timestamp to distance in meters."""
-        validate_sound_speed(sound_speed)
-        return timestamp * MODEM_TIMESTAMP_QUANTUM_S * sound_speed
+        return timestamp_to_distance(timestamp, sound_speed)
 
     def distance_to_timestamp(self, distance: float, sound_speed: float) -> int:
         """Convert distance in meters to modem timestamp units."""
-        validate_sound_speed(sound_speed)
-        return round((distance / sound_speed) / MODEM_TIMESTAMP_QUANTUM_S)
+        return distance_to_timestamp(distance, sound_speed)

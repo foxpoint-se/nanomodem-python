@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import re
 
+from nanomodem.constants import MODEM_TIMESTAMP_QUANTUM_S, validate_sound_speed
+
 TEST_MESSAGE_PAYLOAD = "Hello! This is a Nanomodem v3 DSSS test transmission at 640 bps."
 TEST_MESSAGE_BYTE_COUNT = len(TEST_MESSAGE_PAYLOAD)
 MAX_BYTES_CORRECTED = 8
@@ -56,3 +58,15 @@ def parse_test_broadcast_sender(line: str) -> str | None:
 def is_test_broadcast_line(line: str) -> bool:
     """True if line is a received broadcast of the fixed v3 test payload."""
     return parse_test_broadcast_sender(line) is not None
+
+
+def timestamp_to_distance(timestamp: int, sound_speed: float) -> float:
+    """Convert modem timestamp counts to distance in meters per user guide."""
+    validate_sound_speed(sound_speed)
+    return timestamp * MODEM_TIMESTAMP_QUANTUM_S * sound_speed
+
+
+def distance_to_timestamp(distance: float, sound_speed: float) -> int:
+    """Convert distance in meters to modem timestamp counts per user guide."""
+    validate_sound_speed(sound_speed)
+    return round((distance / sound_speed) / MODEM_TIMESTAMP_QUANTUM_S)

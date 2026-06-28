@@ -7,10 +7,10 @@ from typing import Callable, Optional
 
 from nanomodem.calculation import calculate_distance_3d
 from nanomodem.constants import SOUND_SPEED_WATER_M_S, validate_sound_speed
-from nanomodem.positioning.calculation import Calculation
 from nanomodem.types import Coord
 
 from ..protocols import OnModemEventCallback
+from ..spec import distance_to_timestamp
 from ..wire_types import (
     AddressSetEvent,
     BroadcastCommand,
@@ -44,8 +44,6 @@ MOCK_BYTES_CORRECTED = 3
 MOCK_STATUS_VOLTAGE_RAW = 48123
 
 logger = logging.getLogger(__name__)
-
-_calculation = Calculation()
 
 
 class InMemoryBus:
@@ -167,7 +165,7 @@ class InMemoryBus:
             target.position,
             target.depth,
         )
-        timestamp = _calculation.distance_to_timestamp(distance, self._sound_speed)
+        timestamp = distance_to_timestamp(distance, self._sound_speed)
         sender.deliver(
             RoundtripResponseEvent(
                 responder_id=target_id,
