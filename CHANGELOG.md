@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v4.0.0 (2026-07-02)
+
+### Refactoring
+
+- **nanomodem-demo**: Rename God View transport for clarity
+  ([`0e573ac`](https://github.com/foxpoint-se/nanomodem-python/commit/0e573acd6660b056707f8a0b78cbc60310660f37))
+
+### Breaking Changes
+
+- **nanomodem-demo**: NetworkMockTransport removed; use SimulatorJsonTransport from
+  nanomodem_demo.transports.
+
+
 ## v3.0.0 (2026-06-28)
 
 ### Bug Fixes
