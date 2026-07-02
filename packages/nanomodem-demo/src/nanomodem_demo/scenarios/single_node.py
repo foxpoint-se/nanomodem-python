@@ -16,7 +16,7 @@ from nanomodem_demo.controller import ControllerWindow
 from nanomodem_demo.node_builder import build_in_memory_node, build_positioning_node, build_serial_node
 from nanomodem_demo.simulator import AcousticTransportConfig, SimulatorInboundHandlers, SimulatorMetadataClient
 from nanomodem_demo.startup import verify_modem_id_at_startup
-from nanomodem_demo.transports import NetworkMockTransport
+from nanomodem_demo.transports import SimulatorJsonTransport
 
 MAP_CENTER = (59.310153, 17.975189)
 MAP_ZOOM = 16
@@ -39,11 +39,11 @@ def launch_single(
     """Create a single controller with the given ID and transport."""
     acoustic_config: Optional[AcousticTransportConfig] = None
 
-    network_transport: NetworkMockTransport | None = None
+    simulator_transport: SimulatorJsonTransport | None = None
 
     if network_host and network_port:
-        network_transport = NetworkMockTransport(node_id, host=network_host, port=network_port)
-        node = build_positioning_node(node_id, network_transport, sound_speed=sound_speed)
+        simulator_transport = SimulatorJsonTransport(node_id, host=network_host, port=network_port)
+        node = build_positioning_node(node_id, simulator_transport, sound_speed=sound_speed)
         acoustic_config = None
     elif port:
         node = build_serial_node(node_id, port, baud=baud, sound_speed=sound_speed)
@@ -65,8 +65,8 @@ def launch_single(
     if hasattr(wire_transport, "start"):
         wire_transport.start()
 
-    if network_transport is not None:
-        network_transport.on_gps_update(lambda coord: _schedule_position_update(root, controller, coord))
+    if simulator_transport is not None:
+        simulator_transport.on_gps_update(lambda coord: _schedule_position_update(root, controller, coord))
 
     if world_host and world_port and acoustic_config:
         metadata_client = _start_metadata_client(root, controller, world_host, world_port, acoustic_config)
@@ -162,7 +162,7 @@ def main() -> None:
     print("Starting controller")
     print(f"  Node ID: {node_id}")
     if network_host and network_port:
-        print(f"  Transport: NetworkMockTransport ({network_host}:{network_port})")
+        print(f"  Transport: SimulatorJsonTransport ({network_host}:{network_port})")
     elif args.port:
         print(f"  Transport: SerialWireTransport ({args.port}, {args.baud} baud)")
         if world_host and world_port and args.world_port:
