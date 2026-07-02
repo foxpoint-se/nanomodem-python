@@ -1,4 +1,4 @@
-"""Tests for NetworkMockTransport."""
+"""Tests for SimulatorJsonTransport."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ from nanomodem.positioning import BasicPositionCodec
 from nanomodem.types import Coord
 from nanomodem_demo.node_builder import build_positioning_node
 from nanomodem_demo.simulator.types import NodeRegistration, TransmitMessage
-from nanomodem_demo.transports import NetworkMockTransport
+from nanomodem_demo.transports import SimulatorJsonTransport
 
 POLL_TIMEOUT_S = 2.0
 POLL_INTERVAL_S = 0.01
@@ -120,12 +120,12 @@ class MockSimulatorServer:
         _wait_until(lambda: self.client_socket is not None, timeout_s)
 
 
-def test_network_transport_registers_on_connect() -> None:
+def test__should_register_on_connect() -> None:
     server = MockSimulatorServer(port=5556)
     server.start()
 
     try:
-        transport = NetworkMockTransport(node_id="001", port=5556)
+        transport = SimulatorJsonTransport(node_id="001", port=5556)
         transport.start()
 
         _wait_for_length(server.received_messages, 1)
@@ -139,12 +139,12 @@ def test_network_transport_registers_on_connect() -> None:
         server.stop()
 
 
-def test_network_transport_broadcast_position() -> None:
+def test__should_transmit_broadcast_position() -> None:
     server = MockSimulatorServer(port=5557)
     server.start()
 
     try:
-        transport = NetworkMockTransport(node_id="001", port=5557)
+        transport = SimulatorJsonTransport(node_id="001", port=5557)
         node = build_positioning_node("001", transport)
         transport.start()
 
@@ -172,12 +172,12 @@ def test_network_transport_broadcast_position() -> None:
         server.stop()
 
 
-def test_network_transport_receives_acoustic_message() -> None:
+def test__should_receive_acoustic_message() -> None:
     server = MockSimulatorServer(port=5558)
     server.start()
 
     try:
-        transport = NetworkMockTransport(node_id="001", port=5558)
+        transport = SimulatorJsonTransport(node_id="001", port=5558)
         transport.start()
 
         received_events: list[ModemEvent] = []
@@ -204,7 +204,7 @@ def test__should_invoke_gps_callback_when_simulator_sends_gps_update() -> None:
     server.start()
 
     try:
-        transport = NetworkMockTransport(node_id="001", port=5560)
+        transport = SimulatorJsonTransport(node_id="001", port=5560)
         transport.start()
 
         received: list[Coord] = []
@@ -222,12 +222,12 @@ def test__should_invoke_gps_callback_when_simulator_sends_gps_update() -> None:
         server.stop()
 
 
-def test_network_transport_request_range() -> None:
+def test__should_transmit_range_request() -> None:
     server = MockSimulatorServer(port=5559)
     server.start()
 
     try:
-        transport = NetworkMockTransport(node_id="001", port=5559)
+        transport = SimulatorJsonTransport(node_id="001", port=5559)
         node = build_positioning_node("001", transport)
         node.set_known_node_position("002", Coord(lat=59.31, lon=17.98))
         transport.start()
@@ -257,7 +257,7 @@ def test__should_stop_safely_when_reader_was_never_started() -> None:
     server.start()
 
     try:
-        transport = NetworkMockTransport(node_id="001", port=5561)
+        transport = SimulatorJsonTransport(node_id="001", port=5561)
         transport.stop()
     finally:
         server.stop()
@@ -268,7 +268,7 @@ def test__should_parse_status_response_from_acoustic_message() -> None:
     server.start()
 
     try:
-        transport = NetworkMockTransport(node_id="001", port=5562)
+        transport = SimulatorJsonTransport(node_id="001", port=5562)
         transport.start()
 
         received: list[ModemEvent] = []

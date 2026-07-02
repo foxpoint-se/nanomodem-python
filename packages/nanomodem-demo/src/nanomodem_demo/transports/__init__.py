@@ -1,3 +1,3 @@
-from .network import NetworkMockTransport
+from .simulator_json import SimulatorJsonTransport
 
-__all__ = ["NetworkMockTransport"]
+__all__ = ["SimulatorJsonTransport"]

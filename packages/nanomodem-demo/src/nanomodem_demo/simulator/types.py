@@ -1,7 +1,7 @@
-"""TypedDict definitions for JSON protocol between NetworkMockTransport and Simulator.
+"""TypedDict definitions for JSON protocol between SimulatorJsonTransport and Simulator.
 
 This module defines the message schemas for communication between:
-- Controllers using NetworkMockTransport
+- Controllers using SimulatorJsonTransport
 - The God View Simulator
 
 These types are used for JSON serialization/deserialization in the network layer.
@@ -38,7 +38,7 @@ class NodeRegistration(TypedDict):
 class TransmitMessage(TypedDict):
     """Acoustic message transmission from controller to simulator.
 
-    Sent when a controller transmits a message via NetworkMockTransport.
+    Sent when a controller transmits a message via SimulatorJsonTransport.
     The simulator will then deliver it to the appropriate recipients
     based on physical positions and acoustic propagation.
     """

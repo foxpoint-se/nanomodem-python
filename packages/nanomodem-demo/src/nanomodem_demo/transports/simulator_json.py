@@ -1,4 +1,4 @@
-"""NetworkMockTransport -- TCP-based transport for multi-process simulation.
+"""SimulatorJsonTransport — TCP/JSON client for the God View Simulator.
 
 Connects to a God View Simulator over TCP and uses a JSON protocol
 to send/receive acoustic messages. Enables multi-terminal testing
@@ -30,7 +30,7 @@ from ..simulator.protocol import (
 logger = logging.getLogger(__name__)
 
 
-class NetworkMockTransport:
+class SimulatorJsonTransport:
     """WireTransport that communicates with a God View Simulator via TCP/JSON.
 
     This enables multi-process simulation where each controller runs in
@@ -70,7 +70,7 @@ class NetworkMockTransport:
         self._reader_thread = threading.Thread(
             target=self._read_loop,
             daemon=True,
-            name=f"network-{node_id}-reader",
+            name=f"simulator-json-{node_id}-reader",
         )
         self._reader_started = False
         self._stopped = False
@@ -131,7 +131,7 @@ class NetworkMockTransport:
             except socket.timeout:
                 continue
             except Exception:
-                logger.exception("Error in network reader thread")
+                logger.exception("Error in simulator JSON reader thread")
                 break
 
     def _on_gps_from_simulator(self, coord: Coord) -> None:
