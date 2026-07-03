@@ -26,7 +26,12 @@ def _build_parser() -> argparse.ArgumentParser:
 
     transport_group = parser.add_mutually_exclusive_group()
     transport_group.add_argument("-s", "--serial", type=str, help="Serial port path (e.g. /dev/ttyUSB0)")
-    transport_group.add_argument("-m", "--in-memory", action="store_true", help="Use in-memory transport")
+    transport_group.add_argument(
+        "-m",
+        "--in-memory",
+        action="store_true",
+        help="In-memory bus (one node per run; peer ping needs REPL, not one-shot)",
+    )
 
     parser.add_argument("--baud", type=int, default=9600, help="Serial baud rate (default: 9600)")
     parser.add_argument(

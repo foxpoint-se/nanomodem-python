@@ -22,7 +22,7 @@ def _format_demo_restart_hint(node: PositioningNode, exc: ModemIdMismatchError) 
     if isinstance(transport, SimulatorJsonTransport):
         return (
             f"Restart with: nanomodem-controller {exc.actual_id} "
-            f"--network {transport._host}:{transport._port}"
+            f"--network {transport.host}:{transport.port}"
         )
     if isinstance(transport, InMemoryTransport):
         return f"Restart with: nanomodem-controller {exc.actual_id}"

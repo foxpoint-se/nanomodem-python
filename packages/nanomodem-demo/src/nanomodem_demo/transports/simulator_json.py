@@ -75,6 +75,14 @@ class SimulatorJsonTransport:
         self._reader_started = False
         self._stopped = False
 
+    @property
+    def host(self) -> str:
+        return self._host
+
+    @property
+    def port(self) -> int:
+        return self._port
+
     def send_command(self, command: ModemCommand) -> None:
         """Send a modem command via the simulator acoustic channel."""
         data = self._driver.format_command(command)
