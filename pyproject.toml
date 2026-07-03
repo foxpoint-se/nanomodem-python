@@ -6,6 +6,7 @@ requires-python = ">=3.12"
 dependencies = [
     "nanomodem",
     "nanomodem-demo",
+    "nanomodem-cli",
 ]
 
 [tool.uv.workspace]
@@ -14,6 +15,7 @@ members = ["packages/*"]
 [tool.uv.sources]
 nanomodem = { workspace = true }
 nanomodem-demo = { workspace = true }
+nanomodem-cli = { workspace = true }
 
 [dependency-groups]
 dev = [
@@ -29,10 +31,12 @@ testpaths = [
     "packages/nanomodem/src/nanomodem/core/transports/tests",
     "packages/nanomodem/src/nanomodem/positioning/tests",
     "packages/nanomodem-demo/tests",
+    "packages/nanomodem-cli/tests",
 ]
 pythonpath = [
     "packages/nanomodem/src",
     "packages/nanomodem-demo/src",
+    "packages/nanomodem-cli/src",
 ]
 python_classes = []
 
@@ -40,7 +44,7 @@ python_classes = []
 python_version = "3.12"
 strict = true
 ignore_missing_imports = true
-mypy_path = "packages/nanomodem/src:packages/nanomodem-demo/src"
+mypy_path = "packages/nanomodem/src:packages/nanomodem-demo/src:packages/nanomodem-cli/src"
 
 [tool.ruff]
 line-length = 120
@@ -60,10 +64,11 @@ line-ending = "auto"
 version_toml = [
     "packages/nanomodem/pyproject.toml:project.version",
     "packages/nanomodem-demo/pyproject.toml:project.version",
+    "packages/nanomodem-cli/pyproject.toml:project.version",
 ]
 tag_format = "v{version}"
 commit_parser = "conventional"
 build_command = """
-uv lock --upgrade-package nanomodem --upgrade-package nanomodem-demo
+uv lock --upgrade-package nanomodem --upgrade-package nanomodem-demo --upgrade-package nanomodem-cli
 git add uv.lock
 """

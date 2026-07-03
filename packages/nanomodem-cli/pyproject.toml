@@ -1,0 +1,33 @@
+[project]
+name = "nanomodem-cli"
+version = "0.1.0"
+description = "Command-line interface for nanomodem acoustic modems"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "nanomodem",
+    "pyserial>=3.5",
+]
+
+[project.scripts]
+nanomodem = "nanomodem_cli.__main__:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/nanomodem_cli"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src"]
+
+[tool.hatch.build.targets.wheel.sources]
+"src" = ""
+
+[tool.uv.sources]
+nanomodem = { workspace = true }
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

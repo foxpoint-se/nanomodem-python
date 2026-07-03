@@ -94,8 +94,13 @@ class ModemNode(Generic[T]):
     def on_received_unicast(self, callback: Callable[[T], None]) -> None:
         self._on_received_unicast = callback
 
-    def on_roundtrip_response(self, callback: Callable[[str, int], None]) -> None:
+    def on_roundtrip_response(
+        self,
+        callback: Callable[[str, int], None] | None,
+    ) -> Callable[[str, int], None] | None:
+        prior = self._on_roundtrip_response
         self._on_roundtrip_response = callback
+        return prior
 
     def on_status_response(
         self,
