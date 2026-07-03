@@ -6,7 +6,6 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "nanomodem",
-    "prompt_toolkit>=3.0",
     "pyserial>=3.5",
 ]
 

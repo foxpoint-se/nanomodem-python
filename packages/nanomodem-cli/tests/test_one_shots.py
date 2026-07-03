@@ -127,7 +127,7 @@ def test__should_exit_with_error_on_serial_id_mismatch(mock_serial_class: MagicM
 
     assert code == 1
     assert "Node id mismatch" in stderr
-    assert "nanomodem -n 002" in stderr
+    assert "nanomodem -n 002 -s /dev/ttyUSB0" in stderr
 
 
 def test__should_execute_status_on_modem_node() -> None:

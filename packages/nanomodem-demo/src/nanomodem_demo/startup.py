@@ -7,8 +7,26 @@ import threading
 from typing import Callable
 
 from nanomodem import PositioningNode
+from nanomodem.core.transports.in_memory import InMemoryTransport
+from nanomodem.core.transports.serial_wire import SerialWireTransport
 from nanomodem.core.wire_types import StatusResponseEvent
 from nanomodem.errors import ModemIdMismatchError, ModemStatusTimeoutError
+
+from nanomodem_demo.transports import SimulatorJsonTransport
+
+
+def _format_demo_restart_hint(node: PositioningNode, exc: ModemIdMismatchError) -> str:
+    transport = node.modem_node.transport
+    if isinstance(transport, SerialWireTransport):
+        return f"Restart with: nanomodem-controller {exc.actual_id} --port {transport.port}"
+    if isinstance(transport, SimulatorJsonTransport):
+        return (
+            f"Restart with: nanomodem-controller {exc.actual_id} "
+            f"--network {transport._host}:{transport._port}"
+        )
+    if isinstance(transport, InMemoryTransport):
+        return f"Restart with: nanomodem-controller {exc.actual_id}"
+    return f"Restart with: nanomodem-controller {exc.actual_id}"
 
 
 def verify_modem_id_at_startup(node: PositioningNode, timeout_s: float = 2.0) -> None:
@@ -33,14 +51,10 @@ def verify_modem_id_at_startup(node: PositioningNode, timeout_s: float = 2.0) ->
             raise ModemIdMismatchError(node.node_id, status.address)
     except ModemIdMismatchError as exc:
         print(f"\nError: {exc}\n", file=sys.stderr)
-        print(
-            f"Restart with: nanomodem-controller {exc.actual_id} --port /dev/ttyUSB0\n",
-            file=sys.stderr,
-        )
+        print(f"{_format_demo_restart_hint(node, exc)}\n", file=sys.stderr)
         sys.exit(1)
     except ModemStatusTimeoutError as exc:
         print(f"\nError: {exc}\n", file=sys.stderr)
         sys.exit(1)
     finally:
         node.modem_node.on_status_response(prior_status)
-
