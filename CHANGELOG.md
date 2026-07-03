@@ -2,6 +2,28 @@
 
 <!-- version list -->
 
+## v4.1.0 (2026-07-03)
+
+### Bug Fixes
+
+- Address Copilot review on CLI callback and error handling
+  ([`017a6ef`](https://github.com/foxpoint-se/nanomodem-python/commit/017a6ef473e3a01972aaf357fcf7e4d0250b1aca))
+
+- Address follow-up review on transport API and CLI help
+  ([`645e7c1`](https://github.com/foxpoint-se/nanomodem-python/commit/645e7c1cce92b1783a65a437b6118c56cd6459a1))
+
+- Tighten CLI review follow-ups on deps and error hints
+  ([`a8e94dc`](https://github.com/foxpoint-se/nanomodem-python/commit/a8e94dc5e1b1c1714f77a9ea606d83ad366a2dbd))
+
+- Validate CLI node ids and sound speed before startup
+  ([`6aeb2ca`](https://github.com/foxpoint-se/nanomodem-python/commit/6aeb2cad53abe4dd5542a9b9e102188dad830bb7))
+
+### Features
+
+- **nanomodem-cli**: Add one-shot status and ping commands
+  ([`2657c42`](https://github.com/foxpoint-se/nanomodem-python/commit/2657c420c058d1a2f40655fc594873131890e77e))
+
+
 ## v4.0.0 (2026-07-02)
 
 ### Refactoring
