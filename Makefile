@@ -34,7 +34,7 @@ format:
 	uv run ruff format packages & uv run ruff check packages --fix
 
 typecheck:
-	uv run mypy packages/nanomodem/src packages/nanomodem-demo/src
+	uv run mypy packages/nanomodem/src packages/nanomodem-demo/src packages/nanomodem-cli/src
 
 test: lint typecheck
 	uv run pytest
