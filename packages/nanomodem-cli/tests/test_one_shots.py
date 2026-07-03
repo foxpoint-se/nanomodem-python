@@ -61,6 +61,27 @@ def test__should_fail_when_transport_missing_for_one_shot() -> None:
     assert "transport" in stderr.lower()
 
 
+def test__should_fail_when_node_id_is_invalid_for_one_shot() -> None:
+    code, _stdout, stderr = _run_cli(["-n", "abc", "-m", "status"])
+
+    assert code == 1
+    assert "--node-id" in stderr
+
+
+def test__should_fail_when_sound_speed_is_invalid_for_one_shot() -> None:
+    code, _stdout, stderr = _run_cli(["-n", "001", "-m", "--sound-speed", "-1", "status"])
+
+    assert code == 1
+    assert "sound_speed" in stderr
+
+
+def test__should_fail_when_ping_target_id_is_invalid() -> None:
+    code, _stdout, stderr = _run_cli(["-n", "001", "-m", "ping", "bad"])
+
+    assert code == 1
+    assert "ping target_id" in stderr
+
+
 def _mock_serial_port(responses_by_write: dict[int, bytes]) -> MagicMock:
     mock_port = MagicMock()
     mock_port.is_open = True

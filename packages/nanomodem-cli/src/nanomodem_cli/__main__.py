@@ -15,6 +15,7 @@ from nanomodem.core.transports.serial_wire import SerialWireTransport
 
 from .one_shot import execute_ping, execute_status
 from .startup import verify_modem_id_at_startup
+from .validation import validate_one_shot_args
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -57,17 +58,8 @@ def _create_transport(args: argparse.Namespace) -> WireTransport:
     sys.exit(1)
 
 
-def _validate_one_shot_args(args: argparse.Namespace) -> None:
-    if not args.node_id:
-        print("Error: --node-id is required for one-shot commands.", file=sys.stderr)
-        sys.exit(1)
-    if not args.serial and not args.in_memory:
-        print("Error: A transport (--serial or --in-memory) must be specified for one-shot commands.", file=sys.stderr)
-        sys.exit(1)
-
-
 def _run_one_shot(args: argparse.Namespace) -> int:
-    _validate_one_shot_args(args)
+    validate_one_shot_args(args)
     transport = _create_transport(args)
     node = ModemNode(node_id=args.node_id, transport=transport, codec=RawPayloadCodec())
 
