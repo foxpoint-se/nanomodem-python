@@ -10,9 +10,7 @@ class ModemIdMismatchError(Exception):
         self.expected_id = expected_id
         self.actual_id = actual_id
         super().__init__(
-            f"Node id mismatch: you started as {expected_id} but the modem reports "
-            f"{actual_id}. Restart with the correct id, e.g. "
-            f"nanomodem-controller {actual_id} --port /dev/ttyUSB0",
+            f"Node id mismatch: expected {expected_id}, modem reports {actual_id}.",
         )
 
 

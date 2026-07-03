@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import sys
 import threading
+from typing import Callable
 
 from nanomodem.core.modem_node import ModemNode
 from nanomodem.core.spec import supply_voltage_volts, timestamp_to_distance
@@ -17,7 +18,7 @@ def execute_status(node: ModemNode[bytes], timeout_s: float = STATUS_TIMEOUT_S) 
     """Query modem status and print id and voltage."""
     received: list[StatusResponseEvent] = []
     done = threading.Event()
-    prior = node.on_status_response(None)
+    prior: Callable[[StatusResponseEvent], None] | None = None
 
     def capture(status: StatusResponseEvent) -> None:
         received.append(status)
@@ -25,7 +26,7 @@ def execute_status(node: ModemNode[bytes], timeout_s: float = STATUS_TIMEOUT_S) 
         if prior is not None:
             prior(status)
 
-    node.on_status_response(capture)
+    prior = node.on_status_response(capture)
     try:
         node.query_status()
         if not done.wait(timeout_s):
@@ -52,22 +53,28 @@ def execute_ping(
     """Ping a target node and print range in meters."""
     received_timestamp: int | None = None
     done = threading.Event()
+    prior: Callable[[str, int], None] | None = None
 
     def capture(responder_id: str, timestamp_counts: int) -> None:
         nonlocal received_timestamp
         if responder_id == target_id:
             received_timestamp = timestamp_counts
             done.set()
+        if prior is not None:
+            prior(responder_id, timestamp_counts)
 
-    node.on_roundtrip_response(capture)
-    node.ping(target_id)
-    if not done.wait(timeout_s):
-        print(
-            f"Error: Timed out after {timeout_s}s waiting for ping response from {target_id}.",
-            file=sys.stderr,
-        )
-        return 1
-    assert received_timestamp is not None
-    distance = timestamp_to_distance(received_timestamp, sound_speed)
-    print(f"range {target_id}: {distance:.0f} m")
-    return 0
+    prior = node.on_roundtrip_response(capture)
+    try:
+        node.ping(target_id)
+        if not done.wait(timeout_s):
+            print(
+                f"Error: Timed out after {timeout_s}s waiting for ping response from {target_id}.",
+                file=sys.stderr,
+            )
+            return 1
+        assert received_timestamp is not None
+        distance = timestamp_to_distance(received_timestamp, sound_speed)
+        print(f"range {target_id}: {distance:.0f} m")
+        return 0
+    finally:
+        node.on_roundtrip_response(prior)

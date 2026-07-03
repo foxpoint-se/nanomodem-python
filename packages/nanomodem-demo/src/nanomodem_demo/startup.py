@@ -15,15 +15,15 @@ def verify_modem_id_at_startup(node: PositioningNode, timeout_s: float = 2.0) ->
     """Run $? and exit the process if the modem id does not match the node."""
     received: list[StatusResponseEvent] = []
     done = threading.Event()
-    prior: Callable[[StatusResponseEvent], None] | None = None
+    prior_status: Callable[[StatusResponseEvent], None] | None = None
 
     def capture(status: StatusResponseEvent) -> None:
         received.append(status)
         done.set()
-        if prior is not None:
-            prior(status)
+        if prior_status is not None:
+            prior_status(status)
 
-    prior = node.modem_node.on_status_response(capture)
+    prior_status = node.modem_node.on_status_response(capture)
     try:
         node.query_modem_status()
         if not done.wait(timeout_s):
@@ -31,9 +31,16 @@ def verify_modem_id_at_startup(node: PositioningNode, timeout_s: float = 2.0) ->
         status = received[0]
         if status.address != node.node_id:
             raise ModemIdMismatchError(node.node_id, status.address)
-    except (ModemIdMismatchError, ModemStatusTimeoutError) as exc:
+    except ModemIdMismatchError as exc:
+        print(f"\nError: {exc}\n", file=sys.stderr)
+        print(
+            f"Restart with: nanomodem-controller {exc.actual_id} --port /dev/ttyUSB0\n",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    except ModemStatusTimeoutError as exc:
         print(f"\nError: {exc}\n", file=sys.stderr)
         sys.exit(1)
     finally:
-        node.modem_node.on_status_response(prior)
+        node.modem_node.on_status_response(prior_status)
 

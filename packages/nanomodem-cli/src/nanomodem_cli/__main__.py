@@ -35,9 +35,6 @@ def _build_parser() -> argparse.ArgumentParser:
         default=SOUND_SPEED_WATER_M_S,
         help=f"Speed of sound in m/s (default: {SOUND_SPEED_WATER_M_S})",
     )
-    parser.add_argument("--log-events", action="store_true", help="Print parsed modem events to stdout")
-    parser.add_argument("--log-wire", action="store_true", help="Print raw wire bytes (serial only) to stdout")
-
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
     subparsers.add_parser("status", help="Query modem ID and voltage")
     ping_parser = subparsers.add_parser("ping", help="Range to target node ID")
