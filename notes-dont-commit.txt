@@ -1,0 +1,130 @@
+bygg nåt enkelt som simulerar två noder
+ett gui. ett program. kan instantiera flera klasser vid behov
+KLART
+
+på nåt sätt mocka serial, om jag inte sätter upp en serial på riktigt.
+KLART
+
+tänk också på att det ska gå att plutta in dom riktiga grejerna också.
+KLART
+
+kanske ska börja med abstraktionen att skicka nåt överhuvudtaget?
+säg att det är ett gui med ett inputfält
+då kan man skicka vad som helst där
+måste printa ut vad som kommer tillbaka också. inklusive den egna devicens prints
+när man skickar kan det gå ut på serial. med com och baudrate
+eller så kan jag ersätta det med nån lokal abstraktion som mockar det.
+kanske en bra början? 
+KLART
+
+Nästa grej????
+A node should store its recorded distances to each other node.
+KLART
+
+So if node A pings B, C and D, it should keep a record of this.
+When a node has distances from three or more other nodes, it should calculate the intersection point between the circles that these
+KLART
+
+Också: rensa upp och lägg i en folder
+KLART
+
+Poetry eller inte?
+Men sen installera scipy och börja plutta ut jevla plutten
+KLART
+
+Formula breakdown:
+d = measured distance from ping (3D diagonal distance from host to beacon)
+z_host = host depth (from pressure sensor, e.g., 10 m below surface)
+z_beacon = beacon depth (surface beacons: 0 m, or known if submerged)
+Example:
+Beacon on surface: z_beacon = 0
+Host at 10 m depth: z_host = 10
+Measured distance: d = 15 m (diagonal)
+Calculate 2D distance:
+2D_distance = sqrt(15² - (10 - 0)²)            = sqrt(225 - 100)            = sqrt(125)            = 11.18 m
+This is the horizontal distance (radius of the circle in the x-y plane at depth 10 m).
+In your case:
+Surface beacons: z_beacon = 0
+Host depth: z_host from pressure sensor
+Use the formula to get the horizontal circle radius for each beacon
+KLART
+
+- [KLART] det här funkar inte från readmen
+    export PYTHONPATH=$PYTHONPATH:$(pwd)/src
+    python3 -m foxpoint.nanomodem
+- [KLART] kolla planen
+    ska codec verkligen gå in i driver???
+        fråga i ask mode
+        amen kanske ändå. kolla hur den skickas in i transport
+        JAPP. den ska va där
+    vad är .start och .stop? i exemplen
+        JAPP. vi ska ha dom. det är för att läsa serial
+- [KLART] automatiskt ta bort brancher i gh
+- [KLART] få med koordinater
+- [KLART] måste kunna skicka tillbaka koordinater, så att en nod kan veta de andras
+- [KLART] nåt mellanlager för att skicka våra meddelanden
+- [KLART] få in en karta, så det blir riktiga koordinater och meter
+- [KLART] måste fixa problemet som står i chatten. ska inte behöva min egen position.
+- [KLART] den nya launchfilen funkar inte? går inte att range:a till en nod när man lagt till den. varför?
+    - eller nej... den noden finns ju inte??! då är allt i sin ordning.
+- [KLART] göra så den använder nån seriell brygga i mock-läge
+- [KLART] måste förbättra senaste iterationen:
+    - det är en "simulated" markör där hela tiden. vafan är det?
+    - behöver en launch-fil som bara startar en controller. det är scenariot vi kommer använda sen
+    - ska inte instansiera controllers med position? det är bättre att sätta själv tror jag
+    - varför blinkar den?
+    - går den att göra snyggare?
+    - går det att göra markörerna snyggare? så att man ser vad som är simulerad plus mer
+    - går det att göra editeringen bättre? fula knappar för P och D t ex
+    - behöver en markör när man klickar på kartan
+    - behöver kunna pejsta in en position med text
+    - uppdateras verkligen range:n när man byter position på en nod för en andra gång?
+- [KLART] nu finns kalkylering även i broker-skriptet? detta måste gå att konsolidera. fanns även nån annan. alla borde använda samma?
+
+Varför heter saker v3?? Aha för versionen av nanomodem kanske?
+KLART
+
+- få med djup
+KLART
+
+- kunna sätta koordinater i gui:t även när man kör på riktigt
+KLART
+
+==== allt ovan är gjort typ
+
+- få med kodade meddelanden
+- skriv om föreningen på hemsidan?
+- försök göra den snyggare om det går
+- en annan grej som vore bra: om man kan dra igång varsin launchfil, men att dom kan kommunicera. hur skulle det gå till? kanske en seriell länk?
+- discord notifications? går det också att få med nån changelog i meddelandet?
+- uppdatera importerade github actions, så jag slipper varning om node 20
+- verkar inte som att version i lock-filen funkade?
+- riktigt scenario. en nod. seriell. kan jag också se vad som skrivs?
+- kan man dessutom mocka ett annat modem? den agerar enbart som modemet. finns inga custom funktioner
+- ta en kik på codec. hur ska man koda meddelanden
+- möjlighet att sätta ID på noden också. ska skicka det kommandot och även sätta det på nod-klassen.
+
+Be agenten om förslag på refaktor.
+Ta bort onödigt junk.
+
+skript för att hitta portarna?
+
+se till att alla kommandon stöds.
+    t ex hantera att sätta id och sånt
+    och att starta utan ID och sätta det sen? kanske?
+
+ha ett proper CLI? nåt som initierar python-klasserna och sen kan man köra saker
+    och få ganska rå output
+
+One "bonus" feature for the Simulator:
+The Simulator could have a button: "Broadcast All Beacon Positions."
+It sends out $B messages for every node it knows about.
+Your Controller hears these and automatically populates its registry.
+This is exactly how you'd do it in the boat (you'd have the beacons broadcast their locations periodically).
+
+Prata om det där. Är det kanske det som är mitt "hårdkoda in dom andra noderna" när vi gör våra tester?
+Eller det kanske mejkar sense att man gör det från kontrollern? Uh. Jag vet inte.
+
+måste fixa bättre ikoner. Den har glömt bort det.
+måste fixa samma gränssnitt i simulatorn som i kontrollern
+zooma ut
